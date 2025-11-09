@@ -1,16 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, CheckCircle, Target, XCircle, Ban, StopCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, Target, XCircle } from "lucide-react";
 
 interface SummaryData {
   overallTarget: number;
   totalSubmissions: number;
-  validSubmissions: number;
-  validPercentage: number;
-  invalidSubmissions: number;
-  invalidPercentage: number;
-  forceApproved: number;
-  forceCancelled: number;
-  terminated: number;
+  approvedSubmissions: number;
+  approvalRate: number;
+  notApprovedSubmissions: number;
+  notApprovedRate: number;
 }
 
 interface SummaryCardsProps {
@@ -32,34 +29,16 @@ export function SummaryCards({ data }: SummaryCardsProps) {
       variant: "default" as const,
     },
     {
-      title: "Valid Submissions",
-      value: `${data.validSubmissions.toLocaleString()} (${data.validPercentage}%)`,
+      title: "Approved Submissions",
+      value: `${data.approvedSubmissions.toLocaleString()} (${data.approvalRate}%)`,
       icon: CheckCircle,
       variant: "success" as const,
     },
     {
-      title: "Invalid Submissions",
-      value: `${data.invalidSubmissions.toLocaleString()} (${data.invalidPercentage}%)`,
+      title: "Not Approved Submissions",
+      value: `${data.notApprovedSubmissions.toLocaleString()} (${data.notApprovedRate}%)`,
       icon: XCircle,
       variant: "destructive" as const,
-    },
-    {
-      title: "Force Approved",
-      value: data.forceApproved.toLocaleString(),
-      icon: CheckCircle,
-      variant: "default" as const,
-    },
-    {
-      title: "Force Cancelled",
-      value: data.forceCancelled.toLocaleString(),
-      icon: Ban,
-      variant: "default" as const,
-    },
-    {
-      title: "Terminated",
-      value: data.terminated.toLocaleString(),
-      icon: StopCircle,
-      variant: "warning" as const,
     },
   ];
 
@@ -69,8 +48,6 @@ export function SummaryCards({ data }: SummaryCardsProps) {
         return "border-success/20 bg-success/5";
       case "destructive":
         return "border-destructive/20 bg-destructive/5";
-      case "warning":
-        return "border-warning/20 bg-warning/5";
       default:
         return "";
     }
@@ -82,8 +59,6 @@ export function SummaryCards({ data }: SummaryCardsProps) {
         return "text-success";
       case "destructive":
         return "text-destructive";
-      case "warning":
-        return "text-warning";
       default:
         return "text-primary";
     }

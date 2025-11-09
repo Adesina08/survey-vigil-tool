@@ -1,29 +1,33 @@
-export type Status = "Valid" | "Invalid" | "Terminated";
+export type ApprovalStatus = "Approved" | "Not Approved";
 export type Gender = "Male" | "Female";
 export type AgeGroup = "18-25" | "26-35" | "36-45" | "46+";
-export type ErrorType = "Odd Hour" | "Low LOI" | "Outside LGA" | "Duplicate";
+export type ErrorType =
+  | "Odd Hour"
+  | "Low LOI"
+  | "Outside LGA Boundary"
+  | "Duplicate Phone";
 
 export interface SheetSubmissionRow {
   "Submission ID": string;
   "Submission Date": string;
   "Submission Time": string;
-  "Interviewer ID": string;
-  "Interviewer Name": string;
+  "A1. Enumerator ID": string;
+  "Enumerator Name": string;
+  "Interviewer ID"?: string;
+  "Interviewer Name"?: string;
   State: string;
-  LGA: string;
+  "A3. select the LGA": string;
+  LGA?: string;
   "Age Group": AgeGroup;
   Gender: Gender;
-  "Outcome Status": Status;
-  "Force Approved": "Yes" | "No";
-  "Force Cancelled": "Yes" | "No";
-  Terminated: "Yes" | "No";
-  "Odd Hour Flag": "Yes" | "No";
-  "Low LOI Flag": "Yes" | "No";
-  "Outside LGA Flag": "Yes" | "No";
-  "Duplicate Flag": "Yes" | "No";
+  "Approval Status": ApprovalStatus;
+  "Outcome Status"?: "Valid" | "Invalid";
+  "Error Flags": ErrorType[];
   "Interview Length (mins)": number;
-  Latitude: number;
-  Longitude: number;
+  "_A5. GPS Coordinates_latitude": number;
+  "_A5. GPS Coordinates_longitude": number;
+  Latitude?: number;
+  Longitude?: number;
 }
 
 export interface SheetStateTargetRow {
@@ -44,21 +48,18 @@ export interface SheetStateGenderTargetRow {
 }
 
 interface BaseSubmissionDefinition {
-  interviewerId: string;
-  interviewerName: string;
-  state: string;
+  enumeratorId: string;
+  enumeratorName: string;
   lga: string;
   ageGroup: AgeGroup;
   gender: Gender;
-  status: Status;
-  count: number;
+  approved: number;
+  notApproved: number;
   baseTimestamp: string;
   latitude: number;
   longitude: number;
   interviewLength: number;
-  forceApproved?: number;
-  forceCancelled?: number;
-  errorCounts?: Partial<Record<ErrorType, number>>;
+  errorDistribution?: Partial<Record<ErrorType, number>>;
 }
 
 const padNumber = (value: number, length = 4) => value.toString().padStart(length, "0");
@@ -76,430 +77,213 @@ const formatTimePart = (date: Date) => {
   return `${hours}:${minutes}`;
 };
 
-const ERROR_COLUMN_MAP: Record<ErrorType, keyof SheetSubmissionRow> = {
-  "Odd Hour": "Odd Hour Flag",
-  "Low LOI": "Low LOI Flag",
-  "Outside LGA": "Outside LGA Flag",
-  Duplicate: "Duplicate Flag",
+const jitterCoordinate = (value: number, index: number, scale = 0.0025) => {
+  const offset = ((index % 5) - 2) * scale;
+  return Number((value + offset).toFixed(5));
 };
 
 const baseDefinitions: BaseSubmissionDefinition[] = [
-  // Lagos valid submissions
   {
-    interviewerId: "INT-001",
-    interviewerName: "Amaka I.",
-    state: "Lagos",
-    lga: "Ikeja",
+    enumeratorId: "OGN-001",
+    enumeratorName: "Adeola A.",
+    lga: "Abeokuta North",
     ageGroup: "18-25",
     gender: "Female",
-    status: "Valid",
-    count: 421,
-    baseTimestamp: "2024-01-15T08:00:00Z",
-    latitude: 6.6018,
-    longitude: 3.3515,
+    approved: 32,
+    notApproved: 6,
+    baseTimestamp: "2024-02-01T08:00:00Z",
+    latitude: 7.1606,
+    longitude: 3.3501,
     interviewLength: 34,
-    forceApproved: 10,
+    errorDistribution: {
+      "Odd Hour": 3,
+      "Low LOI": 2,
+      "Outside LGA Boundary": 1,
+    },
   },
   {
-    interviewerId: "INT-002",
-    interviewerName: "Bisi A.",
-    state: "Lagos",
-    lga: "Surulere",
+    enumeratorId: "OGN-001",
+    enumeratorName: "Adeola A.",
+    lga: "Abeokuta North",
     ageGroup: "26-35",
-    gender: "Male",
-    status: "Valid",
-    count: 433,
-    baseTimestamp: "2024-01-15T08:10:00Z",
-    latitude: 6.5013,
-    longitude: 3.3560,
-    interviewLength: 36,
-    forceApproved: 10,
-  },
-  {
-    interviewerId: "INT-001",
-    interviewerName: "Amaka I.",
-    state: "Lagos",
-    lga: "Ikeja",
-    ageGroup: "36-45",
     gender: "Female",
-    status: "Valid",
-    count: 412,
-    baseTimestamp: "2024-01-15T08:20:00Z",
-    latitude: 6.6018,
-    longitude: 3.3515,
-    interviewLength: 35,
-    forceApproved: 10,
-  },
-  {
-    interviewerId: "INT-002",
-    interviewerName: "Bisi A.",
-    state: "Lagos",
-    lga: "Eti-Osa",
-    ageGroup: "46+",
-    gender: "Male",
-    status: "Valid",
-    count: 421,
-    baseTimestamp: "2024-01-15T08:30:00Z",
-    latitude: 6.4592,
-    longitude: 3.6015,
-    interviewLength: 37,
-    forceApproved: 10,
-  },
-  // Abuja valid submissions
-  {
-    interviewerId: "INT-003",
-    interviewerName: "Chinedu K.",
-    state: "FCT Abuja",
-    lga: "Gwagwalada",
-    ageGroup: "18-25",
-    gender: "Female",
-    status: "Valid",
-    count: 245,
-    baseTimestamp: "2024-01-16T09:15:00Z",
-    latitude: 8.9620,
-    longitude: 7.0795,
+    approved: 28,
+    notApproved: 4,
+    baseTimestamp: "2024-02-01T10:15:00Z",
+    latitude: 7.1606,
+    longitude: 3.3501,
     interviewLength: 33,
-    forceApproved: 7,
+    errorDistribution: {
+      "Odd Hour": 2,
+      "Duplicate Phone": 1,
+    },
   },
   {
-    interviewerId: "INT-004",
-    interviewerName: "Dami S.",
-    state: "FCT Abuja",
-    lga: "Bwari",
+    enumeratorId: "OGN-002",
+    enumeratorName: "Tosin B.",
+    lga: "Abeokuta South",
     ageGroup: "26-35",
     gender: "Male",
-    status: "Valid",
-    count: 251,
-    baseTimestamp: "2024-01-16T09:25:00Z",
-    latitude: 9.3056,
-    longitude: 7.3878,
-    interviewLength: 32,
-    forceApproved: 7,
-  },
-  {
-    interviewerId: "INT-003",
-    interviewerName: "Chinedu K.",
-    state: "FCT Abuja",
-    lga: "Abaji",
-    ageGroup: "36-45",
-    gender: "Female",
-    status: "Valid",
-    count: 242,
-    baseTimestamp: "2024-01-16T09:35:00Z",
-    latitude: 8.4754,
-    longitude: 6.9443,
-    interviewLength: 34,
-    forceApproved: 7,
-  },
-  {
-    interviewerId: "INT-004",
-    interviewerName: "Dami S.",
-    state: "FCT Abuja",
-    lga: "Kuje",
-    ageGroup: "46+",
-    gender: "Male",
-    status: "Valid",
-    count: 243,
-    baseTimestamp: "2024-01-16T09:45:00Z",
-    latitude: 8.8795,
-    longitude: 7.2299,
-    interviewLength: 35,
-    forceApproved: 7,
-  },
-  // Kano valid submissions
-  {
-    interviewerId: "INT-005",
-    interviewerName: "Farida M.",
-    state: "Kano",
-    lga: "Nassarawa",
-    ageGroup: "18-25",
-    gender: "Female",
-    status: "Valid",
-    count: 180,
-    baseTimestamp: "2024-01-17T10:10:00Z",
-    latitude: 12.0022,
-    longitude: 8.5920,
-    interviewLength: 32,
-    forceApproved: 6,
-  },
-  {
-    interviewerId: "INT-006",
-    interviewerName: "Gambo Y.",
-    state: "Kano",
-    lga: "Tarauni",
-    ageGroup: "26-35",
-    gender: "Male",
-    status: "Valid",
-    count: 142,
-    baseTimestamp: "2024-01-17T10:20:00Z",
-    latitude: 12.0041,
-    longitude: 8.5619,
-    interviewLength: 33,
-    forceApproved: 5,
-  },
-  {
-    interviewerId: "INT-005",
-    interviewerName: "Farida M.",
-    state: "Kano",
-    lga: "Gwale",
-    ageGroup: "36-45",
-    gender: "Female",
-    status: "Valid",
-    count: 130,
-    baseTimestamp: "2024-01-17T10:30:00Z",
-    latitude: 11.9986,
-    longitude: 8.5167,
+    approved: 30,
+    notApproved: 6,
+    baseTimestamp: "2024-02-02T09:00:00Z",
+    latitude: 7.1475,
+    longitude: 3.3619,
     interviewLength: 31,
-    forceApproved: 5,
+    errorDistribution: {
+      "Low LOI": 3,
+      "Duplicate Phone": 2,
+    },
   },
   {
-    interviewerId: "INT-006",
-    interviewerName: "Gambo Y.",
-    state: "Kano",
-    lga: "Kumbotso",
-    ageGroup: "46+",
+    enumeratorId: "OGN-002",
+    enumeratorName: "Tosin B.",
+    lga: "Abeokuta South",
+    ageGroup: "36-45",
     gender: "Male",
-    status: "Valid",
-    count: 125,
-    baseTimestamp: "2024-01-17T10:40:00Z",
-    latitude: 11.8900,
-    longitude: 8.5556,
+    approved: 25,
+    notApproved: 6,
+    baseTimestamp: "2024-02-02T11:20:00Z",
+    latitude: 7.1475,
+    longitude: 3.3619,
+    interviewLength: 32,
+    errorDistribution: {
+      "Odd Hour": 2,
+      "Outside LGA Boundary": 2,
+    },
+  },
+  {
+    enumeratorId: "OGN-003",
+    enumeratorName: "Ibrahim C.",
+    lga: "Sagamu",
+    ageGroup: "18-25",
+    gender: "Male",
+    approved: 24,
+    notApproved: 4,
+    baseTimestamp: "2024-02-03T08:40:00Z",
+    latitude: 6.8432,
+    longitude: 3.6464,
+    interviewLength: 30,
+    errorDistribution: {
+      "Odd Hour": 2,
+      "Duplicate Phone": 1,
+    },
+  },
+  {
+    enumeratorId: "OGN-003",
+    enumeratorName: "Ibrahim C.",
+    lga: "Sagamu",
+    ageGroup: "46+",
+    gender: "Female",
+    approved: 24,
+    notApproved: 3,
+    baseTimestamp: "2024-02-03T10:05:00Z",
+    latitude: 6.8432,
+    longitude: 3.6464,
+    interviewLength: 29,
+    errorDistribution: {
+      "Low LOI": 2,
+    },
+  },
+  {
+    enumeratorId: "OGN-004",
+    enumeratorName: "Sade D.",
+    lga: "Ijebu Ode",
+    ageGroup: "18-25",
+    gender: "Female",
+    approved: 26,
+    notApproved: 5,
+    baseTimestamp: "2024-02-04T09:30:00Z",
+    latitude: 6.8198,
+    longitude: 3.9173,
+    interviewLength: 35,
+    errorDistribution: {
+      "Outside LGA Boundary": 2,
+      "Duplicate Phone": 1,
+    },
+  },
+  {
+    enumeratorId: "OGN-004",
+    enumeratorName: "Sade D.",
+    lga: "Ijebu Ode",
+    ageGroup: "36-45",
+    gender: "Female",
+    approved: 26,
+    notApproved: 6,
+    baseTimestamp: "2024-02-04T11:10:00Z",
+    latitude: 6.8198,
+    longitude: 3.9173,
     interviewLength: 34,
-    forceApproved: 5,
-  },
-  // Lagos invalid submissions
-  {
-    interviewerId: "INT-001",
-    interviewerName: "Amaka I.",
-    state: "Lagos",
-    lga: "Surulere",
-    ageGroup: "18-25",
-    gender: "Female",
-    status: "Invalid",
-    count: 60,
-    baseTimestamp: "2024-01-18T07:30:00Z",
-    latitude: 6.5013,
-    longitude: 3.3560,
-    interviewLength: 18,
-    forceCancelled: 3,
-    errorCounts: { "Odd Hour": 60 },
+    errorDistribution: {
+      "Odd Hour": 3,
+      "Low LOI": 2,
+    },
   },
   {
-    interviewerId: "INT-002",
-    interviewerName: "Bisi A.",
-    state: "Lagos",
-    lga: "Ikeja",
+    enumeratorId: "OGN-005",
+    enumeratorName: "Kunle E.",
+    lga: "Ifo",
     ageGroup: "26-35",
-    gender: "Male",
-    status: "Invalid",
-    count: 70,
-    baseTimestamp: "2024-01-18T07:40:00Z",
-    latitude: 6.6018,
-    longitude: 3.3515,
-    interviewLength: 17,
-    forceCancelled: 3,
-    errorCounts: { "Low LOI": 70 },
-  },
-  {
-    interviewerId: "INT-001",
-    interviewerName: "Amaka I.",
-    state: "Lagos",
-    lga: "Ikeja",
-    ageGroup: "36-45",
     gender: "Female",
-    status: "Invalid",
-    count: 59,
-    baseTimestamp: "2024-01-18T07:50:00Z",
-    latitude: 6.6018,
-    longitude: 3.3515,
-    interviewLength: 19,
-    forceCancelled: 3,
-    errorCounts: { "Outside LGA": 40, Duplicate: 19 },
-  },
-  // Abuja invalid submissions
-  {
-    interviewerId: "INT-003",
-    interviewerName: "Chinedu K.",
-    state: "FCT Abuja",
-    lga: "Bwari",
-    ageGroup: "18-25",
-    gender: "Female",
-    status: "Invalid",
-    count: 40,
-    baseTimestamp: "2024-01-18T08:00:00Z",
-    latitude: 9.3056,
-    longitude: 7.3878,
-    interviewLength: 16,
-    forceCancelled: 2,
-    errorCounts: { "Odd Hour": 20, "Low LOI": 20 },
+    approved: 27,
+    notApproved: 4,
+    baseTimestamp: "2024-02-05T08:15:00Z",
+    latitude: 6.817,
+    longitude: 3.195,
+    interviewLength: 33,
+    errorDistribution: {
+      "Low LOI": 2,
+    },
   },
   {
-    interviewerId: "INT-004",
-    interviewerName: "Dami S.",
-    state: "FCT Abuja",
-    lga: "Gwagwalada",
-    ageGroup: "26-35",
-    gender: "Male",
-    status: "Invalid",
-    count: 40,
-    baseTimestamp: "2024-01-18T08:10:00Z",
-    latitude: 8.9620,
-    longitude: 7.0795,
-    interviewLength: 17,
-    forceCancelled: 2,
-    errorCounts: { "Outside LGA": 20, Duplicate: 20 },
-  },
-  {
-    interviewerId: "INT-003",
-    interviewerName: "Chinedu K.",
-    state: "FCT Abuja",
-    lga: "Kuje",
-    ageGroup: "36-45",
-    gender: "Female",
-    status: "Invalid",
-    count: 38,
-    baseTimestamp: "2024-01-18T08:20:00Z",
-    latitude: 8.8795,
-    longitude: 7.2299,
-    interviewLength: 17,
-    forceCancelled: 3,
-    errorCounts: { "Low LOI": 18, Duplicate: 20 },
-  },
-  // Kano invalid submissions
-  {
-    interviewerId: "INT-005",
-    interviewerName: "Farida M.",
-    state: "Kano",
-    lga: "Tarauni",
-    ageGroup: "18-25",
-    gender: "Female",
-    status: "Invalid",
-    count: 50,
-    baseTimestamp: "2024-01-18T08:30:00Z",
-    latitude: 12.0041,
-    longitude: 8.5619,
-    interviewLength: 18,
-    forceCancelled: 2,
-    errorCounts: { "Odd Hour": 30, "Outside LGA": 20 },
-  },
-  {
-    interviewerId: "INT-006",
-    interviewerName: "Gambo Y.",
-    state: "Kano",
-    lga: "Nassarawa",
-    ageGroup: "26-35",
-    gender: "Male",
-    status: "Invalid",
-    count: 49,
-    baseTimestamp: "2024-01-18T08:40:00Z",
-    latitude: 12.0022,
-    longitude: 8.5920,
-    interviewLength: 18,
-    forceCancelled: 2,
-    errorCounts: { "Low LOI": 25, Duplicate: 24 },
-  },
-  {
-    interviewerId: "INT-005",
-    interviewerName: "Farida M.",
-    state: "Kano",
-    lga: "Gwale",
-    ageGroup: "36-45",
-    gender: "Female",
-    status: "Invalid",
-    count: 50,
-    baseTimestamp: "2024-01-18T08:50:00Z",
-    latitude: 11.9986,
-    longitude: 8.5167,
-    interviewLength: 17,
-    forceCancelled: 3,
-    errorCounts: { "Outside LGA": 30, Duplicate: 20 },
-  },
-  // Lagos terminated submissions
-  {
-    interviewerId: "INT-002",
-    interviewerName: "Bisi A.",
-    state: "Lagos",
-    lga: "Eti-Osa",
-    ageGroup: "26-35",
-    gender: "Male",
-    status: "Terminated",
-    count: 32,
-    baseTimestamp: "2024-01-19T06:45:00Z",
-    latitude: 6.4592,
-    longitude: 3.6015,
-    interviewLength: 9,
-  },
-  {
-    interviewerId: "INT-001",
-    interviewerName: "Amaka I.",
-    state: "Lagos",
-    lga: "Ikeja",
+    enumeratorId: "OGN-005",
+    enumeratorName: "Kunle E.",
+    lga: "Ifo",
     ageGroup: "46+",
-    gender: "Female",
-    status: "Terminated",
-    count: 33,
-    baseTimestamp: "2024-01-19T06:55:00Z",
-    latitude: 6.6018,
-    longitude: 3.3515,
-    interviewLength: 10,
-  },
-  // Abuja terminated submissions
-  {
-    interviewerId: "INT-003",
-    interviewerName: "Chinedu K.",
-    state: "FCT Abuja",
-    lga: "Abaji",
-    ageGroup: "36-45",
-    gender: "Female",
-    status: "Terminated",
-    count: 20,
-    baseTimestamp: "2024-01-19T07:05:00Z",
-    latitude: 8.4754,
-    longitude: 6.9443,
-    interviewLength: 9,
-  },
-  {
-    interviewerId: "INT-004",
-    interviewerName: "Dami S.",
-    state: "FCT Abuja",
-    lga: "Gwagwalada",
-    ageGroup: "26-35",
     gender: "Male",
-    status: "Terminated",
-    count: 18,
-    baseTimestamp: "2024-01-19T07:15:00Z",
-    latitude: 8.9620,
-    longitude: 7.0795,
-    interviewLength: 9,
-  },
-  // Kano terminated submissions
-  {
-    interviewerId: "INT-005",
-    interviewerName: "Farida M.",
-    state: "Kano",
-    lga: "Kumbotso",
-    ageGroup: "46+",
-    gender: "Female",
-    status: "Terminated",
-    count: 22,
-    baseTimestamp: "2024-01-19T07:25:00Z",
-    latitude: 11.8900,
-    longitude: 8.5556,
-    interviewLength: 8,
+    approved: 23,
+    notApproved: 5,
+    baseTimestamp: "2024-02-05T09:45:00Z",
+    latitude: 6.817,
+    longitude: 3.195,
+    interviewLength: 31,
+    errorDistribution: {
+      "Odd Hour": 2,
+      "Outside LGA Boundary": 1,
+    },
   },
   {
-    interviewerId: "INT-006",
-    interviewerName: "Gambo Y.",
-    state: "Kano",
-    lga: "Tarauni",
+    enumeratorId: "OGN-006",
+    enumeratorName: "Yemi F.",
+    lga: "Yewa South",
     ageGroup: "18-25",
     gender: "Male",
-    status: "Terminated",
-    count: 21,
-    baseTimestamp: "2024-01-19T07:35:00Z",
-    latitude: 12.0041,
-    longitude: 8.5619,
-    interviewLength: 8,
+    approved: 22,
+    notApproved: 4,
+    baseTimestamp: "2024-02-06T08:50:00Z",
+    latitude: 6.8904,
+    longitude: 3.0171,
+    interviewLength: 32,
+    errorDistribution: {
+      "Duplicate Phone": 2,
+    },
+  },
+  {
+    enumeratorId: "OGN-006",
+    enumeratorName: "Yemi F.",
+    lga: "Yewa South",
+    ageGroup: "36-45",
+    gender: "Male",
+    approved: 25,
+    notApproved: 4,
+    baseTimestamp: "2024-02-06T10:20:00Z",
+    latitude: 6.8904,
+    longitude: 3.0171,
+    interviewLength: 30,
+    errorDistribution: {
+      "Odd Hour": 2,
+      "Low LOI": 1,
+    },
   },
 ];
 
@@ -508,80 +292,81 @@ let submissionCounter = 0;
 export const sheetSubmissions: SheetSubmissionRow[] = baseDefinitions.flatMap((definition) => {
   const rows: SheetSubmissionRow[] = [];
   const baseDate = new Date(definition.baseTimestamp);
-  const forceApprovedLimit = Math.min(definition.forceApproved ?? 0, definition.count);
-  const forceCancelledLimit = Math.min(definition.forceCancelled ?? 0, definition.count);
+  const totalSubmissions = definition.approved + definition.notApproved;
 
-  for (let index = 0; index < definition.count; index += 1) {
-    submissionCounter += 1;
+  const buildRow = (status: ApprovalStatus, index: number): SheetSubmissionRow => {
     const timestamp = new Date(baseDate.getTime());
     timestamp.setMinutes(baseDate.getMinutes() + index);
 
-    const row: SheetSubmissionRow = {
-      "Submission ID": `SUB-${padNumber(submissionCounter, 4)}`,
+    const latitude = jitterCoordinate(definition.latitude, index);
+    const longitude = jitterCoordinate(definition.longitude, index);
+
+    submissionCounter += 1;
+
+    return {
+      "Submission ID": `OGN-${padNumber(submissionCounter, 5)}`,
       "Submission Date": formatDatePart(timestamp),
       "Submission Time": formatTimePart(timestamp),
-      "Interviewer ID": definition.interviewerId,
-      "Interviewer Name": definition.interviewerName,
-      State: definition.state,
+      "A1. Enumerator ID": definition.enumeratorId,
+      "Enumerator Name": definition.enumeratorName,
+      "Interviewer ID": definition.enumeratorId,
+      "Interviewer Name": definition.enumeratorName,
+      State: "Ogun",
+      "A3. select the LGA": definition.lga,
       LGA: definition.lga,
       "Age Group": definition.ageGroup,
       Gender: definition.gender,
-      "Outcome Status": definition.status,
-      "Force Approved": index < forceApprovedLimit ? "Yes" : "No",
-      "Force Cancelled": index < forceCancelledLimit ? "Yes" : "No",
-      Terminated: definition.status === "Terminated" ? "Yes" : "No",
-      "Odd Hour Flag": "No",
-      "Low LOI Flag": "No",
-      "Outside LGA Flag": "No",
-      "Duplicate Flag": "No",
+      "Approval Status": status,
+      "Outcome Status": status === "Approved" ? "Valid" : "Invalid",
+      "Error Flags": [],
       "Interview Length (mins)": definition.interviewLength,
-      Latitude: definition.latitude,
-      Longitude: definition.longitude,
+      "_A5. GPS Coordinates_latitude": latitude,
+      "_A5. GPS Coordinates_longitude": longitude,
+      Latitude: latitude,
+      Longitude: longitude,
     };
+  };
 
-    rows.push(row);
+  for (let index = 0; index < definition.approved; index += 1) {
+    rows.push(buildRow("Approved", index));
   }
 
-  if (definition.errorCounts) {
-    (Object.entries(definition.errorCounts) as Array<[ErrorType, number]>).forEach(([errorType, count]) => {
-      const limit = Math.min(count, rows.length);
-      for (let i = 0; i < limit; i += 1) {
-        const targetRow = rows[i % rows.length];
-        targetRow[ERROR_COLUMN_MAP[errorType]] = "Yes";
-      }
-    });
+  for (let index = definition.approved; index < totalSubmissions; index += 1) {
+    rows.push(buildRow("Not Approved", index));
+  }
+
+  if (definition.errorDistribution) {
+    const notApprovedRows = rows.filter(
+      (row) => row["Approval Status"] === "Not Approved"
+    );
+
+    if (notApprovedRows.length > 0) {
+      Object.entries(definition.errorDistribution).forEach(([errorType, count]) => {
+        for (let index = 0; index < (count ?? 0); index += 1) {
+          const targetRow = notApprovedRows[index % notApprovedRows.length];
+          if (!targetRow["Error Flags"].includes(errorType as ErrorType)) {
+            targetRow["Error Flags"].push(errorType as ErrorType);
+          }
+        }
+      });
+    }
   }
 
   return rows;
 });
 
 export const sheetStateTargets: SheetStateTargetRow[] = [
-  { State: "Lagos", "State Target": 2000 },
-  { State: "FCT Abuja", "State Target": 1500 },
-  { State: "Kano", "State Target": 1500 },
+  { State: "Ogun", "State Target": 400 },
 ];
 
 export const sheetStateAgeTargets: SheetStateAgeTargetRow[] = [
-  { State: "Lagos", "Age Group": "18-25", "Age Group Target": 500 },
-  { State: "Lagos", "Age Group": "26-35", "Age Group Target": 500 },
-  { State: "Lagos", "Age Group": "36-45", "Age Group Target": 500 },
-  { State: "Lagos", "Age Group": "46+", "Age Group Target": 500 },
-  { State: "FCT Abuja", "Age Group": "18-25", "Age Group Target": 375 },
-  { State: "FCT Abuja", "Age Group": "26-35", "Age Group Target": 375 },
-  { State: "FCT Abuja", "Age Group": "36-45", "Age Group Target": 375 },
-  { State: "FCT Abuja", "Age Group": "46+", "Age Group Target": 375 },
-  { State: "Kano", "Age Group": "18-25", "Age Group Target": 375 },
-  { State: "Kano", "Age Group": "26-35", "Age Group Target": 375 },
-  { State: "Kano", "Age Group": "36-45", "Age Group Target": 375 },
-  { State: "Kano", "Age Group": "46+", "Age Group Target": 375 },
+  { State: "Ogun", "Age Group": "18-25", "Age Group Target": 130 },
+  { State: "Ogun", "Age Group": "26-35", "Age Group Target": 110 },
+  { State: "Ogun", "Age Group": "36-45", "Age Group Target": 110 },
+  { State: "Ogun", "Age Group": "46+", "Age Group Target": 80 },
 ];
 
 export const sheetStateGenderTargets: SheetStateGenderTargetRow[] = [
-  { State: "Lagos", Gender: "Male", "Gender Target": 1000 },
-  { State: "Lagos", Gender: "Female", "Gender Target": 1000 },
-  { State: "FCT Abuja", Gender: "Male", "Gender Target": 750 },
-  { State: "FCT Abuja", Gender: "Female", "Gender Target": 750 },
-  { State: "Kano", Gender: "Male", "Gender Target": 750 },
-  { State: "Kano", Gender: "Female", "Gender Target": 750 },
+  { State: "Ogun", Gender: "Male", "Gender Target": 200 },
+  { State: "Ogun", Gender: "Female", "Gender Target": 200 },
 ];
-

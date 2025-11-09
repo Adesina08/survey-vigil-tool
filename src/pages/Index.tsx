@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { FilterControls } from "@/components/dashboard/FilterControls";
 import { SummaryCards } from "@/components/dashboard/SummaryCards";
@@ -14,10 +14,10 @@ import { dashboardData } from "@/lib/dashboardData";
 const Index = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState(dashboardData.lastUpdated);
+  const [selectedLga, setSelectedLga] = useState<string>("all");
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    // Simulate API call
     setTimeout(() => {
       setIsRefreshing(false);
       setLastRefreshed(
@@ -33,9 +33,18 @@ const Index = () => {
   };
 
   const handleFilterChange = (filterType: string, value: string) => {
+    if (filterType === "lga") {
+      setSelectedLga(value);
+    }
     console.log(`Filter changed: ${filterType} = ${value}`);
-    // Backend integration point for filtering
   };
+
+  const filteredMapSubmissions = useMemo(() => {
+    if (selectedLga === "all") {
+      return dashboardData.mapSubmissions;
+    }
+    return dashboardData.mapSubmissions.filter((submission) => submission.lga === selectedLga);
+  }, [selectedLga]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -46,7 +55,7 @@ const Index = () => {
       />
 
       <main className="mx-auto max-w-7xl space-y-6 px-6 py-6">
-        <FilterControls onFilterChange={handleFilterChange} />
+        <FilterControls lgas={dashboardData.filters.lgas} onFilterChange={handleFilterChange} />
 
         <SummaryCards data={dashboardData.summary} />
 
@@ -55,7 +64,11 @@ const Index = () => {
           statusBreakdown={dashboardData.statusBreakdown}
         />
 
-        <InteractiveMap submissions={dashboardData.mapSubmissions} />
+        <InteractiveMap
+          submissions={filteredMapSubmissions}
+          interviewers={dashboardData.filters.interviewers}
+          errorTypes={dashboardData.filters.errorTypes}
+        />
 
         <QuotaTracker
           byState={dashboardData.quotaByState}
