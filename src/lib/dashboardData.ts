@@ -4,6 +4,9 @@ import {
   sheetStateAgeTargets,
   sheetStateGenderTargets,
   type SheetSubmissionRow,
+  type SheetStateTargetRow,
+  type SheetStateAgeTargetRow,
+  type SheetStateGenderTargetRow,
   type ErrorType,
 } from "@/data/sampleData";
 
@@ -84,7 +87,7 @@ interface AchievementByLGARow extends AchievementRow {
   state: string;
 }
 
-interface DashboardData {
+export interface DashboardData {
   summary: SummaryData;
   statusBreakdown: StatusBreakdown;
   quotaProgress: number;
@@ -144,8 +147,20 @@ const getApprovalStatus = (row: SheetSubmissionRow) => {
   return status === "Approved" || status === "Valid" ? "Approved" : "Not Approved";
 };
 
-const buildDashboardData = (): DashboardData => {
-  const totalSubmissions = sheetSubmissions.length;
+interface DashboardDataInput {
+  submissions: SheetSubmissionRow[];
+  stateTargets?: SheetStateTargetRow[];
+  stateAgeTargets?: SheetStateAgeTargetRow[];
+  stateGenderTargets?: SheetStateGenderTargetRow[];
+}
+
+export const buildDashboardData = ({
+  submissions,
+  stateTargets = [],
+  stateAgeTargets = [],
+  stateGenderTargets = [],
+}: DashboardDataInput): DashboardData => {
+  const totalSubmissions = submissions.length;
 
   const approvedByState = new Map<string, number>();
   const approvedByStateAge = new Map<string, number>();
@@ -160,6 +175,9 @@ const buildDashboardData = (): DashboardData => {
   const totalsByLGA = new Map<string, number>();
   const approvedByLGA = new Map<string, number>();
   const notApprovedByLGA = new Map<string, number>();
+
+  const totalsByStateAge = new Map<string, number>();
+  const totalsByStateGender = new Map<string, number>();
 
   const interviewerNames = new Map<string, string>();
 
@@ -187,7 +205,7 @@ const buildDashboardData = (): DashboardData => {
   const mapSubmissions: Array<MapSubmission & { sortKey: number }> = [];
   let latestTimestamp = new Date(0);
 
-  sheetSubmissions.forEach((row) => {
+  submissions.forEach((row) => {
     const state = row.State ?? "Unknown State";
     const ageGroup = row["Age Group"] ?? "Unknown";
     const gender = row.Gender ?? "Unknown";
@@ -213,6 +231,8 @@ const buildDashboardData = (): DashboardData => {
     incrementMap(totalsByState, state);
     incrementMap(totalsByInterviewer, interviewerId);
     incrementMap(totalsByLGA, `${state}|${lga}`);
+    incrementMap(totalsByStateAge, `${state}|${ageGroup}`);
+    incrementMap(totalsByStateGender, `${state}|${gender}`);
 
     interviewerNames.set(interviewerId, interviewerName);
     const interviewerError = interviewerErrors.get(interviewerId) ?? {
@@ -281,7 +301,39 @@ const buildDashboardData = (): DashboardData => {
   const totalApproved = [...approvedByState.values()].reduce((sum, value) => sum + value, 0);
   const totalNotApproved = totalSubmissions - totalApproved;
 
-  const overallTarget = sheetStateTargets.reduce(
+  const effectiveStateTargets =
+    stateTargets.length > 0
+      ? stateTargets
+      : [...totalsByState.entries()].map(([state, total]) => ({
+          State: state,
+          "State Target": total,
+        }));
+
+  const effectiveStateAgeTargets =
+    stateAgeTargets.length > 0
+      ? stateAgeTargets
+      : [...totalsByStateAge.entries()].map(([key, total]) => {
+          const [state, ageGroup] = key.split("|");
+          return {
+            State: state,
+            "Age Group": ageGroup,
+            "Age Group Target": total,
+          };
+        });
+
+  const effectiveStateGenderTargets =
+    stateGenderTargets.length > 0
+      ? stateGenderTargets
+      : [...totalsByStateGender.entries()].map(([key, total]) => {
+          const [state, gender] = key.split("|");
+          return {
+            State: state,
+            Gender: gender as SheetStateGenderTargetRow["Gender"],
+            "Gender Target": total,
+          };
+        });
+
+  const overallTarget = effectiveStateTargets.reduce(
     (sum, row) => sum + row["State Target"],
     0
   );
@@ -291,7 +343,7 @@ const buildDashboardData = (): DashboardData => {
 
   const quotaProgress = overallTarget > 0 ? (totalApproved / overallTarget) * 100 : 0;
 
-  const quotaByState: QuotaRow[] = sheetStateTargets.map((row) => {
+  const quotaByState: QuotaRow[] = effectiveStateTargets.map((row) => {
     const achieved = approvedByState.get(row.State) ?? 0;
     const balance = Math.max(row["State Target"] - achieved, 0);
     return {
@@ -302,7 +354,7 @@ const buildDashboardData = (): DashboardData => {
     };
   });
 
-  const quotaByStateAge: QuotaAgeRow[] = sheetStateAgeTargets.map((row) => {
+  const quotaByStateAge: QuotaAgeRow[] = effectiveStateAgeTargets.map((row) => {
     const key = `${row.State}|${row["Age Group"]}`;
     const achieved = approvedByStateAge.get(key) ?? 0;
     const balance = Math.max(row["Age Group Target"] - achieved, 0);
@@ -315,7 +367,7 @@ const buildDashboardData = (): DashboardData => {
     };
   });
 
-  const quotaByStateGender: QuotaGenderRow[] = sheetStateGenderTargets.map((row) => {
+  const quotaByStateGender: QuotaGenderRow[] = effectiveStateGenderTargets.map((row) => {
     const key = `${row.State}|${row.Gender}`;
     const achieved = approvedByStateGender.get(key) ?? 0;
     const balance = Math.max(row["Gender Target"] - achieved, 0);
@@ -456,4 +508,9 @@ const buildDashboardData = (): DashboardData => {
   };
 };
 
-export const dashboardData = buildDashboardData();
+export const dashboardData = buildDashboardData({
+  submissions: sheetSubmissions,
+  stateTargets: sheetStateTargets,
+  stateAgeTargets: sheetStateAgeTargets,
+  stateGenderTargets: sheetStateGenderTargets,
+});
