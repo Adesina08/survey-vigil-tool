@@ -14,7 +14,6 @@
   autoLaunch = false
 
 [[redirects]]
-  from = "/api/dashboard"
-  to = "/.netlify/functions/dashboard"
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
   status = 200
-  force = true

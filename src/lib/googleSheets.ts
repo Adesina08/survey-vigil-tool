@@ -11,10 +11,11 @@ import type {
 
 const GVIZ_PREFIX = "google.visualization.Query.setResponse(";
 const GVIZ_SUFFIX = ");";
+const XSSI_PREFIX = ")]}'";
 
 interface GVizColumn {
-  id: string;
-  label: string;
+  id?: string;
+  label?: string;
 }
 
 interface GVizCell {
@@ -23,14 +24,14 @@ interface GVizCell {
 }
 
 interface GVizRow {
-  c: GVizCell[];
+  c?: GVizCell[];
 }
 
 interface GVizResponse {
-  status: string;
-  table: {
-    cols: GVizColumn[];
-    rows: GVizRow[];
+  status?: string;
+  table?: {
+    cols?: GVizColumn[];
+    rows?: GVizRow[];
   };
 }
 
@@ -96,15 +97,42 @@ const getFromRow = (row: NormalisedRow, ...candidates: string[]): unknown => {
 
 const parseGVizResponse = (rawText: string): Record<string, unknown>[] => {
   const trimmed = rawText.trim();
-  if (!trimmed.startsWith(GVIZ_PREFIX) || !trimmed.endsWith(GVIZ_SUFFIX)) {
+  const withoutXssi = trimmed.startsWith(XSSI_PREFIX)
+    ? trimmed.slice(XSSI_PREFIX.length).trim()
+    : trimmed;
+
+  const start = withoutXssi.indexOf(GVIZ_PREFIX);
+  const end = withoutXssi.lastIndexOf(GVIZ_SUFFIX);
+
+  let payload: unknown;
+
+  if (start !== -1 && end !== -1 && end > start) {
+    const jsonText = withoutXssi
+      .slice(start + GVIZ_PREFIX.length, end)
+      .trim();
+    payload = JSON.parse(jsonText);
+  } else if (withoutXssi.startsWith("{")) {
+    payload = JSON.parse(withoutXssi);
+  } else {
+    const sample = withoutXssi.slice(0, 400);
+    throw new Error(
+      `Unexpected Google Sheets response format. Sample: ${sample}`,
+    );
+  }
+
+  if (!payload || typeof payload !== "object") {
     throw new Error("Unexpected Google Sheets response format");
   }
 
-  const jsonText = trimmed.slice(GVIZ_PREFIX.length, -GVIZ_SUFFIX.length);
-  const parsed = JSON.parse(jsonText) as GVizResponse;
+  const parsed = payload as GVizResponse;
 
-  if (parsed.status !== "ok") {
+  if (parsed.status && parsed.status !== "ok") {
     throw new Error("Google Sheets request failed");
+  }
+
+  if (!parsed.table || !Array.isArray(parsed.table.cols) || !Array.isArray(parsed.table.rows)) {
+    console.error("GViz parsed but table missing. Head:", JSON.stringify(parsed).slice(0, 400));
+    throw new Error("GViz parsed but table missing rows/cols");
   }
 
   const headers = parsed.table.cols.map((column, index) => {
@@ -115,7 +143,9 @@ const parseGVizResponse = (rawText: string): Record<string, unknown>[] => {
   return parsed.table.rows.map((row) => {
     const record: Record<string, unknown> = {};
 
-    row.c.forEach((cell, index) => {
+    const cells = Array.isArray(row.c) ? row.c : [];
+
+    cells.forEach((cell, index) => {
       const header = headers[index] ?? `Column ${index + 1}`;
       record[header] = parseGVizCellValue(cell);
     });
@@ -188,14 +218,27 @@ export const fetchGoogleSheetRows = async ({
   }
 
   const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?${params.toString()}`;
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: {
+      "cache-control": "no-cache",
+    },
+  });
+
+  const rawText = await response.text();
 
   if (!response.ok) {
+    console.error("GViz non-OK", response.status, rawText.slice(0, 400));
     throw new Error(`Failed to fetch Google Sheet: ${response.statusText}`);
   }
 
-  const rawText = await response.text();
-  return parseGVizResponse(rawText);
+  try {
+    return parseGVizResponse(rawText);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("GViz parse error:", message);
+    console.error("GViz raw head:", rawText.slice(0, 400));
+    throw error;
+  }
 };
 
 const toStringValue = (value: unknown): string => {
