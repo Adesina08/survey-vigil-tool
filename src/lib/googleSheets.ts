@@ -228,10 +228,15 @@ const normaliseGender = (value: unknown): Gender => {
 
 const parseErrorFlags = (value: unknown): ErrorType[] => {
   const allowed: ErrorType[] = [
-    "Odd Hour",
+    "OddHour",
     "Low LOI",
+    "High LOI",
     "Outside LGA Boundary",
-    "Duplicate Phone",
+    "DuplicatePhone",
+    "Interwoven",
+    "ShortGap",
+    "ClusteredInterview",
+    "Terminated",
   ];
 
   if (!value) {
@@ -299,6 +304,8 @@ export const mapSheetRowsToSubmissions = (
 
       const startDate = parseDateValue(row["start"]) ?? parseDateValue(row["Submission Start"]);
       const endDate = parseDateValue(row["end"]) ?? parseDateValue(row["Submission End"]);
+      const startIso = startDate?.toISOString();
+      const endIso = endDate?.toISOString();
 
       const submissionDateSource =
         parseDateValue(row["Submission Date"]) ??
@@ -321,6 +328,10 @@ export const mapSheetRowsToSubmissions = (
         toStringValue(row["Enumerator Name"]) ||
         toStringValue(row["Interviewer Name"]) ||
         enumeratorId;
+      const username =
+        toStringValue(row.username) ||
+        toStringValue(row["username"]) ||
+        enumeratorId;
 
       const state = toStringValue(row.State) || defaultState || "Unknown State";
       const lga = toStringValue(row["A3. select the LGA"]) || toStringValue(row.LGA) || "Unknown LGA";
@@ -329,6 +340,21 @@ export const mapSheetRowsToSubmissions = (
       const ageGroup = determineAgeGroup(age);
 
       const gender = normaliseGender(row["A7. Sex"] ?? row["Gender"]);
+
+      const deviceid =
+        toStringValue(row.deviceid) ||
+        toStringValue(row.deviceId) ||
+        toStringValue(row.DeviceID) ||
+        undefined;
+      const imei = toStringValue(row.imei) || undefined;
+      const subscriberid = toStringValue(row.subscriberid) || undefined;
+      const simserial = toStringValue(row.simserial) || undefined;
+
+      const respondentPhone =
+        toStringValue(row["Respondent phone number"]) ||
+        toStringValue(row.Resp_No) ||
+        toStringValue(row["Phone Number"]) ||
+        undefined;
 
       const approvalRaw = toStringValue(
         row["Approval Status"] ?? row["Outcome Status"] ?? row["A6. Consent to participate"]
@@ -376,18 +402,30 @@ export const mapSheetRowsToSubmissions = (
         "Submission ID": submissionId,
         "Submission Date": submissionDateString,
         "Submission Time": submissionTimeString,
+        start: startIso,
+        end: endIso,
+        starttime: startIso,
+        endtime: endIso,
         "A1. Enumerator ID": enumeratorId,
         "Enumerator Name": enumeratorName,
         "Interviewer ID": enumeratorId,
         "Interviewer Name": enumeratorName,
+        username,
         State: state,
         "A3. select the LGA": lga,
         LGA: lga,
+        deviceid,
+        imei,
+        subscriberid,
+        simserial,
         "Age Group": ageGroup,
         Gender: gender,
         "Approval Status": approvalStatus,
         "Error Flags": errorFlags,
         "Interview Length (mins)": interviewLength,
+        Resp_No: respondentPhone,
+        "Respondent phone number": respondentPhone,
+        "A5. GPS Coordinates": coordinatesText || undefined,
         "_A5. GPS Coordinates_latitude": resolvedLatitude ?? 0,
         "_A5. GPS Coordinates_longitude": resolvedLongitude ?? 0,
       };
