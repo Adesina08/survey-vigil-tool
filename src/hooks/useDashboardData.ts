@@ -1,94 +1,30 @@
 import { useQuery } from "@tanstack/react-query";
 
-import {
-  buildDashboardData,
-  dashboardData as sampleDashboardData,
-  type DashboardData,
-} from "@/lib/dashboardData";
-import {
-  fetchGoogleSheetRows,
-  mapSheetRowsToStateAgeTargets,
-  mapSheetRowsToStateGenderTargets,
-  mapSheetRowsToStateTargets,
-  mapSheetRowsToSubmissions,
-} from "@/lib/googleSheets";
+import { dashboardData as sampleDashboardData, type DashboardData } from "@/lib/dashboardData";
 
-const spreadsheetId = import.meta.env.VITE_GOOGLE_SHEETS_ID as string | undefined;
-const submissionsSheetName = import.meta.env.VITE_GOOGLE_SHEETS_SUBMISSIONS_SHEET as
-  | string
-  | undefined;
-const stateTargetsSheetName = import.meta.env.VITE_GOOGLE_SHEETS_STATE_TARGETS_SHEET as
-  | string
-  | undefined;
-const stateAgeTargetsSheetName = import.meta.env.VITE_GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET as
-  | string
-  | undefined;
-const stateGenderTargetsSheetName = import.meta.env.VITE_GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET as
-  | string
-  | undefined;
-const defaultState = import.meta.env.VITE_GOOGLE_SHEETS_DEFAULT_STATE as string | undefined;
-
-const shouldUseGoogleSheets = Boolean(spreadsheetId && submissionsSheetName);
+const DASHBOARD_ENDPOINT = "/api/dashboard";
 
 export const useDashboardData = () => {
   return useQuery<DashboardData, Error>({
-    queryKey: [
-      "dashboard-data",
-      spreadsheetId,
-      submissionsSheetName,
-      stateTargetsSheetName,
-      stateAgeTargetsSheetName,
-      stateGenderTargetsSheetName,
-      defaultState,
-    ],
+    queryKey: ["dashboard-data"],
     queryFn: async () => {
-      if (!shouldUseGoogleSheets) {
-        return sampleDashboardData;
+      const response = await fetch(DASHBOARD_ENDPOINT);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch dashboard data: ${response.statusText}`);
       }
 
-      const submissionRows = await fetchGoogleSheetRows({
-        spreadsheetId: spreadsheetId!,
-        sheetName: submissionsSheetName!,
-      });
+      const payload = (await response.json()) as unknown;
 
-      const submissions = mapSheetRowsToSubmissions(submissionRows, {
-        defaultState,
-      });
-
-      if (submissions.length === 0) {
-        throw new Error("No submissions found in the configured Google Sheet.");
+      if (!payload || typeof payload !== "object") {
+        throw new Error("Invalid dashboard data received from the server.");
       }
 
-      const [stateTargetsRows, stateAgeTargetsRows, stateGenderTargetsRows] = await Promise.all([
-        stateTargetsSheetName
-          ? fetchGoogleSheetRows({ spreadsheetId: spreadsheetId!, sheetName: stateTargetsSheetName })
-          : Promise.resolve<null>(null),
-        stateAgeTargetsSheetName
-          ? fetchGoogleSheetRows({ spreadsheetId: spreadsheetId!, sheetName: stateAgeTargetsSheetName })
-          : Promise.resolve<null>(null),
-        stateGenderTargetsSheetName
-          ? fetchGoogleSheetRows({ spreadsheetId: spreadsheetId!, sheetName: stateGenderTargetsSheetName })
-          : Promise.resolve<null>(null),
-      ]);
-
-      return buildDashboardData({
-        submissions,
-        stateTargets: stateTargetsRows ? mapSheetRowsToStateTargets(stateTargetsRows) : undefined,
-        stateAgeTargets: stateAgeTargetsRows
-          ? mapSheetRowsToStateAgeTargets(stateAgeTargetsRows)
-          : undefined,
-        stateGenderTargets: stateGenderTargetsRows
-          ? mapSheetRowsToStateGenderTargets(stateGenderTargetsRows)
-          : undefined,
-      });
+      return payload as DashboardData;
     },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    retry: shouldUseGoogleSheets ? 1 : false,
-    ...(shouldUseGoogleSheets
-      ? {}
-      : {
-          initialData: sampleDashboardData,
-        }),
+    retry: 1,
+    initialData: sampleDashboardData,
   });
 };
