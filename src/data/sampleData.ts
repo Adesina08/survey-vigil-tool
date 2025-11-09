@@ -1,6 +1,6 @@
 export type ApprovalStatus = "Approved" | "Not Approved";
-export type Gender = "Male" | "Female";
-export type AgeGroup = "18-25" | "26-35" | "36-45" | "46+";
+export type Gender = "Male" | "Female" | "Unknown";
+export type AgeGroup = "18-25" | "26-35" | "36-45" | "46+" | "Unknown";
 export type ErrorType =
   | "Odd Hour"
   | "Low LOI"
@@ -18,9 +18,9 @@ export interface SheetSubmissionRow {
   State: string;
   "A3. select the LGA": string;
   LGA?: string;
-  "Age Group": AgeGroup;
-  Gender: Gender;
-  "Approval Status": ApprovalStatus;
+  "Age Group"?: AgeGroup;
+  Gender?: Gender;
+  "Approval Status"?: ApprovalStatus;
   "Outcome Status"?: "Valid" | "Invalid";
   "Error Flags": ErrorType[];
   "Interview Length (mins)": number;
