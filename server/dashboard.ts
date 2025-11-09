@@ -18,7 +18,7 @@ const stateAgeTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_AGE_TARGETS_SHE
 const stateGenderTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET;
 const defaultState = process.env.GOOGLE_SHEETS_DEFAULT_STATE;
 
-const shouldUseGoogleSheets = Boolean(spreadsheetId && submissionsSheetName);
+const shouldUseGoogleSheets = Boolean(spreadsheetId);
 
 export const loadDashboardData = async (): Promise<DashboardData> => {
   if (!shouldUseGoogleSheets) {
@@ -27,7 +27,7 @@ export const loadDashboardData = async (): Promise<DashboardData> => {
 
   const submissionRows = await fetchGoogleSheetRows({
     spreadsheetId: spreadsheetId!,
-    sheetName: submissionsSheetName!,
+    sheetName: submissionsSheetName ?? undefined,
   });
 
   const submissions = mapSheetRowsToSubmissions(submissionRows, {
