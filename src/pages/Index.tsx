@@ -1,17 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { FilterControls } from "@/components/dashboard/FilterControls";
-import { SummaryCards } from "@/components/dashboard/SummaryCards";
-import { ProgressCharts } from "@/components/dashboard/ProgressCharts";
-import { QuotaTracker } from "@/components/dashboard/QuotaTracker";
-import { InteractiveMap } from "@/components/dashboard/InteractiveMap";
-import { UserProductivity } from "@/components/dashboard/UserProductivity";
-import { ErrorBreakdown } from "@/components/dashboard/ErrorBreakdown";
-import { AchievementsTables } from "@/components/dashboard/AchievementsTables";
 import { ExportBar } from "@/components/dashboard/ExportBar";
 import { Button } from "@/components/ui/button";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { AlertCircle, Loader2 } from "lucide-react";
+import TabsQCAnalysis from "@/components/TabsQCAnalysis";
+import QualityControl from "./QualityControl";
 
 const Index = () => {
   const { data: dashboardData, isLoading, isFetching, isError, error, refetch } = useDashboardData();
@@ -108,35 +102,14 @@ const Index = () => {
       />
 
       <main className="mx-auto max-w-7xl flex-1 space-y-6 px-6 py-6">
-        <FilterControls lgas={dashboardData.filters.lgas} onFilterChange={handleFilterChange} />
-
-        <SummaryCards data={dashboardData.summary} />
-
-        <ProgressCharts
-          quotaProgress={dashboardData.quotaProgress}
-          statusBreakdown={dashboardData.statusBreakdown}
-        />
-
-        <InteractiveMap
-          submissions={filteredMapSubmissions}
-          interviewers={dashboardData.filters.interviewers}
-          errorTypes={dashboardData.filters.errorTypes}
-        />
-
-        <QuotaTracker
-          byLGA={dashboardData.quotaByLGA}
-          byLGAAge={dashboardData.quotaByLGAAge}
-          byLGAGender={dashboardData.quotaByLGAGender}
-        />
-
-        <UserProductivity data={dashboardData.userProductivity} />
-
-        <ErrorBreakdown data={dashboardData.errorBreakdown} />
-
-        <AchievementsTables
-          byState={dashboardData.achievements.byState}
-          byInterviewer={dashboardData.achievements.byInterviewer}
-          byLGA={dashboardData.achievements.byLGA}
+        <TabsQCAnalysis
+          qualityControl={
+            <QualityControl
+              dashboardData={dashboardData}
+              filteredMapSubmissions={filteredMapSubmissions}
+              onFilterChange={handleFilterChange}
+            />
+          }
         />
       </main>
 

@@ -10,14 +10,32 @@ import {
   dashboardData as sampleDashboardData,
   type DashboardData,
 } from "../src/lib/dashboardData";
+import { sheetSubmissions, type SheetSubmissionRow } from "../src/data/sampleData";
+
+export const loadSubmissionRows = async (): Promise<SheetSubmissionRow[]> => {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+  const submissionsSheetName = process.env.GOOGLE_SHEETS_SUBMISSIONS_SHEET;
+  const defaultState = process.env.GOOGLE_SHEETS_DEFAULT_STATE;
+
+  if (!spreadsheetId) {
+    return sheetSubmissions;
+  }
+
+  const submissionRows = await fetchGoogleSheetRows({
+    spreadsheetId,
+    sheetName: submissionsSheetName ?? undefined,
+  });
+
+  return mapSheetRowsToSubmissions(submissionRows, {
+    defaultState: defaultState ?? undefined,
+  });
+};
 
 export const loadDashboardData = async (): Promise<DashboardData> => {
   const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
-  const submissionsSheetName = process.env.GOOGLE_SHEETS_SUBMISSIONS_SHEET;
   const stateTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_TARGETS_SHEET;
   const stateAgeTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET;
   const stateGenderTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET;
-  const defaultState = process.env.GOOGLE_SHEETS_DEFAULT_STATE;
 
   const shouldUseGoogleSheets = Boolean(spreadsheetId);
 
@@ -25,14 +43,7 @@ export const loadDashboardData = async (): Promise<DashboardData> => {
     return sampleDashboardData;
   }
 
-  const submissionRows = await fetchGoogleSheetRows({
-    spreadsheetId: spreadsheetId!,
-    sheetName: submissionsSheetName ?? undefined,
-  });
-
-  const submissions = mapSheetRowsToSubmissions(submissionRows, {
-    defaultState: defaultState ?? undefined,
-  });
+  const submissions = await loadSubmissionRows();
 
   if (submissions.length === 0) {
     throw new Error("No submissions found in the configured Google Sheet.");
