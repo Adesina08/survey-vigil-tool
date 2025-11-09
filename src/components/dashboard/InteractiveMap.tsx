@@ -309,12 +309,12 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
 
   return (
     <Card className="fade-in">
-      <CardHeader className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+      <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-2 self-start">
           <MapPin className="h-5 w-5 text-primary" />
-          <CardTitle>Survey Locations</CardTitle>
+          <CardTitle className="text-left">Submissions on Map</CardTitle>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3 overflow-x-auto pb-1">
           <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
             <SelectTrigger className="min-w-[180px]">
               <SelectValue placeholder="All Error Types" />

@@ -106,7 +106,7 @@ const convertGVizDate = (value: string): string | null => {
 
 interface FetchSheetOptions {
   spreadsheetId: string;
-  sheetName: string;
+  sheetName?: string;
   query?: string;
 }
 
@@ -117,8 +117,11 @@ export const fetchGoogleSheetRows = async ({
 }: FetchSheetOptions): Promise<Record<string, unknown>[]> => {
   const params = new URLSearchParams({
     tqx: "out:json",
-    sheet: sheetName,
   });
+
+  if (sheetName) {
+    params.set("sheet", sheetName);
+  }
 
   if (query) {
     params.set("tq", query);
