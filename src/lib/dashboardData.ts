@@ -528,13 +528,15 @@ export const buildDashboardData = ({
     .slice(0, 500)
     .map(({ sortKey, ...entry }) => entry);
 
-  const lastUpdated = latestTimestamp.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const lastUpdated = totalSubmissions > 0
+    ? latestTimestamp.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "No data available";
 
   return {
     summary,
