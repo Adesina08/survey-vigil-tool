@@ -100,14 +100,14 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <DashboardHeader
         lastRefreshed={lastRefreshed}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing || isFetching}
       />
 
-      <main className="mx-auto max-w-7xl space-y-6 px-6 py-6">
+      <main className="mx-auto max-w-7xl flex-1 space-y-6 px-6 py-6">
         <FilterControls lgas={dashboardData.filters.lgas} onFilterChange={handleFilterChange} />
 
         <SummaryCards data={dashboardData.summary} />
@@ -141,6 +141,12 @@ const Index = () => {
       </main>
 
       <ExportBar />
+
+      <footer className="border-t bg-background py-4">
+        <div className="mx-auto max-w-7xl px-6 text-center text-sm text-muted-foreground">
+          © 2025 Survey Vigil Tool. All rights reserved.
+        </div>
+      </footer>
     </div>
   );
 };
