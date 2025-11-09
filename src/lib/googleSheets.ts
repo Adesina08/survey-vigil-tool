@@ -36,7 +36,34 @@ interface GVizResponse {
 
 type NormalisedRow = Map<string, unknown>;
 
-const normaliseHeaderKey = (key: string): string => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+const normaliseHeaderKey = (key: string): string => {
+  const withoutHtml = key.replace(/<[^>]*>/g, "");
+  const trimmed = withoutHtml.trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^\*{2}.*\*{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const preserveLeadingUnderscore = trimmed.startsWith("_");
+  const lower = trimmed.toLowerCase();
+
+  const withUnderscores = lower
+    .replace(/[\s./:()]+/g, "_")
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/_+/g, "_");
+
+  const withoutLeading = preserveLeadingUnderscore
+    ? `_${withUnderscores.replace(/^_+/, "")}`
+    : withUnderscores.replace(/^_+/, "");
+
+  const normalised = withoutLeading.replace(/_+$/, "");
+
+  return normalised || trimmed;
+};
 
 const createNormalisedRow = (row: Record<string, unknown>): NormalisedRow => {
   const map: NormalisedRow = new Map();
