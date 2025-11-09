@@ -11,16 +11,16 @@ import {
   type DashboardData,
 } from "../src/lib/dashboardData";
 
-const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
-const submissionsSheetName = process.env.GOOGLE_SHEETS_SUBMISSIONS_SHEET;
-const stateTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_TARGETS_SHEET;
-const stateAgeTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET;
-const stateGenderTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET;
-const defaultState = process.env.GOOGLE_SHEETS_DEFAULT_STATE;
-
-const shouldUseGoogleSheets = Boolean(spreadsheetId);
-
 export const loadDashboardData = async (): Promise<DashboardData> => {
+  const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
+  const submissionsSheetName = process.env.GOOGLE_SHEETS_SUBMISSIONS_SHEET;
+  const stateTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_TARGETS_SHEET;
+  const stateAgeTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET;
+  const stateGenderTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET;
+  const defaultState = process.env.GOOGLE_SHEETS_DEFAULT_STATE;
+
+  const shouldUseGoogleSheets = Boolean(spreadsheetId);
+
   if (!shouldUseGoogleSheets) {
     return sampleDashboardData;
   }
