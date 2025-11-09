@@ -9,6 +9,7 @@ import {
   type SheetStateGenderTargetRow,
   type ErrorType,
 } from "@/data/sampleData";
+import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks";
 
 interface MapSubmission {
   id: string;
@@ -163,7 +164,9 @@ export const buildDashboardData = ({
   stateAgeTargets = [],
   stateGenderTargets = [],
 }: DashboardDataInput): DashboardData => {
-  const totalSubmissions = submissions.length;
+  const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(submissions);
+
+  const totalSubmissions = processedSubmissions.length;
 
   const approvedByState = new Map<string, number>();
   const approvedByStateAge = new Map<string, number>();
@@ -192,12 +195,20 @@ export const buildDashboardData = ({
 
   const interviewerNames = new Map<string, string>();
 
-  const errorCounts: Record<ErrorType, number> = {
-    "Odd Hour": 0,
-    "Low LOI": 0,
-    "Outside LGA Boundary": 0,
-    "Duplicate Phone": 0,
-  };
+  const errorTypes: ErrorType[] = [
+    "OddHour",
+    "Low LOI",
+    "High LOI",
+    "Outside LGA Boundary",
+    "DuplicatePhone",
+    "Interwoven",
+    "ShortGap",
+    "ClusteredInterview",
+    "Terminated",
+  ];
+  const errorCounts = Object.fromEntries(
+    errorTypes.map((type) => [type, 0])
+  ) as Record<ErrorType, number>;
 
   const interviewerErrors = new Map<
     string,
@@ -216,7 +227,7 @@ export const buildDashboardData = ({
   const mapSubmissions: Array<MapSubmission & { sortKey: number }> = [];
   let latestTimestamp = new Date(0);
 
-  submissions.forEach((row) => {
+  processedSubmissions.forEach((row) => {
     const state = row.State ?? "Unknown State";
     const ageGroup = row["Age Group"] ?? "Unknown";
     const gender = row.Gender ?? "Unknown";
@@ -274,9 +285,9 @@ export const buildDashboardData = ({
     }
 
     errorFlags.forEach((errorType) => {
-      errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
+    errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
       switch (errorType) {
-        case "Odd Hour":
+        case "OddHour":
           interviewerError.oddHour += 1;
           break;
         case "Low LOI":
@@ -285,7 +296,7 @@ export const buildDashboardData = ({
         case "Outside LGA Boundary":
           interviewerError.outsideLGA += 1;
           break;
-        case "Duplicate Phone":
+        case "DuplicatePhone":
           interviewerError.duplicate += 1;
           break;
         default:
@@ -294,6 +305,8 @@ export const buildDashboardData = ({
     });
 
     interviewerErrors.set(interviewerId, interviewerError);
+
+    const metadata = row.qualityMetadata;
 
     mapSubmissions.push({
       id: row["Submission ID"],
@@ -310,7 +323,7 @@ export const buildDashboardData = ({
         hour: "2-digit",
         minute: "2-digit",
       }),
-      status: isApproved ? "approved" : "not_approved",
+      status: (metadata?.isValid ?? isApproved) ? "approved" : "not_approved",
       sortKey: timestamp.getTime(),
     });
   });

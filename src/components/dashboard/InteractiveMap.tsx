@@ -12,6 +12,7 @@ import {
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
+import { formatErrorLabel } from "@/lib/utils";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -137,7 +138,9 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
     const statusColor = getMarkerColor(submission.status);
     const errorsSection =
       submission.errorTypes.length > 0
-        ? `<div><span style="font-weight: 600;">Errors:</span> ${submission.errorTypes.join(", ")}</div>`
+        ? `<div><span style="font-weight: 600;">Errors:</span> ${submission.errorTypes
+            .map((value) => formatErrorLabel(value))
+            .join(", ")}</div>`
         : "<div><span style=\"font-weight: 600;\">Errors:</span> None</div>";
 
     const statusLabel = submission.status === "approved" ? "APPROVED" : "NOT APPROVED";
@@ -320,7 +323,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
               <SelectItem value="all">All Error Types</SelectItem>
               {errorTypes.map((type) => (
                 <SelectItem key={type} value={type}>
-                  {type}
+                  {formatErrorLabel(type)}
                 </SelectItem>
               ))}
             </SelectContent>

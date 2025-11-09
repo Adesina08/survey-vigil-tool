@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
+import { formatErrorLabel } from "@/lib/utils";
 
 interface ErrorData {
   errorType: string;
@@ -69,7 +70,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
             <TableBody>
               {sortedData.map((row) => (
                 <TableRow key={row.errorType}>
-                  <TableCell className="font-medium">{row.errorType}</TableCell>
+                  <TableCell className="font-medium">{formatErrorLabel(row.errorType)}</TableCell>
                   <TableCell className="text-right text-destructive font-semibold">
                     {row.count.toLocaleString()}
                   </TableCell>
