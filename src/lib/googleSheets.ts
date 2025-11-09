@@ -34,6 +34,39 @@ interface GVizResponse {
   };
 }
 
+type NormalisedRow = Map<string, unknown>;
+
+const normaliseHeaderKey = (key: string): string => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const createNormalisedRow = (row: Record<string, unknown>): NormalisedRow => {
+  const map: NormalisedRow = new Map();
+
+  Object.entries(row).forEach(([rawKey, value]) => {
+    if (typeof rawKey !== "string" || rawKey.length === 0) {
+      return;
+    }
+
+    const key = normaliseHeaderKey(rawKey);
+
+    if (!map.has(key)) {
+      map.set(key, value);
+    }
+  });
+
+  return map;
+};
+
+const getFromRow = (row: NormalisedRow, ...candidates: string[]): unknown => {
+  for (const candidate of candidates) {
+    const normalised = normaliseHeaderKey(candidate);
+    if (row.has(normalised)) {
+      return row.get(normalised);
+    }
+  }
+
+  return undefined;
+};
+
 const parseGVizResponse = (rawText: string): Record<string, unknown>[] => {
   const trimmed = rawText.trim();
   if (!trimmed.startsWith(GVIZ_PREFIX) || !trimmed.endsWith(GVIZ_SUFFIX)) {
@@ -298,22 +331,25 @@ export const mapSheetRowsToSubmissions = (
   { defaultState }: SubmissionMappingOptions = {}
 ): SheetSubmissionRow[] => {
   return rows
-    .map((row) => {
-      const submissionId =
-        toStringValue(row["Submission ID"]) ||
-        toStringValue(row["_id"]) ||
-        toStringValue(row["_uuid"]) ||
-        `${Date.now()}`;
+    .map((row, index) => {
+      const normalisedRow = createNormalisedRow(row);
 
-      const startDate = parseDateValue(row["start"]) ?? parseDateValue(row["Submission Start"]);
-      const endDate = parseDateValue(row["end"]) ?? parseDateValue(row["Submission End"]);
+      const submissionId =
+        toStringValue(getFromRow(normalisedRow, "Submission ID", "_id", "_uuid")) ||
+        `submission-${index}`;
+
+      const startDate =
+        parseDateValue(getFromRow(normalisedRow, "start", "Start", "Submission Start")) ??
+        parseDateValue(getFromRow(normalisedRow, "starttime", "Start Time"));
+      const endDate =
+        parseDateValue(getFromRow(normalisedRow, "end", "End", "Submission End")) ??
+        parseDateValue(getFromRow(normalisedRow, "endtime", "End Time"));
       const startIso = startDate?.toISOString();
       const endIso = endDate?.toISOString();
 
       const submissionDateSource =
-        parseDateValue(row["Submission Date"]) ??
-        parseDateValue(row["A2. Date"]) ??
-        parseDateValue(row.today) ??
+        parseDateValue(getFromRow(normalisedRow, "Submission Date", "A2. Date", "Date")) ??
+        parseDateValue(getFromRow(normalisedRow, "today", "Today")) ??
         startDate ??
         endDate;
 
@@ -326,41 +362,68 @@ export const mapSheetRowsToSubmissions = (
         ? formatTimePart(submissionDateSource)
         : "";
 
-      const enumeratorId = toStringValue(row["A1. Enumerator ID"]) || "Unknown";
+      const enumeratorId =
+        toStringValue(
+          getFromRow(
+            normalisedRow,
+            "A1. Enumerator ID",
+            "Enumerator ID",
+            "Interviewer ID",
+            "InterviewerID"
+          )
+        ) || "Unknown";
       const enumeratorName =
-        toStringValue(row["Enumerator Name"]) ||
-        toStringValue(row["Interviewer Name"]) ||
-        enumeratorId;
+        toStringValue(
+          getFromRow(
+            normalisedRow,
+            "Enumerator Name",
+            "Interviewer Name",
+            "Interviewer",
+            "Enumerator"
+          )
+        ) || enumeratorId;
       const username =
-        toStringValue(row.username) ||
-        toStringValue(row["username"]) ||
-        enumeratorId;
+        toStringValue(getFromRow(normalisedRow, "username", "User Name")) || enumeratorId;
 
-      const state = toStringValue(row.State) || defaultState || "Unknown State";
-      const lga = toStringValue(row["A3. select the LGA"]) || toStringValue(row.LGA) || "Unknown LGA";
+      const state =
+        toStringValue(getFromRow(normalisedRow, "State", "State Name")) ||
+        defaultState ||
+        "Unknown State";
+      const lga =
+        toStringValue(
+          getFromRow(normalisedRow, "A3. select the LGA", "LGA", "Local Government Area")
+        ) || "Unknown LGA";
 
-      const age = toNumberValue(row["A8. Age"]) ?? toNumberValue(row["Age"]);
+      const age =
+        toNumberValue(getFromRow(normalisedRow, "A8. Age", "Age", "Respondent Age")) ?? undefined;
       const ageGroup = determineAgeGroup(age);
 
-      const gender = normaliseGender(row["A7. Sex"] ?? row["Gender"]);
+      const gender = normaliseGender(
+        getFromRow(normalisedRow, "A7. Sex", "Gender", "Respondent Gender")
+      );
 
       const deviceid =
-        toStringValue(row.deviceid) ||
-        toStringValue(row.deviceId) ||
-        toStringValue(row.DeviceID) ||
-        undefined;
-      const imei = toStringValue(row.imei) || undefined;
-      const subscriberid = toStringValue(row.subscriberid) || undefined;
-      const simserial = toStringValue(row.simserial) || undefined;
+        toStringValue(
+          getFromRow(normalisedRow, "deviceid", "deviceId", "DeviceID", "device id")
+        ) || undefined;
+      const imei = toStringValue(getFromRow(normalisedRow, "imei", "IMEI")) || undefined;
+      const subscriberid =
+        toStringValue(getFromRow(normalisedRow, "subscriberid", "Subscriber ID")) || undefined;
+      const simserial = toStringValue(getFromRow(normalisedRow, "simserial", "SIM Serial")) || undefined;
 
       const respondentPhone =
-        toStringValue(row["Respondent phone number"]) ||
-        toStringValue(row.Resp_No) ||
-        toStringValue(row["Phone Number"]) ||
-        undefined;
+        toStringValue(
+          getFromRow(normalisedRow, "Respondent phone number", "Resp_No", "Phone Number")
+        ) || undefined;
 
       const approvalRaw = toStringValue(
-        row["Approval Status"] ?? row["Outcome Status"] ?? row["A6. Consent to participate"]
+        getFromRow(
+          normalisedRow,
+          "Approval Status",
+          "Outcome Status",
+          "A6. Consent to participate",
+          "Consent"
+        )
       ).toLowerCase();
       const approvalStatus: ApprovalStatus =
         approvalRaw.includes("not") || approvalRaw === "no" || approvalRaw === "0" || approvalRaw === "false"
@@ -368,7 +431,9 @@ export const mapSheetRowsToSubmissions = (
           : "Approved";
 
       const interviewLength = (() => {
-        const explicit = toNumberValue(row["Interview Length (mins)"]);
+        const explicit = toNumberValue(
+          getFromRow(normalisedRow, "Interview Length (mins)", "Interview Length", "LOI")
+        );
         if (typeof explicit === "number") {
           return Math.max(Math.round(explicit), 0);
         }
@@ -381,25 +446,39 @@ export const mapSheetRowsToSubmissions = (
         return 0;
       })();
 
-      const latitude =
-        toNumberValue(row["_A5. GPS Coordinates_latitude"]) ??
-        toNumberValue(row["latitude"]) ??
-        toNumberValue(row["Latitude"]);
-      const longitude =
-        toNumberValue(row["_A5. GPS Coordinates_longitude"]) ??
-        toNumberValue(row["longitude"]) ??
-        toNumberValue(row["Longitude"]);
+      const latitude = toNumberValue(
+        getFromRow(
+          normalisedRow,
+          "_A5. GPS Coordinates_latitude",
+          "latitude",
+          "Latitude",
+          "GPS Latitude"
+        )
+      );
+      const longitude = toNumberValue(
+        getFromRow(
+          normalisedRow,
+          "_A5. GPS Coordinates_longitude",
+          "longitude",
+          "Longitude",
+          "GPS Longitude"
+        )
+      );
 
-      const coordinatesText = toStringValue(row["A5. GPS Coordinates"]);
+      const coordinatesText = toStringValue(
+        getFromRow(normalisedRow, "A5. GPS Coordinates", "GPS Coordinates")
+      );
       const parsedCoordinates =
-        (!latitude || !longitude) && coordinatesText
+        (latitude === undefined || longitude === undefined) && coordinatesText
           ? parseCoordinatePair(coordinatesText)
           : undefined;
 
       const resolvedLatitude = latitude ?? parsedCoordinates?.lat;
       const resolvedLongitude = longitude ?? parsedCoordinates?.lng;
 
-      const errorFlags = parseErrorFlags(row["Error Flags"]);
+      const errorFlags = parseErrorFlags(
+        getFromRow(normalisedRow, "Error Flags", "Errors", "Error Flag")
+      );
 
       const submission: SheetSubmissionRow = {
         "Submission ID": submissionId,
@@ -450,8 +529,9 @@ export const mapSheetRowsToStateTargets = (
 ): SheetStateTargetRow[] =>
   rows
     .map((row) => {
-      const state = toStringValue(row.State);
-      const target = toNumberValue(row["State Target"] ?? row.Target);
+      const normalisedRow = createNormalisedRow(row);
+      const state = toStringValue(getFromRow(normalisedRow, "State", "State Name"));
+      const target = toNumberValue(getFromRow(normalisedRow, "State Target", "Target"));
       if (!state || target === undefined) {
         return null;
       }
@@ -464,9 +544,14 @@ export const mapSheetRowsToStateAgeTargets = (
 ): SheetStateAgeTargetRow[] =>
   rows
     .map((row) => {
-      const state = toStringValue(row.State);
-      const ageGroup = normaliseAgeGroupLabel(toStringValue(row["Age Group"] ?? row.Group));
-      const target = toNumberValue(row["Age Group Target"] ?? row.Target);
+      const normalisedRow = createNormalisedRow(row);
+      const state = toStringValue(getFromRow(normalisedRow, "State", "State Name"));
+      const ageGroup = normaliseAgeGroupLabel(
+        toStringValue(getFromRow(normalisedRow, "Age Group", "Group", "Age"))
+      );
+      const target = toNumberValue(
+        getFromRow(normalisedRow, "Age Group Target", "Target", "Age Target")
+      );
       if (!state || !ageGroup || target === undefined) {
         return null;
       }
@@ -479,9 +564,10 @@ export const mapSheetRowsToStateGenderTargets = (
 ): SheetStateGenderTargetRow[] =>
   rows
     .map((row) => {
-      const state = toStringValue(row.State);
-      const gender = normaliseGender(row.Gender ?? row.Group);
-      const target = toNumberValue(row["Gender Target"] ?? row.Target);
+      const normalisedRow = createNormalisedRow(row);
+      const state = toStringValue(getFromRow(normalisedRow, "State", "State Name"));
+      const gender = normaliseGender(getFromRow(normalisedRow, "Gender", "Group"));
+      const target = toNumberValue(getFromRow(normalisedRow, "Gender Target", "Target"));
       if (!state || !gender || target === undefined) {
         return null;
       }
