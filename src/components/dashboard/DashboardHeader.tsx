@@ -30,9 +30,7 @@ export function DashboardHeader({ lastRefreshed, onRefresh, isRefreshing }: Dash
               </svg>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Survey Quality Control
-              </h1>
+              <h1 className="text-2xl font-bold text-foreground">OGSTEP SURVEY</h1>
               <p className="text-sm text-muted-foreground">
                 Real-time quality control dashboard for survey data
               </p>
