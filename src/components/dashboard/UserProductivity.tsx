@@ -17,7 +17,6 @@ interface InterviewerData {
   lowLOI: number;
   outsideLGA: number;
   duplicate: number;
-  terminated: number;
   totalErrors: number;
 }
 
@@ -26,11 +25,10 @@ interface UserProductivityProps {
 }
 
 export function UserProductivity({ data }: UserProductivityProps) {
-  // Sort by total submissions for the chart
   const chartData = [...data]
     .sort((a, b) => b.totalSubmissions - a.totalSubmissions)
-    .slice(0, 10) // Top 10
-    .map(item => ({
+    .slice(0, 10)
+    .map((item) => ({
       name: item.interviewer,
       submissions: item.totalSubmissions,
     }));
@@ -46,14 +44,10 @@ export function UserProductivity({ data }: UserProductivityProps) {
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={400}>
-            <BarChart
-              data={chartData}
-              layout="vertical"
-              margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-            >
+            <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 30, left: 100, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis type="number" />
-              <YAxis dataKey="name" type="category" width={90} />
+              <YAxis dataKey="name" type="category" width={120} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "hsl(var(--card))",
@@ -63,11 +57,7 @@ export function UserProductivity({ data }: UserProductivityProps) {
               />
               <Bar dataKey="submissions" radius={[0, 8, 8, 0]}>
                 {chartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={`hsl(var(--primary))`}
-                    opacity={1 - (index * 0.05)}
-                  />
+                  <Cell key={`cell-${index}`} fill={`hsl(var(--primary))`} opacity={1 - index * 0.05} />
                 ))}
               </Bar>
             </BarChart>
@@ -90,36 +80,19 @@ export function UserProductivity({ data }: UserProductivityProps) {
                   <TableHead className="text-right">Low LOI</TableHead>
                   <TableHead className="text-right">Outside LGA</TableHead>
                   <TableHead className="text-right">Duplicate</TableHead>
-                  <TableHead className="text-right">Terminated</TableHead>
                   <TableHead className="text-right">Total Errors</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data.map((row) => (
-                  <TableRow
-                    key={row.interviewer}
-                    className="cursor-pointer hover:bg-muted/50"
-                  >
+                  <TableRow key={row.interviewer} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className="font-medium">{row.interviewer}</TableCell>
                     <TableCell className="text-right">{row.totalSubmissions}</TableCell>
-                    <TableCell className="text-right text-destructive">
-                      {row.oddHour}
-                    </TableCell>
-                    <TableCell className="text-right text-destructive">
-                      {row.lowLOI}
-                    </TableCell>
-                    <TableCell className="text-right text-destructive">
-                      {row.outsideLGA}
-                    </TableCell>
-                    <TableCell className="text-right text-destructive">
-                      {row.duplicate}
-                    </TableCell>
-                    <TableCell className="text-right text-warning">
-                      {row.terminated}
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-destructive">
-                      {row.totalErrors}
-                    </TableCell>
+                    <TableCell className="text-right text-destructive">{row.oddHour}</TableCell>
+                    <TableCell className="text-right text-destructive">{row.lowLOI}</TableCell>
+                    <TableCell className="text-right text-destructive">{row.outsideLGA}</TableCell>
+                    <TableCell className="text-right text-destructive">{row.duplicate}</TableCell>
+                    <TableCell className="text-right font-bold text-destructive">{row.totalErrors}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

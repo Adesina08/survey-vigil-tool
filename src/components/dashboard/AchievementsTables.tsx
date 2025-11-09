@@ -15,26 +15,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 interface StateAchievement {
   state: string;
   total: number;
-  valid: number;
-  invalid: number;
-  percentageValid: number;
+  approved: number;
+  notApproved: number;
+  percentageApproved: number;
 }
 
 interface InterviewerAchievement {
   interviewer: string;
   total: number;
-  valid: number;
-  invalid: number;
-  percentageValid: number;
+  approved: number;
+  notApproved: number;
+  percentageApproved: number;
 }
 
 interface LGAAchievement {
   lga: string;
   state: string;
   total: number;
-  valid: number;
-  invalid: number;
-  percentageValid: number;
+  approved: number;
+  notApproved: number;
+  percentageApproved: number;
 }
 
 interface AchievementsTablesProps {
@@ -46,23 +46,24 @@ interface AchievementsTablesProps {
 export function AchievementsTables({ byState, byInterviewer, byLGA }: AchievementsTablesProps) {
   const handleExport = (type: string) => {
     console.log(`Exporting ${type} achievements...`);
-    // Backend integration point
   };
 
   const calculateTotals = (data: any[]) => {
     return data.reduce(
       (acc, row) => ({
         total: acc.total + row.total,
-        valid: acc.valid + row.valid,
-        invalid: acc.invalid + row.invalid,
+        approved: acc.approved + row.approved,
+        notApproved: acc.notApproved + row.notApproved,
       }),
-      { total: 0, valid: 0, invalid: 0 }
+      { total: 0, approved: 0, notApproved: 0 }
     );
   };
 
   const stateTotals = calculateTotals(byState);
   const interviewerTotals = calculateTotals(byInterviewer);
   const lgaTotals = calculateTotals(byLGA);
+
+  const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
   return (
     <Card className="fade-in">
@@ -88,9 +89,9 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
                     <TableRow>
                       <TableHead>State</TableHead>
                       <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Valid</TableHead>
-                      <TableHead className="text-right">Invalid</TableHead>
-                      <TableHead className="text-right">% Valid</TableHead>
+                      <TableHead className="text-right">Approved</TableHead>
+                      <TableHead className="text-right">Not Approved</TableHead>
+                      <TableHead className="text-right">% Approved</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -99,13 +100,13 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
                         <TableCell className="font-medium">{row.state}</TableCell>
                         <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
                         <TableCell className="text-right text-success">
-                          {row.valid.toLocaleString()}
+                          {row.approved.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right text-destructive">
-                          {row.invalid.toLocaleString()}
+                          {row.notApproved.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {row.percentageValid.toFixed(1)}%
+                          {formatPercentage(row.percentageApproved)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -117,13 +118,15 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
                         {stateTotals.total.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-bold text-success">
-                        {stateTotals.valid.toLocaleString()}
+                        {stateTotals.approved.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-bold text-destructive">
-                        {stateTotals.invalid.toLocaleString()}
+                        {stateTotals.notApproved.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-bold">
-                        {((stateTotals.valid / stateTotals.total) * 100).toFixed(1)}%
+                        {stateTotals.total > 0
+                          ? formatPercentage((stateTotals.approved / stateTotals.total) * 100)
+                          : "0.0%"}
                       </TableCell>
                     </TableRow>
                   </TableFooter>
@@ -135,12 +138,7 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
           <TabsContent value="interviewer">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button
-                  onClick={() => handleExport("interviewer")}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
+                <Button onClick={() => handleExport("interviewer")} variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export Interviewer Data
                 </Button>
@@ -151,9 +149,9 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
                     <TableRow>
                       <TableHead>Interviewer</TableHead>
                       <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Valid</TableHead>
-                      <TableHead className="text-right">Invalid</TableHead>
-                      <TableHead className="text-right">% Valid</TableHead>
+                      <TableHead className="text-right">Approved</TableHead>
+                      <TableHead className="text-right">Not Approved</TableHead>
+                      <TableHead className="text-right">% Approved</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -162,13 +160,13 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
                         <TableCell className="font-medium">{row.interviewer}</TableCell>
                         <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
                         <TableCell className="text-right text-success">
-                          {row.valid.toLocaleString()}
+                          {row.approved.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right text-destructive">
-                          {row.invalid.toLocaleString()}
+                          {row.notApproved.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {row.percentageValid.toFixed(1)}%
+                          {formatPercentage(row.percentageApproved)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -180,13 +178,15 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
                         {interviewerTotals.total.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-bold text-success">
-                        {interviewerTotals.valid.toLocaleString()}
+                        {interviewerTotals.approved.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-bold text-destructive">
-                        {interviewerTotals.invalid.toLocaleString()}
+                        {interviewerTotals.notApproved.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-bold">
-                        {((interviewerTotals.valid / interviewerTotals.total) * 100).toFixed(1)}%
+                        {interviewerTotals.total > 0
+                          ? formatPercentage((interviewerTotals.approved / interviewerTotals.total) * 100)
+                          : "0.0%"}
                       </TableCell>
                     </TableRow>
                   </TableFooter>
@@ -198,12 +198,7 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
           <TabsContent value="lga">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button
-                  onClick={() => handleExport("lga")}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
+                <Button onClick={() => handleExport("lga")} variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export LGA Data
                 </Button>
@@ -213,47 +208,45 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
                   <TableHeader>
                     <TableRow>
                       <TableHead>LGA</TableHead>
-                      <TableHead>State</TableHead>
                       <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Valid</TableHead>
-                      <TableHead className="text-right">Invalid</TableHead>
-                      <TableHead className="text-right">% Valid</TableHead>
+                      <TableHead className="text-right">Approved</TableHead>
+                      <TableHead className="text-right">Not Approved</TableHead>
+                      <TableHead className="text-right">% Approved</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {byLGA.map((row, idx) => (
-                      <TableRow key={idx}>
+                    {byLGA.map((row) => (
+                      <TableRow key={`${row.state}-${row.lga}`}>
                         <TableCell className="font-medium">{row.lga}</TableCell>
-                        <TableCell>{row.state}</TableCell>
                         <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
                         <TableCell className="text-right text-success">
-                          {row.valid.toLocaleString()}
+                          {row.approved.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right text-destructive">
-                          {row.invalid.toLocaleString()}
+                          {row.notApproved.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right font-semibold">
-                          {row.percentageValid.toFixed(1)}%
+                          {formatPercentage(row.percentageApproved)}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell className="font-bold" colSpan={2}>
-                        Total
-                      </TableCell>
+                      <TableCell className="font-bold">Total</TableCell>
                       <TableCell className="text-right font-bold">
                         {lgaTotals.total.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-bold text-success">
-                        {lgaTotals.valid.toLocaleString()}
+                        {lgaTotals.approved.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-bold text-destructive">
-                        {lgaTotals.invalid.toLocaleString()}
+                        {lgaTotals.notApproved.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-bold">
-                        {((lgaTotals.valid / lgaTotals.total) * 100).toFixed(1)}%
+                        {lgaTotals.total > 0
+                          ? formatPercentage((lgaTotals.approved / lgaTotals.total) * 100)
+                          : "0.0%"}
                       </TableCell>
                     </TableRow>
                   </TableFooter>

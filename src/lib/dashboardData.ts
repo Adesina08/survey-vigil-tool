@@ -7,21 +7,6 @@ import {
   type ErrorType,
 } from "@/data/sampleData";
 
-const ERROR_LABELS: Record<ErrorType, string> = {
-  "Odd Hour": "Odd Hour",
-  "Low LOI": "Low LOI",
-  "Outside LGA": "Outside LGA Boundary",
-  Duplicate: "Duplicate Phone",
-};
-
-const STATUS_LABELS = {
-  Valid: "valid" as const,
-  Invalid: "invalid" as const,
-  Terminated: "terminated" as const,
-};
-
-type StatusKey = keyof typeof STATUS_LABELS;
-
 interface MapSubmission {
   id: string;
   lat: number;
@@ -31,25 +16,21 @@ interface MapSubmission {
   state: string;
   errorTypes: string[];
   timestamp: string;
-  status: "valid" | "invalid" | "terminated";
+  status: "approved" | "not_approved";
 }
 
 interface SummaryData {
   overallTarget: number;
   totalSubmissions: number;
-  validSubmissions: number;
-  validPercentage: number;
-  invalidSubmissions: number;
-  invalidPercentage: number;
-  forceApproved: number;
-  forceCancelled: number;
-  terminated: number;
+  approvedSubmissions: number;
+  approvalRate: number;
+  notApprovedSubmissions: number;
+  notApprovedRate: number;
 }
 
 interface StatusBreakdown {
-  valid: number;
-  invalid: number;
-  terminated: number;
+  approved: number;
+  notApproved: number;
 }
 
 interface QuotaRow {
@@ -74,7 +55,6 @@ interface ProductivityRow {
   lowLOI: number;
   outsideLGA: number;
   duplicate: number;
-  terminated: number;
   totalErrors: number;
 }
 
@@ -86,9 +66,9 @@ interface ErrorBreakdownRow {
 
 interface AchievementRow {
   total: number;
-  valid: number;
-  invalid: number;
-  percentageValid: number;
+  approved: number;
+  notApproved: number;
+  percentageApproved: number;
 }
 
 interface AchievementByStateRow extends AchievementRow {
@@ -119,6 +99,11 @@ interface DashboardData {
     byInterviewer: AchievementByInterviewerRow[];
     byLGA: AchievementByLGARow[];
   };
+  filters: {
+    lgas: string[];
+    interviewers: string[];
+    errorTypes: string[];
+  };
   lastUpdated: string;
 }
 
@@ -128,33 +113,61 @@ const incrementMap = (map: Map<string, number>, key: string, amount = 1) => {
   map.set(key, (map.get(key) ?? 0) + amount);
 };
 
+const getNumber = (value: number | undefined | null) => (value ?? 0);
+
+const getCoordinate = (row: SheetSubmissionRow, key: "lat" | "lng") => {
+  if (key === "lat") {
+    return (
+      row["_A5. GPS Coordinates_latitude"] ??
+      (row.Latitude as number | undefined) ??
+      0
+    );
+  }
+
+  return (
+    row["_A5. GPS Coordinates_longitude"] ??
+    (row.Longitude as number | undefined) ??
+    0
+  );
+};
+
+const getLGA = (row: SheetSubmissionRow) => row["A3. select the LGA"] ?? row.LGA ?? "Unknown LGA";
+
+const getInterviewerId = (row: SheetSubmissionRow) =>
+  row["A1. Enumerator ID"] ?? row["Interviewer ID"] ?? "Unknown";
+
+const getInterviewerName = (row: SheetSubmissionRow) =>
+  row["Enumerator Name"] ?? row["Interviewer Name"] ?? getInterviewerId(row);
+
+const getApprovalStatus = (row: SheetSubmissionRow) => {
+  const status = row["Approval Status"] ?? row["Outcome Status"] ?? "Valid";
+  return status === "Approved" || status === "Valid" ? "Approved" : "Not Approved";
+};
+
 const buildDashboardData = (): DashboardData => {
   const totalSubmissions = sheetSubmissions.length;
 
-  const validByState = new Map<string, number>();
-  const validByStateAge = new Map<string, number>();
-  const validByStateGender = new Map<string, number>();
+  const approvedByState = new Map<string, number>();
+  const approvedByStateAge = new Map<string, number>();
+  const approvedByStateGender = new Map<string, number>();
   const totalsByState = new Map<string, number>();
-  const invalidByState = new Map<string, number>();
-  const terminatedByState = new Map<string, number>();
+  const notApprovedByState = new Map<string, number>();
 
   const totalsByInterviewer = new Map<string, number>();
-  const validByInterviewer = new Map<string, number>();
-  const invalidByInterviewer = new Map<string, number>();
+  const approvedByInterviewer = new Map<string, number>();
+  const notApprovedByInterviewer = new Map<string, number>();
 
   const totalsByLGA = new Map<string, number>();
-  const validByLGA = new Map<string, number>();
-  const invalidByLGA = new Map<string, number>();
-  const terminatedByLGA = new Map<string, number>();
+  const approvedByLGA = new Map<string, number>();
+  const notApprovedByLGA = new Map<string, number>();
 
   const interviewerNames = new Map<string, string>();
 
-  const errorCounts: Record<string, number> = {
+  const errorCounts: Record<ErrorType, number> = {
     "Odd Hour": 0,
     "Low LOI": 0,
     "Outside LGA Boundary": 0,
     "Duplicate Phone": 0,
-    Terminated: 0,
   };
 
   const interviewerErrors = new Map<
@@ -164,33 +177,42 @@ const buildDashboardData = (): DashboardData => {
       lowLOI: number;
       outsideLGA: number;
       duplicate: number;
-      terminated: number;
     }
   >();
 
-  let forceApproved = 0;
-  let forceCancelled = 0;
+  const lgaSet = new Set<string>();
+  const interviewerSet = new Set<string>();
+  const errorTypeSet = new Set<string>();
 
   const mapSubmissions: Array<MapSubmission & { sortKey: number }> = [];
   let latestTimestamp = new Date(0);
 
   sheetSubmissions.forEach((row) => {
-    const state = row.State;
-    const ageGroup = row["Age Group"];
-    const gender = row.Gender;
-    const interviewerId = row["Interviewer ID"];
-    const interviewerName = row["Interviewer Name"];
-    const lgaKey = `${state}|${row.LGA}`;
-    const status = row["Outcome Status"] as StatusKey;
+    const state = row.State ?? "Unknown State";
+    const ageGroup = row["Age Group"] ?? "Unknown";
+    const gender = row.Gender ?? "Unknown";
+    const interviewerId = getInterviewerId(row);
+    const interviewerName = getInterviewerName(row);
+    const interviewerLabel = `${interviewerId} · ${interviewerName}`;
+    const lga = getLGA(row);
+    const approvalStatus = getApprovalStatus(row);
+    const errorFlags = row["Error Flags"] ?? [];
+
+    const lat = getCoordinate(row, "lat");
+    const lng = getCoordinate(row, "lng");
 
     const timestamp = parseDate(row["Submission Date"], row["Submission Time"]);
     if (timestamp > latestTimestamp) {
       latestTimestamp = timestamp;
     }
 
+    lgaSet.add(lga);
+    interviewerSet.add(interviewerLabel);
+    errorFlags.forEach((flag) => errorTypeSet.add(flag));
+
     incrementMap(totalsByState, state);
     incrementMap(totalsByInterviewer, interviewerId);
-    incrementMap(totalsByLGA, lgaKey);
+    incrementMap(totalsByLGA, `${state}|${lga}`);
 
     interviewerNames.set(interviewerId, interviewerName);
     const interviewerError = interviewerErrors.get(interviewerId) ?? {
@@ -198,74 +220,52 @@ const buildDashboardData = (): DashboardData => {
       lowLOI: 0,
       outsideLGA: 0,
       duplicate: 0,
-      terminated: 0,
     };
 
-    if (status === "Valid") {
-      incrementMap(validByState, state);
-      incrementMap(validByStateAge, `${state}|${ageGroup}`);
-      incrementMap(validByStateGender, `${state}|${gender}`);
-      incrementMap(validByInterviewer, interviewerId);
-      incrementMap(validByLGA, lgaKey);
+    const isApproved = approvalStatus === "Approved";
+
+    if (isApproved) {
+      incrementMap(approvedByState, state);
+      incrementMap(approvedByStateAge, `${state}|${ageGroup}`);
+      incrementMap(approvedByStateGender, `${state}|${gender}`);
+      incrementMap(approvedByInterviewer, interviewerId);
+      incrementMap(approvedByLGA, `${state}|${lga}`);
+    } else {
+      incrementMap(notApprovedByState, state);
+      incrementMap(notApprovedByInterviewer, interviewerId);
+      incrementMap(notApprovedByLGA, `${state}|${lga}`);
     }
 
-    if (status === "Invalid") {
-      incrementMap(invalidByState, state);
-      incrementMap(invalidByInterviewer, interviewerId);
-      incrementMap(invalidByLGA, lgaKey);
-    }
-
-    if (status === "Terminated" || row.Terminated === "Yes") {
-      incrementMap(terminatedByState, state);
-      incrementMap(terminatedByLGA, lgaKey);
-      interviewerError.terminated += 1;
-      errorCounts.Terminated += 1;
-    }
-
-    if (row["Force Approved"] === "Yes") {
-      forceApproved += 1;
-    }
-
-    if (row["Force Cancelled"] === "Yes") {
-      forceCancelled += 1;
-    }
-
-    (Object.entries(ERROR_LABELS) as Array<[ErrorType, string]>).forEach(([errorKey, label]) => {
-      const column = `${errorKey} Flag` as keyof SheetSubmissionRow;
-      if (row[column] === "Yes") {
-        errorCounts[label] += 1;
-        switch (errorKey) {
-          case "Odd Hour":
-            interviewerError.oddHour += 1;
-            break;
-          case "Low LOI":
-            interviewerError.lowLOI += 1;
-            break;
-          case "Outside LGA":
-            interviewerError.outsideLGA += 1;
-            break;
-          case "Duplicate":
-            interviewerError.duplicate += 1;
-            break;
-        }
+    errorFlags.forEach((errorType) => {
+      errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
+      switch (errorType) {
+        case "Odd Hour":
+          interviewerError.oddHour += 1;
+          break;
+        case "Low LOI":
+          interviewerError.lowLOI += 1;
+          break;
+        case "Outside LGA Boundary":
+          interviewerError.outsideLGA += 1;
+          break;
+        case "Duplicate Phone":
+          interviewerError.duplicate += 1;
+          break;
+        default:
+          break;
       }
     });
 
     interviewerErrors.set(interviewerId, interviewerError);
 
-    const statusLabel = STATUS_LABELS[status] ?? "valid";
-    const errorTypes = (Object.entries(ERROR_LABELS) as Array<[ErrorType, string]>)
-      .filter(([errorKey]) => row[`${errorKey} Flag` as keyof SheetSubmissionRow] === "Yes")
-      .map(([, label]) => label);
-
     mapSubmissions.push({
       id: row["Submission ID"],
-      lat: row.Latitude,
-      lng: row.Longitude,
-      interviewer: interviewerName,
-      lga: row.LGA,
+      lat,
+      lng,
+      interviewer: interviewerLabel,
+      lga,
       state,
-      errorTypes,
+      errorTypes: errorFlags,
       timestamp: timestamp.toLocaleString("en-US", {
         month: "short",
         day: "numeric",
@@ -273,23 +273,26 @@ const buildDashboardData = (): DashboardData => {
         hour: "2-digit",
         minute: "2-digit",
       }),
-      status: statusLabel,
+      status: isApproved ? "approved" : "not_approved",
       sortKey: timestamp.getTime(),
     });
   });
 
-  const totalValid = [...validByState.values()].reduce((sum, value) => sum + value, 0);
-  const totalInvalid = [...invalidByState.values()].reduce((sum, value) => sum + value, 0);
-  const totalTerminated = errorCounts.Terminated;
+  const totalApproved = [...approvedByState.values()].reduce((sum, value) => sum + value, 0);
+  const totalNotApproved = totalSubmissions - totalApproved;
 
-  const overallTarget = sheetStateTargets.reduce((sum, row) => sum + row["State Target"], 0);
-  const validPercentage = totalSubmissions > 0 ? (totalValid / totalSubmissions) * 100 : 0;
-  const invalidPercentage = totalSubmissions > 0 ? (totalInvalid / totalSubmissions) * 100 : 0;
+  const overallTarget = sheetStateTargets.reduce(
+    (sum, row) => sum + row["State Target"],
+    0
+  );
 
-  const quotaProgress = overallTarget > 0 ? (totalValid / overallTarget) * 100 : 0;
+  const approvalRate = totalSubmissions > 0 ? (totalApproved / totalSubmissions) * 100 : 0;
+  const notApprovedRate = totalSubmissions > 0 ? (totalNotApproved / totalSubmissions) * 100 : 0;
+
+  const quotaProgress = overallTarget > 0 ? (totalApproved / overallTarget) * 100 : 0;
 
   const quotaByState: QuotaRow[] = sheetStateTargets.map((row) => {
-    const achieved = validByState.get(row.State) ?? 0;
+    const achieved = approvedByState.get(row.State) ?? 0;
     const balance = Math.max(row["State Target"] - achieved, 0);
     return {
       state: row.State,
@@ -301,7 +304,7 @@ const buildDashboardData = (): DashboardData => {
 
   const quotaByStateAge: QuotaAgeRow[] = sheetStateAgeTargets.map((row) => {
     const key = `${row.State}|${row["Age Group"]}`;
-    const achieved = validByStateAge.get(key) ?? 0;
+    const achieved = approvedByStateAge.get(key) ?? 0;
     const balance = Math.max(row["Age Group Target"] - achieved, 0);
     return {
       state: row.State,
@@ -314,7 +317,7 @@ const buildDashboardData = (): DashboardData => {
 
   const quotaByStateGender: QuotaGenderRow[] = sheetStateGenderTargets.map((row) => {
     const key = `${row.State}|${row.Gender}`;
-    const achieved = validByStateGender.get(key) ?? 0;
+    const achieved = approvedByStateGender.get(key) ?? 0;
     const balance = Math.max(row["Gender Target"] - achieved, 0);
     return {
       state: row.State,
@@ -332,7 +335,6 @@ const buildDashboardData = (): DashboardData => {
       lowLOI: 0,
       outsideLGA: 0,
       duplicate: 0,
-      terminated: 0,
     };
 
     return {
@@ -342,13 +344,11 @@ const buildDashboardData = (): DashboardData => {
       lowLOI: errorStats.lowLOI,
       outsideLGA: errorStats.outsideLGA,
       duplicate: errorStats.duplicate,
-      terminated: errorStats.terminated,
       totalErrors:
         errorStats.oddHour +
         errorStats.lowLOI +
         errorStats.outsideLGA +
-        errorStats.duplicate +
-        errorStats.terminated,
+        errorStats.duplicate,
     };
   });
 
@@ -360,69 +360,63 @@ const buildDashboardData = (): DashboardData => {
   }));
 
   const achievementsByState: AchievementByStateRow[] = [...totalsByState.entries()].map(([state, total]) => {
-    const valid = validByState.get(state) ?? 0;
-    const invalid = invalidByState.get(state) ?? 0;
-    const terminated = terminatedByState.get(state) ?? 0;
-    const computedTotal = valid + invalid + terminated;
+    const approved = approvedByState.get(state) ?? 0;
+    const notApproved = notApprovedByState.get(state) ?? (total - approved);
+    const computedTotal = approved + notApproved;
 
     return {
       state,
       total: computedTotal,
-      valid,
-      invalid,
-      percentageValid: computedTotal > 0 ? (valid / computedTotal) * 100 : 0,
+      approved,
+      notApproved,
+      percentageApproved: computedTotal > 0 ? (approved / computedTotal) * 100 : 0,
     };
   });
 
   const achievementsByInterviewer: AchievementByInterviewerRow[] = [...totalsByInterviewer.entries()].map(
     ([interviewerId, total]) => {
-      const valid = validByInterviewer.get(interviewerId) ?? 0;
-      const invalid = invalidByInterviewer.get(interviewerId) ?? 0;
+      const approved = approvedByInterviewer.get(interviewerId) ?? 0;
+      const notApproved = notApprovedByInterviewer.get(interviewerId) ?? (total - approved);
       const interviewerLabel = `${interviewerId} · ${interviewerNames.get(interviewerId) ?? interviewerId}`;
 
       return {
         interviewer: interviewerLabel,
         total,
-        valid,
-        invalid,
-        percentageValid: total > 0 ? (valid / total) * 100 : 0,
+        approved,
+        notApproved,
+        percentageApproved: total > 0 ? (approved / total) * 100 : 0,
       };
     }
   );
 
   const achievementsByLGA: AchievementByLGARow[] = [...totalsByLGA.entries()].map(([key, total]) => {
     const [state, lga] = key.split("|");
-    const valid = validByLGA.get(key) ?? 0;
-    const invalid = invalidByLGA.get(key) ?? 0;
-    const terminated = terminatedByLGA.get(key) ?? 0;
-    const computedTotal = valid + invalid + terminated;
+    const approved = approvedByLGA.get(key) ?? 0;
+    const notApproved = notApprovedByLGA.get(key) ?? (total - approved);
+    const computedTotal = approved + notApproved;
 
     return {
       lga,
       state,
       total: computedTotal,
-      valid,
-      invalid,
-      percentageValid: computedTotal > 0 ? (valid / computedTotal) * 100 : 0,
+      approved,
+      notApproved,
+      percentageApproved: computedTotal > 0 ? (approved / computedTotal) * 100 : 0,
     };
   });
 
   const summary: SummaryData = {
     overallTarget,
     totalSubmissions,
-    validSubmissions: totalValid,
-    validPercentage: Number(validPercentage.toFixed(1)),
-    invalidSubmissions: totalInvalid,
-    invalidPercentage: Number(invalidPercentage.toFixed(1)),
-    forceApproved,
-    forceCancelled,
-    terminated: totalTerminated,
+    approvedSubmissions: totalApproved,
+    approvalRate: Number(approvalRate.toFixed(1)),
+    notApprovedSubmissions: totalNotApproved,
+    notApprovedRate: Number(notApprovedRate.toFixed(1)),
   };
 
   const statusBreakdown: StatusBreakdown = {
-    valid: totalValid,
-    invalid: totalInvalid,
-    terminated: totalTerminated,
+    approved: totalApproved,
+    notApproved: totalNotApproved,
   };
 
   const sortedMapSubmissions = mapSubmissions
@@ -452,6 +446,11 @@ const buildDashboardData = (): DashboardData => {
       byState: achievementsByState,
       byInterviewer: achievementsByInterviewer,
       byLGA: achievementsByLGA,
+    },
+    filters: {
+      lgas: Array.from(lgaSet).sort(),
+      interviewers: Array.from(interviewerSet).sort(),
+      errorTypes: Array.from(errorTypeSet).sort(),
     },
     lastUpdated,
   };

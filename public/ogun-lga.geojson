@@ -1,0 +1,113 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "LGA_NAME": "Abeokuta North"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [3.3100, 7.1200],
+            [3.3900, 7.1200],
+            [3.3900, 7.2100],
+            [3.3100, 7.2100],
+            [3.3100, 7.1200]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "LGA_NAME": "Abeokuta South"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [3.3300, 7.0600],
+            [3.4100, 7.0600],
+            [3.4100, 7.1400],
+            [3.3300, 7.1400],
+            [3.3300, 7.0600]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "LGA_NAME": "Sagamu"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [3.5800, 6.7700],
+            [3.7200, 6.7700],
+            [3.7200, 6.8900],
+            [3.5800, 6.8900],
+            [3.5800, 6.7700]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "LGA_NAME": "Ijebu Ode"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [3.8600, 6.7400],
+            [3.9800, 6.7400],
+            [3.9800, 6.8600],
+            [3.8600, 6.8600],
+            [3.8600, 6.7400]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "LGA_NAME": "Ifo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [3.1200, 6.7200],
+            [3.2600, 6.7200],
+            [3.2600, 6.8800],
+            [3.1200, 6.8800],
+            [3.1200, 6.7200]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "LGA_NAME": "Yewa South"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [2.9400, 6.7800],
+            [3.0800, 6.7800],
+            [3.0800, 6.9200],
+            [2.9400, 6.9200],
+            [2.9400, 6.7800]
+          ]
+        ]
+      }
+    }
+  ]
+}

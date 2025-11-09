@@ -4,26 +4,24 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recha
 interface ProgressChartsProps {
   quotaProgress: number;
   statusBreakdown: {
-    valid: number;
-    invalid: number;
-    terminated: number;
+    approved: number;
+    notApproved: number;
   };
 }
 
 export function ProgressCharts({ quotaProgress, statusBreakdown }: ProgressChartsProps) {
   const quotaData = [
     { name: "Achieved", value: quotaProgress },
-    { name: "Remaining", value: 100 - quotaProgress },
+    { name: "Remaining", value: Math.max(100 - quotaProgress, 0) },
   ];
 
   const statusData = [
-    { name: "Valid", value: statusBreakdown.valid },
-    { name: "Invalid", value: statusBreakdown.invalid },
-    { name: "Terminated", value: statusBreakdown.terminated },
+    { name: "Approved", value: statusBreakdown.approved },
+    { name: "Not Approved", value: statusBreakdown.notApproved },
   ];
 
   const QUOTA_COLORS = ["hsl(var(--primary))", "hsl(var(--muted))"];
-  const STATUS_COLORS = ["hsl(var(--success))", "hsl(var(--destructive))", "hsl(var(--warning))"];
+  const STATUS_COLORS = ["hsl(var(--success))", "hsl(var(--destructive))"];
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -60,7 +58,7 @@ export function ProgressCharts({ quotaProgress, statusBreakdown }: ProgressChart
 
       <Card className="slide-in">
         <CardHeader>
-          <CardTitle>Status Breakdown</CardTitle>
+          <CardTitle>Approval Breakdown</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={250}>
