@@ -36,24 +36,27 @@ interface StatusBreakdown {
   notApproved: number;
 }
 
-interface QuotaRow {
+interface QuotaLGARow {
   state: string;
+  lga: string;
   target: number;
   achieved: number;
   balance: number;
 }
 
-interface QuotaAgeRow extends QuotaRow {
+interface QuotaLGAAgeRow extends QuotaLGARow {
   ageGroup: string;
 }
 
-interface QuotaGenderRow extends QuotaRow {
+interface QuotaLGAGenderRow extends QuotaLGARow {
   gender: string;
 }
 
 interface ProductivityRow {
   interviewer: string;
   totalSubmissions: number;
+  validSubmissions: number;
+  invalidSubmissions: number;
   oddHour: number;
   lowLOI: number;
   outsideLGA: number;
@@ -91,9 +94,9 @@ export interface DashboardData {
   summary: SummaryData;
   statusBreakdown: StatusBreakdown;
   quotaProgress: number;
-  quotaByState: QuotaRow[];
-  quotaByStateAge: QuotaAgeRow[];
-  quotaByStateGender: QuotaGenderRow[];
+  quotaByLGA: QuotaLGARow[];
+  quotaByLGAAge: QuotaLGAAgeRow[];
+  quotaByLGAGender: QuotaLGAGenderRow[];
   mapSubmissions: MapSubmission[];
   userProductivity: ProductivityRow[];
   errorBreakdown: ErrorBreakdownRow[];
@@ -176,6 +179,14 @@ export const buildDashboardData = ({
   const approvedByLGA = new Map<string, number>();
   const notApprovedByLGA = new Map<string, number>();
 
+  const totalsByLGAAge = new Map<string, number>();
+  const approvedByLGAAge = new Map<string, number>();
+  const notApprovedByLGAAge = new Map<string, number>();
+
+  const totalsByLGAGender = new Map<string, number>();
+  const approvedByLGAGender = new Map<string, number>();
+  const notApprovedByLGAGender = new Map<string, number>();
+
   const totalsByStateAge = new Map<string, number>();
   const totalsByStateGender = new Map<string, number>();
 
@@ -231,6 +242,8 @@ export const buildDashboardData = ({
     incrementMap(totalsByState, state);
     incrementMap(totalsByInterviewer, interviewerId);
     incrementMap(totalsByLGA, `${state}|${lga}`);
+    incrementMap(totalsByLGAAge, `${state}|${lga}|${ageGroup}`);
+    incrementMap(totalsByLGAGender, `${state}|${lga}|${gender}`);
     incrementMap(totalsByStateAge, `${state}|${ageGroup}`);
     incrementMap(totalsByStateGender, `${state}|${gender}`);
 
@@ -250,10 +263,14 @@ export const buildDashboardData = ({
       incrementMap(approvedByStateGender, `${state}|${gender}`);
       incrementMap(approvedByInterviewer, interviewerId);
       incrementMap(approvedByLGA, `${state}|${lga}`);
+      incrementMap(approvedByLGAAge, `${state}|${lga}|${ageGroup}`);
+      incrementMap(approvedByLGAGender, `${state}|${lga}|${gender}`);
     } else {
       incrementMap(notApprovedByState, state);
       incrementMap(notApprovedByInterviewer, interviewerId);
       incrementMap(notApprovedByLGA, `${state}|${lga}`);
+      incrementMap(notApprovedByLGAAge, `${state}|${lga}|${ageGroup}`);
+      incrementMap(notApprovedByLGAGender, `${state}|${lga}|${gender}`);
     }
 
     errorFlags.forEach((errorType) => {
@@ -343,42 +360,60 @@ export const buildDashboardData = ({
 
   const quotaProgress = overallTarget > 0 ? (totalApproved / overallTarget) * 100 : 0;
 
-  const quotaByState: QuotaRow[] = effectiveStateTargets.map((row) => {
-    const achieved = approvedByState.get(row.State) ?? 0;
-    const balance = Math.max(row["State Target"] - achieved, 0);
-    return {
-      state: row.State,
-      target: row["State Target"],
-      achieved,
-      balance,
-    };
-  });
+  const quotaByLGA: QuotaLGARow[] = [...totalsByLGA.entries()]
+    .map(([key, total]) => {
+      const [state, lga] = key.split("|");
+      const achieved = approvedByLGA.get(key) ?? 0;
+      const balance = Math.max(total - achieved, 0);
+      return {
+        state,
+        lga,
+        target: total,
+        achieved,
+        balance,
+      };
+    })
+    .sort((a, b) => a.lga.localeCompare(b.lga));
 
-  const quotaByStateAge: QuotaAgeRow[] = effectiveStateAgeTargets.map((row) => {
-    const key = `${row.State}|${row["Age Group"]}`;
-    const achieved = approvedByStateAge.get(key) ?? 0;
-    const balance = Math.max(row["Age Group Target"] - achieved, 0);
-    return {
-      state: row.State,
-      ageGroup: row["Age Group"],
-      target: row["Age Group Target"],
-      achieved,
-      balance,
-    };
-  });
+  const quotaByLGAAge: QuotaLGAAgeRow[] = [...totalsByLGAAge.entries()]
+    .map(([key, total]) => {
+      const [state, lga, ageGroup] = key.split("|");
+      const achieved = approvedByLGAAge.get(key) ?? 0;
+      const balance = Math.max(total - achieved, 0);
+      return {
+        state,
+        lga,
+        ageGroup,
+        target: total,
+        achieved,
+        balance,
+      };
+    })
+    .sort((a, b) => {
+      const lgaComparison = a.lga.localeCompare(b.lga);
+      if (lgaComparison !== 0) return lgaComparison;
+      return a.ageGroup.localeCompare(b.ageGroup);
+    });
 
-  const quotaByStateGender: QuotaGenderRow[] = effectiveStateGenderTargets.map((row) => {
-    const key = `${row.State}|${row.Gender}`;
-    const achieved = approvedByStateGender.get(key) ?? 0;
-    const balance = Math.max(row["Gender Target"] - achieved, 0);
-    return {
-      state: row.State,
-      gender: row.Gender,
-      target: row["Gender Target"],
-      achieved,
-      balance,
-    };
-  });
+  const quotaByLGAGender: QuotaLGAGenderRow[] = [...totalsByLGAGender.entries()]
+    .map(([key, total]) => {
+      const [state, lga, gender] = key.split("|");
+      const achieved = approvedByLGAGender.get(key) ?? 0;
+      const balance = Math.max(total - achieved, 0);
+      return {
+        state,
+        lga,
+        gender: gender as QuotaLGAGenderRow["gender"],
+        target: total,
+        achieved,
+        balance,
+      };
+    })
+    .sort((a, b) => {
+      const lgaComparison = a.lga.localeCompare(b.lga);
+      if (lgaComparison !== 0) return lgaComparison;
+      return a.gender.localeCompare(b.gender);
+    });
 
   const userProductivity: ProductivityRow[] = [...totalsByInterviewer.entries()].map(([interviewerId, total]) => {
     const name = interviewerNames.get(interviewerId) ?? interviewerId;
@@ -388,10 +423,14 @@ export const buildDashboardData = ({
       outsideLGA: 0,
       duplicate: 0,
     };
+    const approvedCount = approvedByInterviewer.get(interviewerId) ?? 0;
+    const invalidCount = notApprovedByInterviewer.get(interviewerId) ?? Math.max(total - approvedCount, 0);
 
     return {
       interviewer: `${interviewerId} · ${name}`,
       totalSubmissions: total,
+      validSubmissions: approvedCount,
+      invalidSubmissions: invalidCount,
       oddHour: errorStats.oddHour,
       lowLOI: errorStats.lowLOI,
       outsideLGA: errorStats.outsideLGA,
@@ -488,9 +527,9 @@ export const buildDashboardData = ({
     summary,
     statusBreakdown,
     quotaProgress: Number(quotaProgress.toFixed(1)),
-    quotaByState,
-    quotaByStateAge,
-    quotaByStateGender,
+    quotaByLGA,
+    quotaByLGAAge,
+    quotaByLGAGender,
     mapSubmissions: sortedMapSubmissions,
     userProductivity,
     errorBreakdown,

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import type { Feature, FeatureCollection, Geometry } from "geojson";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -72,7 +73,7 @@ const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
 };
 
 export function InteractiveMap({ submissions, interviewers, errorTypes }: InteractiveMapProps) {
-  const [showLabels, setShowLabels] = useState(false);
+  const [showLabels, setShowLabels] = useState(true);
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
   const mapRef = useRef<L.Map | null>(null);
@@ -80,6 +81,9 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
   const labelLayerRef = useRef<L.LayerGroup | null>(null);
   const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
+  const [geoJsonFeatures, setGeoJsonFeatures] = useState<
+    Feature<Geometry, Record<string, unknown>>[]
+  >([]);
 
   const filteredSubmissions = useMemo(() => {
     return submissions.filter((submission) => {
@@ -186,20 +190,23 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
       try {
         const response = await fetch("/ogun-lga.geojson");
         if (!response.ok) return;
-        const geoJson = await response.json();
+        const geoJson = (await response.json()) as FeatureCollection<Geometry, Record<string, unknown>>;
 
         boundaryLayerRef.current?.remove();
         boundaryLayerRef.current = L.geoJSON(geoJson, {
           style: () => ({
             color: "#1d4ed8",
-            weight: 1.2,
-            fillOpacity: 0.03,
+            weight: 1.5,
+            fillOpacity: 0.12,
+            fillColor: "#93c5fd",
           }),
         }).addTo(mapRef.current!);
 
+        setGeoJsonFeatures(geoJson.features ?? []);
+
         const bounds = boundaryLayerRef.current.getBounds();
         if (bounds.isValid()) {
-          mapRef.current!.fitBounds(bounds, { padding: [24, 24] });
+          mapRef.current!.fitBounds(bounds, { padding: [32, 32] });
         }
       } catch (error) {
         console.error("Failed to load Ogun LGA boundaries", error);
@@ -243,6 +250,32 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
       return;
     }
 
+    const addLabel = (name: string, center: L.LatLngExpression) => {
+      const icon = L.divIcon({
+        className: "lga-label",
+        html: `<div style="background: rgba(37, 99, 235, 0.92); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 4px rgba(15, 23, 42, 0.25);">${name}</div>`,
+        iconSize: [0, 0],
+      });
+
+      L.marker(center, { icon }).addTo(layer);
+    };
+
+    if (geoJsonFeatures.length > 0) {
+      geoJsonFeatures.forEach((feature) => {
+        const { properties } = feature;
+        const lgaName =
+          (properties?.lganame as string | undefined) ??
+          (properties?.LGA as string | undefined) ??
+          (properties?.name as string | undefined) ??
+          "Unknown";
+
+        const featureLayer = L.geoJSON(feature);
+        addLabel(lgaName, featureLayer.getBounds().getCenter());
+      });
+
+      return;
+    }
+
     const lgaCenters = filteredSubmissions.reduce(
       (acc, sub) => {
         if (!acc[sub.lga]) {
@@ -260,16 +293,9 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
     Object.entries(lgaCenters).forEach(([lga, data]) => {
       const avgLat = data.lat / data.count;
       const avgLng = data.lng / data.count;
-
-      const icon = L.divIcon({
-        className: "lga-label",
-        html: `<div style="background: rgba(37, 99, 235, 0.9); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${lga}</div>`,
-        iconSize: [0, 0],
-      });
-
-      L.marker([avgLat, avgLng], { icon }).addTo(layer);
+      addLabel(lga, [avgLat, avgLng]);
     });
-  }, [showLabels, filteredSubmissions]);
+  }, [showLabels, filteredSubmissions, geoJsonFeatures]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -280,45 +306,53 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
 
   return (
     <Card className="fade-in">
-      <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <CardHeader className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <MapPin className="h-5 w-5 text-primary" />
           <CardTitle>Survey Locations</CardTitle>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-          <div className="flex flex-wrap gap-2">
-            <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
-              <SelectTrigger className="min-w-[180px]">
-                <SelectValue placeholder="All Error Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Error Types</SelectItem>
-                {errorTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
-              <SelectTrigger className="min-w-[200px]">
-                <SelectValue placeholder="All Interviewers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Interviewers</SelectItem>
-                {interviewers.map((interviewer) => (
-                  <SelectItem key={interviewer} value={interviewer}>
-                    {interviewer}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
+            <SelectTrigger className="min-w-[180px]">
+              <SelectValue placeholder="All Error Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Error Types</SelectItem>
+              {errorTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
+            <SelectTrigger className="min-w-[200px]">
+              <SelectValue placeholder="All Interviewers" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Interviewers</SelectItem>
+              {interviewers.map((interviewer) => (
+                <SelectItem key={interviewer} value={interviewer}>
+                  {interviewer}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[500px] w-full overflow-hidden rounded-lg border">
+          <div ref={mapContainerRef} className="h-full w-full" />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm text-muted-foreground">
+            Showing {filteredSubmissions.length.toLocaleString()} submissions
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowLabels(!showLabels)}
+              onClick={() => setShowLabels((value) => !value)}
               className="gap-2"
             >
               <Tag className="h-4 w-4" />
@@ -329,14 +363,6 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
               Export Map
             </Button>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[500px] w-full overflow-hidden rounded-lg border">
-          <div ref={mapContainerRef} className="h-full w-full" />
-        </div>
-        <div className="mt-3 text-sm text-muted-foreground">
-          Showing {filteredSubmissions.length.toLocaleString()} submissions
         </div>
       </CardContent>
     </Card>

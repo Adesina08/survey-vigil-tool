@@ -43,7 +43,7 @@ interface AchievementsTablesProps {
   byLGA: LGAAchievement[];
 }
 
-export function AchievementsTables({ byState, byInterviewer, byLGA }: AchievementsTablesProps) {
+export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: AchievementsTablesProps) {
   const handleExport = (type: string) => {
     console.log(`Exporting ${type} achievements...`);
   };
@@ -59,7 +59,6 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
     );
   };
 
-  const stateTotals = calculateTotals(byState);
   const interviewerTotals = calculateTotals(byInterviewer);
   const lgaTotals = calculateTotals(byLGA);
 
@@ -74,66 +73,11 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="state" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="state">By State</TabsTrigger>
+        <Tabs defaultValue="interviewer" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="interviewer">By Interviewer</TabsTrigger>
             <TabsTrigger value="lga">By LGA</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="state">
-            <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>State</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Approved</TableHead>
-                      <TableHead className="text-right">Not Approved</TableHead>
-                      <TableHead className="text-right">% Approved</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {byState.map((row) => (
-                      <TableRow key={row.state}>
-                        <TableCell className="font-medium">{row.state}</TableCell>
-                        <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-success">
-                          {row.approved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {row.notApproved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatPercentage(row.percentageApproved)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell className="font-bold">Total</TableCell>
-                      <TableCell className="text-right font-bold">
-                        {stateTotals.total.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-success">
-                        {stateTotals.approved.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-destructive">
-                        {stateTotals.notApproved.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        {stateTotals.total > 0
-                          ? formatPercentage((stateTotals.approved / stateTotals.total) * 100)
-                          : "0.0%"}
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </div>
-            </div>
-          </TabsContent>
 
           <TabsContent value="interviewer">
             <div className="space-y-4">
