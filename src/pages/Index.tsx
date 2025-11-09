@@ -124,9 +124,9 @@ const Index = () => {
         />
 
         <QuotaTracker
-          byState={dashboardData.quotaByState}
-          byStateAge={dashboardData.quotaByStateAge}
-          byStateGender={dashboardData.quotaByStateGender}
+          byLGA={dashboardData.quotaByLGA}
+          byLGAAge={dashboardData.quotaByLGAAge}
+          byLGAGender={dashboardData.quotaByLGAGender}
         />
 
         <UserProductivity data={dashboardData.userProductivity} />
