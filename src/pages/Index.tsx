@@ -144,7 +144,7 @@ const Index = () => {
 
       <footer className="border-t bg-background py-4">
         <div className="mx-auto max-w-7xl px-6 text-center text-sm text-muted-foreground">
-          © 2025 Survey Vigil Tool. All rights reserved.
+          © 2025
         </div>
       </footer>
     </div>
