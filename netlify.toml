@@ -18,3 +18,9 @@
   to = "/.netlify/functions/dashboard"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/api/analysis/*"
+  to = "/.netlify/functions/analysis_table/:splat"
+  status = 200
+  force = true

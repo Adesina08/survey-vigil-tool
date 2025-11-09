@@ -36,7 +36,7 @@ interface GVizResponse {
 
 type NormalisedRow = Map<string, unknown>;
 
-const normaliseHeaderKey = (key: string): string => {
+export const normaliseHeaderKey = (key: string): string => {
   const withoutHtml = key.replace(/<[^>]*>/g, "");
   const trimmed = withoutHtml.trim();
 

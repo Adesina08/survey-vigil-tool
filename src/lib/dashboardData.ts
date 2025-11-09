@@ -10,6 +10,9 @@ import {
   type ErrorType,
 } from "@/data/sampleData";
 import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks";
+import { normaliseHeaderKey } from "./googleSheets";
+
+export type AnalysisRow = Record<string, unknown>;
 
 interface MapSubmission {
   id: string;
@@ -112,6 +115,7 @@ export interface DashboardData {
     errorTypes: string[];
   };
   lastUpdated: string;
+  analysisRows: AnalysisRow[];
 }
 
 const parseDate = (date: string, time: string) => new Date(`${date}T${time}:00Z`);
@@ -156,6 +160,7 @@ interface DashboardDataInput {
   stateTargets?: SheetStateTargetRow[];
   stateAgeTargets?: SheetStateAgeTargetRow[];
   stateGenderTargets?: SheetStateGenderTargetRow[];
+  analysisRows?: AnalysisRow[];
 }
 
 export const buildDashboardData = ({
@@ -163,6 +168,7 @@ export const buildDashboardData = ({
   stateTargets = [],
   stateAgeTargets = [],
   stateGenderTargets = [],
+  analysisRows,
 }: DashboardDataInput): DashboardData => {
   const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(submissions);
 
@@ -538,6 +544,28 @@ export const buildDashboardData = ({
       })
     : "No data available";
 
+  const normalizedRows: AnalysisRow[] =
+    analysisRows ??
+    submissions.map((row) => {
+      const normalized: AnalysisRow = {};
+      Object.entries(row).forEach(([key, value]) => {
+        if (typeof key !== "string" || key.length === 0) {
+          return;
+        }
+        const normalizedKey = normaliseHeaderKey(key);
+        if (!normalizedKey) {
+          return;
+        }
+        const cleanedValue = Array.isArray(value)
+          ? value.join(" | ")
+          : value === undefined
+            ? null
+            : value;
+        normalized[normalizedKey] = cleanedValue;
+      });
+      return normalized;
+    });
+
   return {
     summary,
     statusBreakdown,
@@ -559,6 +587,7 @@ export const buildDashboardData = ({
       errorTypes: Array.from(errorTypeSet).sort(),
     },
     lastUpdated,
+    analysisRows: normalizedRows,
   };
 };
 
