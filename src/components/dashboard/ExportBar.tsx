@@ -9,7 +9,7 @@ export function ExportBar() {
   return (
     <div className="sticky bottom-0 z-10 border-t bg-card px-6 py-4">
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap justify-center gap-2 text-center">
           <Button onClick={() => handleExport("all")} variant="default" size="sm" className="gap-2">
             <Download className="h-4 w-4" />
             Export All Data
