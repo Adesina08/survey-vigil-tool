@@ -11,6 +11,7 @@ import type {
 
 const GVIZ_PREFIX = "google.visualization.Query.setResponse(";
 const GVIZ_SUFFIX = ");";
+const GVIZ_SECURITY_PREFIX = ")]}'";
 
 interface GVizColumn {
   id: string;
@@ -94,8 +95,17 @@ const getFromRow = (row: NormalisedRow, ...candidates: string[]): unknown => {
   return undefined;
 };
 
+const stripGVizSecurityPrefix = (rawText: string): string => {
+  if (rawText.startsWith(GVIZ_SECURITY_PREFIX)) {
+    return rawText.slice(GVIZ_SECURITY_PREFIX.length);
+  }
+
+  return rawText;
+};
+
 const parseGVizResponse = (rawText: string): Record<string, unknown>[] => {
-  const trimmed = rawText.trim();
+  const trimmed = stripGVizSecurityPrefix(rawText.trim());
+
   if (!trimmed.startsWith(GVIZ_PREFIX) || !trimmed.endsWith(GVIZ_SUFFIX)) {
     throw new Error("Unexpected Google Sheets response format");
   }
@@ -170,6 +180,88 @@ interface FetchSheetOptions {
   query?: string;
 }
 
+const parseCsvLine = (line: string): string[] => {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+
+    if (inQuotes) {
+      if (char === "\"") {
+        const nextChar = line[index + 1];
+        if (nextChar === "\"") {
+          current += "\"";
+          index += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else if (char === "\"") {
+      inQuotes = true;
+    } else if (char === ",") {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current);
+  return result;
+};
+
+const parseCsvResponse = (rawText: string): Record<string, unknown>[] => {
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0);
+
+  if (lines.length === 0) {
+    return [];
+  }
+
+  const headers = parseCsvLine(lines[0]);
+
+  return lines.slice(1).map((line) => {
+    const values = parseCsvLine(line);
+    const record: Record<string, unknown> = {};
+
+    headers.forEach((header, index) => {
+      const value = values[index] ?? "";
+      record[header] = value;
+    });
+
+    return record;
+  });
+};
+
+const fetchGoogleSheetRowsAsCsv = async ({
+  spreadsheetId,
+  sheetName,
+}: Omit<FetchSheetOptions, "query">): Promise<Record<string, unknown>[]> => {
+  const params = new URLSearchParams({
+    tqx: "out:csv",
+  });
+
+  if (sheetName) {
+    params.set("sheet", sheetName);
+  }
+
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?${params.toString()}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Google Sheet CSV: ${response.statusText}`);
+  }
+
+  const csvText = await response.text();
+  return parseCsvResponse(csvText);
+};
+
 export const fetchGoogleSheetRows = async ({
   spreadsheetId,
   sheetName,
@@ -195,7 +287,12 @@ export const fetchGoogleSheetRows = async ({
   }
 
   const rawText = await response.text();
-  return parseGVizResponse(rawText);
+  try {
+    return parseGVizResponse(rawText);
+  } catch (error) {
+    console.warn("Failed to parse GViz response, attempting CSV fallback", error);
+    return fetchGoogleSheetRowsAsCsv({ spreadsheetId, sheetName });
+  }
 };
 
 const toStringValue = (value: unknown): string => {
