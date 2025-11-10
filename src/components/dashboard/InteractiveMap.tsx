@@ -14,7 +14,10 @@ import L from "leaflet";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { formatErrorLabel } from "@/lib/utils";
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+const defaultIconPrototype = L.Icon.Default.prototype as unknown as {
+  _getIconUrl?: unknown;
+};
+delete defaultIconPrototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -37,17 +40,66 @@ interface InteractiveMapProps {
   submissions: Submission[];
   interviewers: string[];
   errorTypes: string[];
+  lgas: string[];
 }
 
 type Html2CanvasFn = (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+
+type Html2CanvasWindow = typeof window & { html2canvas?: Html2CanvasFn };
+
+const getMarkerColor = (status: Submission["status"]) => {
+  switch (status) {
+    case "approved":
+      return "#16a34a";
+    case "not_approved":
+    default:
+      return "#dc2626";
+  }
+};
+
+const createCustomIcon = (status: Submission["status"]) => {
+  const color = getMarkerColor(status);
+  return L.divIcon({
+    className: "custom-marker",
+    html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  });
+};
+
+const createPopupContent = (submission: Submission) => {
+  const statusColor = getMarkerColor(submission.status);
+  const errorsSection =
+    submission.errorTypes.length > 0
+      ? `<div><span style="font-weight: 600;">Errors:</span> ${submission.errorTypes
+          .map((value) => formatErrorLabel(value))
+          .join(", ")}</div>`
+      : "<div><span style=\"font-weight: 600;\">Errors:</span> None</div>";
+
+  const statusLabel = submission.status === "approved" ? "APPROVED" : "NOT APPROVED";
+
+  return `
+      <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
+        <div style="font-weight:700;color:#2563eb;">Submission #${submission.id}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div><span style="font-weight:600;">Interviewer:</span> ${submission.interviewer}</div>
+          <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
+          <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
+          ${errorsSection}
+          <div style="font-size:12px;color:#64748b;">${submission.timestamp}</div>
+        </div>
+      </div>
+    `;
+};
 
 const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
   if (typeof window === "undefined") {
     throw new Error("html2canvas can only be used in the browser");
   }
 
-  if ((window as any).html2canvas) {
-    return (window as any).html2canvas as Html2CanvasFn;
+  const existingInstance = (window as Html2CanvasWindow).html2canvas;
+  if (existingInstance) {
+    return existingInstance;
   }
 
   const existingScript = document.querySelector<HTMLScriptElement>("script[data-html2canvas]");
@@ -55,7 +107,7 @@ const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
     return new Promise((resolve, reject) => {
       existingScript.addEventListener(
         "load",
-        () => resolve((window as any).html2canvas as Html2CanvasFn),
+        () => resolve((window as Html2CanvasWindow).html2canvas as Html2CanvasFn),
         { once: true }
       );
       existingScript.addEventListener("error", reject, { once: true });
@@ -67,16 +119,17 @@ const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
     script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
     script.async = true;
     script.dataset.html2canvas = "true";
-    script.onload = () => resolve((window as any).html2canvas as Html2CanvasFn);
+    script.onload = () => resolve((window as Html2CanvasWindow).html2canvas as Html2CanvasFn);
     script.onerror = (event) => reject(event);
     document.body.appendChild(script);
   });
 };
 
-export function InteractiveMap({ submissions, interviewers, errorTypes }: InteractiveMapProps) {
+export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: InteractiveMapProps) {
   const [showLabels, setShowLabels] = useState(true);
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
+  const [selectedLga, setSelectedLga] = useState("all");
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
@@ -86,15 +139,26 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
     Feature<Geometry, Record<string, unknown>>[]
   >([]);
 
+  useEffect(() => {
+    if (selectedLga === "all") {
+      return;
+    }
+
+    if (!lgas.includes(selectedLga)) {
+      setSelectedLga("all");
+    }
+  }, [lgas, selectedLga]);
+
   const filteredSubmissions = useMemo(() => {
     return submissions.filter((submission) => {
       const matchesError =
         selectedErrorType === "all" || submission.errorTypes.includes(selectedErrorType);
       const matchesInterviewer =
         selectedInterviewer === "all" || submission.interviewer === selectedInterviewer;
-      return matchesError && matchesInterviewer;
+      const matchesLga = selectedLga === "all" || submission.lga === selectedLga;
+      return matchesError && matchesInterviewer && matchesLga;
     });
-  }, [submissions, selectedErrorType, selectedInterviewer]);
+  }, [submissions, selectedErrorType, selectedInterviewer, selectedLga]);
 
   const handleExportMap = async () => {
     if (!mapContainerRef.current) return;
@@ -112,51 +176,6 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
     } catch (error) {
       console.error("Failed to export map", error);
     }
-  };
-
-  const getMarkerColor = (status: Submission["status"]) => {
-    switch (status) {
-      case "approved":
-        return "#16a34a";
-      case "not_approved":
-      default:
-        return "#dc2626";
-    }
-  };
-
-  const createCustomIcon = (status: Submission["status"]) => {
-    const color = getMarkerColor(status);
-    return L.divIcon({
-      className: "custom-marker",
-      html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-      iconSize: [12, 12],
-      iconAnchor: [6, 6],
-    });
-  };
-
-  const createPopupContent = (submission: Submission) => {
-    const statusColor = getMarkerColor(submission.status);
-    const errorsSection =
-      submission.errorTypes.length > 0
-        ? `<div><span style="font-weight: 600;">Errors:</span> ${submission.errorTypes
-            .map((value) => formatErrorLabel(value))
-            .join(", ")}</div>`
-        : "<div><span style=\"font-weight: 600;\">Errors:</span> None</div>";
-
-    const statusLabel = submission.status === "approved" ? "APPROVED" : "NOT APPROVED";
-
-    return `
-      <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
-        <div style="font-weight:700;color:#2563eb;">Submission #${submission.id}</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <div><span style="font-weight:600;">Interviewer:</span> ${submission.interviewer}</div>
-          <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
-          <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
-          ${errorsSection}
-          <div style="font-size:12px;color:#64748b;">${submission.timestamp}</div>
-        </div>
-      </div>
-    `;
   };
 
   useEffect(() => {
@@ -314,7 +333,20 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
           <MapPin className="h-5 w-5 text-primary" />
           <CardTitle className="text-left">Submissions on Map</CardTitle>
         </div>
-        <div className="flex items-center gap-3 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-center gap-3 overflow-x-auto pb-1">
+          <Select value={selectedLga} onValueChange={setSelectedLga}>
+            <SelectTrigger className="min-w-[180px]">
+              <SelectValue placeholder="All LGAs" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All LGAs</SelectItem>
+              {lgas.map((lga) => (
+                <SelectItem key={lga} value={lga}>
+                  {lga}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
             <SelectTrigger className="min-w-[180px]">
               <SelectValue placeholder="All Error Types" />

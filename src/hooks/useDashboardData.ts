@@ -95,6 +95,8 @@ const TIMESTAMP_KEYS = [
   "lastUpdated",
 ];
 
+const INDEX_KEYS = ["_index", "index", "submissionIndex", "submission_index", "_id", "_uuid"]; 
+
 const interpretApprovalStatus = (row: unknown): boolean | null => {
   if (!isRecord(row)) {
     return null;
@@ -145,6 +147,52 @@ const extractTimestamp = (row: unknown): number | null => {
   return null;
 };
 
+const extractSubmissionIndex = (row: unknown): number | null => {
+  if (!isRecord(row)) {
+    return null;
+  }
+
+  for (const key of INDEX_KEYS) {
+    const value = row[key];
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+
+  const fallbackId = row["Submission ID"] ?? row["submission_id"];
+  if (fallbackId) {
+    const parsed = Number(fallbackId);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
+
+const deriveTotalFromRows = (rows: unknown[]): number => {
+  const indices = rows
+    .map((row) => extractSubmissionIndex(row))
+    .filter((value): value is number => value !== null && Number.isFinite(value));
+
+  if (indices.length === 0) {
+    return rows.length;
+  }
+
+  return Math.max(...indices);
+};
+
 const deriveLatestSubmissionTime = (
   summary: Record<string, unknown> | undefined,
   rows: unknown[],
@@ -172,7 +220,8 @@ const normalizeSummary = (
   const summaryRecord = toRecord(summary);
   const fallbackSummary = sampleDashboardData.summary;
 
-  const totalCandidate = readNumber(summaryRecord, ["totalSubmissions", "total"], rows.length);
+  const derivedTotal = deriveTotalFromRows(rows);
+  const totalCandidate = readNumber(summaryRecord, ["totalSubmissions", "total"], derivedTotal);
   const totalSubmissions = Math.max(Math.round(totalCandidate), 0);
 
   const approvedCandidate = readNumber(summaryRecord, ["approvedSubmissions", "approved", "valid"], Number.NaN);

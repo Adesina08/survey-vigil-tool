@@ -13,6 +13,11 @@ export type ErrorType =
   | "Terminated";
 
 export interface SheetSubmissionRow {
+  _index?: number | string;
+  _id?: string;
+  _uuid?: string;
+  _submission_time?: string;
+  _submitted_by?: string;
   "Submission ID": string;
   "Submission Date": string;
   "Submission Time": string;
@@ -25,6 +30,7 @@ export interface SheetSubmissionRow {
   "Interviewer ID"?: string;
   "Interviewer Name"?: string;
   username?: string;
+  interviewer?: string;
   State: string;
   "A3. select the LGA": string;
   LGA?: string;
