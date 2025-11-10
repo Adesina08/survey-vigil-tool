@@ -173,12 +173,6 @@ const convertGVizDate = (value: string): string | null => {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
-interface FetchSheetOptions {
-  spreadsheetId: string;
-  sheetName?: string;
-  query?: string;
-}
-
 const parseCsvLine = (line: string): string[] => {
   const result: string[] = [];
   let current = "";
@@ -238,61 +232,88 @@ const parseCsvResponse = (rawText: string): Record<string, unknown>[] => {
   });
 };
 
-const fetchGoogleSheetRowsAsCsv = async ({
-  spreadsheetId,
-  sheetName,
-}: Omit<FetchSheetOptions, "query">): Promise<Record<string, unknown>[]> => {
-  const params = new URLSearchParams({
-    tqx: "out:csv",
-  });
-
-  if (sheetName) {
-    params.set("sheet", sheetName);
+const buildCsvFallbackUrl = (input: string): string => {
+  const lower = input.toLowerCase();
+  if (lower.includes("out:csv")) {
+    return input;
   }
 
-  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?${params.toString()}`;
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Google Sheet CSV: ${response.statusText}`);
+  if (lower.includes("out:json")) {
+    return input.replace(/out:json/gi, "out:csv");
   }
 
-  const csvText = await response.text();
-  return parseCsvResponse(csvText);
+  try {
+    const url = new URL(input);
+    const tqx = url.searchParams.get("tqx");
+
+    if (tqx) {
+      const parts = tqx
+        .split(";")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0);
+
+      let replaced = false;
+      const updatedParts = parts.map((part) => {
+        const lowerPart = part.toLowerCase();
+        if (lowerPart.startsWith("out:")) {
+          replaced = true;
+          return "out:csv";
+        }
+        return part;
+      });
+
+      if (!replaced) {
+        updatedParts.push("out:csv");
+      }
+
+      url.searchParams.set("tqx", updatedParts.join(";"));
+    } else {
+      url.searchParams.set("tqx", "out:csv");
+    }
+
+    return url.toString();
+  } catch (error) {
+    console.warn("Failed to parse Google Sheets URL for CSV fallback", error);
+    const separator = input.includes("?") ? "&" : "?";
+    return `${input}${separator}tqx=out:csv`;
+  }
 };
 
-export const fetchGoogleSheetRows = async ({
-  spreadsheetId,
-  sheetName,
-  query,
-}: FetchSheetOptions): Promise<Record<string, unknown>[]> => {
-  const params = new URLSearchParams({
-    tqx: "out:json",
-  });
-
-  if (sheetName) {
-    params.set("sheet", sheetName);
+export async function fetchGoogleSheetFromUrl(
+  fullUrl: string
+): Promise<Record<string, unknown>[]> {
+  const trimmedUrl = fullUrl.trim();
+  if (!trimmedUrl) {
+    throw new Error("Google Sheets URL is empty");
   }
 
-  if (query) {
-    params.set("tq", query);
-  }
-
-  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?${params.toString()}`;
-  const response = await fetch(url);
-
+  const response = await fetch(trimmedUrl);
   if (!response.ok) {
-    throw new Error(`Failed to fetch Google Sheet: ${response.statusText}`);
+    throw new Error(`Failed to fetch Google Sheet: ${response.status} ${response.statusText}`);
   }
 
   const rawText = await response.text();
+
   try {
     return parseGVizResponse(rawText);
   } catch (error) {
     console.warn("Failed to parse GViz response, attempting CSV fallback", error);
-    return fetchGoogleSheetRowsAsCsv({ spreadsheetId, sheetName });
   }
-};
+
+  const csvUrl = buildCsvFallbackUrl(trimmedUrl);
+  const csvResponse = await fetch(csvUrl);
+  if (!csvResponse.ok) {
+    throw new Error(`Failed to fetch Google Sheet CSV: ${csvResponse.status} ${csvResponse.statusText}`);
+  }
+
+  const csvText = await csvResponse.text();
+  const rows = parseCsvResponse(csvText);
+  if (rows.length === 0) {
+    throw new Error("Google Sheet CSV returned no rows");
+  }
+
+  return rows;
+}
 
 const toStringValue = (value: unknown): string => {
   if (typeof value === "string") {
@@ -376,15 +397,15 @@ const determineAgeGroup = (age?: number): AgeGroup => {
     return "Unknown";
   }
 
-  if (age < 26) return "18-25";
-  if (age < 36) return "26-35";
-  if (age < 46) return "36-45";
-  return "46+";
+  if (age <= 24) return "15-24";
+  if (age <= 34) return "25-34";
+  if (age <= 44) return "35-44";
+  return "45+";
 };
 
 const normaliseAgeGroupLabel = (value: string): AgeGroup => {
   const formatted = value.trim();
-  const allowed: AgeGroup[] = ["18-25", "26-35", "36-45", "46+", "Unknown"];
+  const allowed: AgeGroup[] = ["15-24", "25-34", "35-44", "45+", "Unknown"];
   return allowed.includes(formatted as AgeGroup) ? (formatted as AgeGroup) : "Unknown";
 };
 

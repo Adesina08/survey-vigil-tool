@@ -169,8 +169,8 @@ def _prepare_topbreak_series(
     series = df[column]
     if column == "a8_age":
         numeric = pd.to_numeric(series, errors="coerce")
-        bins = [-math.inf, 24, 34, 44, 54, math.inf]
-        labels = ["15-24", "25-34", "35-44", "45-54", "55+"]
+        bins = [-math.inf, 24, 34, 44, math.inf]
+        labels = ["15-24", "25-34", "35-44", "45+"]
         series = pd.cut(numeric, bins=bins, labels=labels)
     return _series_to_categorical(series, limit=limit, drop_missing=drop_missing, min_count=min_count)
 
