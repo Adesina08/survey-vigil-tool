@@ -307,6 +307,20 @@ const toStringValue = (value: unknown): string => {
   return "";
 };
 
+const stripChoicePrefix = (value: string): string => {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(\d+)\s*[.)-]?\s*(.+)$/);
+  if (match && match[2]) {
+    return match[2].trim();
+  }
+  return trimmed;
+};
+
+const normaliseChoiceText = (value: unknown): string => {
+  const text = toStringValue(value);
+  return stripChoicePrefix(text);
+};
+
 const toNumberValue = (value: unknown): number | undefined => {
   if (typeof value === "number" && !Number.isNaN(value)) {
     return value;
@@ -375,15 +389,104 @@ const normaliseAgeGroupLabel = (value: string): AgeGroup => {
 };
 
 const normaliseGender = (value: unknown): Gender => {
-  const text = toStringValue(value).toLowerCase();
-  if (text === "male" || text === "m") {
+  const text = normaliseChoiceText(value).toLowerCase();
+  if (text === "male" || text === "m" || text === "1") {
     return "Male";
   }
-  if (text === "female" || text === "f") {
+  if (text === "female" || text === "f" || text === "2") {
     return "Female";
   }
   return "Unknown";
 };
+
+const interpretApprovalStatus = (value: unknown): ApprovalStatus | null => {
+  const text = normaliseChoiceText(value);
+  if (!text) {
+    return null;
+  }
+
+  const lower = text.toLowerCase();
+  const normalised = lower.replace(/[_\s-]+/g, " ").trim();
+
+  const negativeTokens = new Set([
+    "no",
+    "0",
+    "false",
+    "not approved",
+    "not valid",
+    "invalid",
+    "rejected",
+    "reject",
+    "2",
+    "denied",
+    "declined",
+  ]);
+  if (negativeTokens.has(normalised)) {
+    return "Not Approved";
+  }
+
+  if (
+    normalised.includes("not approved") ||
+    normalised.includes("reject") ||
+    normalised.includes("invalid")
+  ) {
+    return "Not Approved";
+  }
+
+  const positiveTokens = new Set([
+    "yes",
+    "1",
+    "true",
+    "approved",
+    "valid",
+    "consented",
+    "consent given",
+    "completed",
+    "complete",
+  ]);
+  if (positiveTokens.has(normalised)) {
+    return "Approved";
+  }
+
+  if (
+    normalised.includes("approve") ||
+    normalised.includes("valid") ||
+    normalised.includes("yes")
+  ) {
+    return "Approved";
+  }
+
+  if (normalised.includes("no")) {
+    return "Not Approved";
+  }
+
+  return null;
+};
+
+const deriveApprovalStatus = (row: NormalisedRow): ApprovalStatus => {
+  const candidateHeaders = [
+    "Approval Status",
+    "Outcome Status",
+    "A6. Consent to participate",
+    "Consent",
+  ];
+
+  for (const header of candidateHeaders) {
+    const value = getFromRow(row, header);
+    const interpreted = interpretApprovalStatus(value);
+    if (interpreted) {
+      return interpreted;
+    }
+  }
+
+  return "Approved";
+};
+
+const normaliseErrorFlagKey = (value: string): string =>
+  stripChoicePrefix(value)
+    .replace(/[_\s-]+/g, " ")
+    .trim()
+    .toLowerCase();
 
 const parseErrorFlags = (value: unknown): ErrorType[] => {
   const allowed: ErrorType[] = [
@@ -398,14 +501,21 @@ const parseErrorFlags = (value: unknown): ErrorType[] => {
     "Terminated",
   ];
 
+  const lookup = new Map(allowed.map((flag) => [normaliseErrorFlagKey(flag), flag]));
+
+  const resolve = (entry: unknown): ErrorType | null => {
+    const key = normaliseErrorFlagKey(toStringValue(entry));
+    return lookup.get(key) ?? null;
+  };
+
   if (!value) {
     return [];
   }
 
   if (Array.isArray(value)) {
     return value
-      .map((entry) => toStringValue(entry))
-      .filter((entry): entry is ErrorType => allowed.includes(entry as ErrorType));
+      .map((entry) => resolve(entry))
+      .filter((entry): entry is ErrorType => entry !== null);
   }
 
   const text = toStringValue(value);
@@ -415,8 +525,8 @@ const parseErrorFlags = (value: unknown): ErrorType[] => {
 
   return text
     .split(/[;,]/)
-    .map((part) => part.trim())
-    .filter((entry): entry is ErrorType => allowed.includes(entry as ErrorType));
+    .map((part) => resolve(part))
+    .filter((entry): entry is ErrorType => entry !== null);
 };
 
 const parseCoordinatePair = (
@@ -486,7 +596,7 @@ export const mapSheetRowsToSubmissions = (
         : "";
 
       const enumeratorId =
-        toStringValue(
+        normaliseChoiceText(
           getFromRow(
             normalisedRow,
             "A1. Enumerator ID",
@@ -496,7 +606,7 @@ export const mapSheetRowsToSubmissions = (
           )
         ) || "Unknown";
       const enumeratorName =
-        toStringValue(
+        normaliseChoiceText(
           getFromRow(
             normalisedRow,
             "Enumerator Name",
@@ -506,14 +616,14 @@ export const mapSheetRowsToSubmissions = (
           )
         ) || enumeratorId;
       const username =
-        toStringValue(getFromRow(normalisedRow, "username", "User Name")) || enumeratorId;
+        normaliseChoiceText(getFromRow(normalisedRow, "username", "User Name")) || enumeratorId;
 
       const state =
-        toStringValue(getFromRow(normalisedRow, "State", "State Name")) ||
+        normaliseChoiceText(getFromRow(normalisedRow, "State", "State Name")) ||
         defaultState ||
         "Unknown State";
       const lga =
-        toStringValue(
+        normaliseChoiceText(
           getFromRow(normalisedRow, "A3. select the LGA", "LGA", "Local Government Area")
         ) || "Unknown LGA";
 
@@ -539,19 +649,7 @@ export const mapSheetRowsToSubmissions = (
           getFromRow(normalisedRow, "Respondent phone number", "Resp_No", "Phone Number")
         ) || undefined;
 
-      const approvalRaw = toStringValue(
-        getFromRow(
-          normalisedRow,
-          "Approval Status",
-          "Outcome Status",
-          "A6. Consent to participate",
-          "Consent"
-        )
-      ).toLowerCase();
-      const approvalStatus: ApprovalStatus =
-        approvalRaw.includes("not") || approvalRaw === "no" || approvalRaw === "0" || approvalRaw === "false"
-          ? "Not Approved"
-          : "Approved";
+      const approvalStatus = deriveApprovalStatus(normalisedRow);
 
       const interviewLength = (() => {
         const explicit = toNumberValue(
