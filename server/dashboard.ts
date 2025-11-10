@@ -1,19 +1,11 @@
-import {
-  fetchGoogleSheetRows,
-  mapSheetRowsToStateAgeTargets,
-  mapSheetRowsToStateGenderTargets,
-  mapSheetRowsToStateTargets,
-  mapSheetRowsToSubmissions,
-} from "../src/lib/googleSheets";
-import {
-  buildDashboardData,
-  dashboardData as sampleDashboardData,
-  type DashboardData,
-} from "../src/lib/dashboardData";
-import { sheetSubmissions, type SheetSubmissionRow } from "../src/data/sampleData";
-
-const getEnv = (name: string) =>
-  process.env[name] || process.env[`VITE_${name}`] || "";
+import { fetchGoogleSheetFromUrl, mapSheetRowsToSubmissions } from "../src/lib/googleSheets";
+import { buildDashboardData, type DashboardData } from "../src/lib/dashboardData";
+import type {
+  SheetStateAgeTargetRow,
+  SheetStateGenderTargetRow,
+  SheetStateTargetRow,
+  SheetSubmissionRow,
+} from "../src/data/sampleData";
 
 // ----------- SINGLE-STATE CONFIG -----------
 const OGUN_STATE_NAME = "Ogun State";
@@ -21,12 +13,20 @@ const OVERALL_STATE_TARGET = 2000;
 
 // Age groups starting from 15
 const AGE_GROUPS = ["15-24", "25-34", "35-44", "45+"] as const;
-type AgeGroup = (typeof AGE_GROUPS)[number];
 
 const GENDER_GROUPS = ["Male", "Female"] as const;
 // -------------------------------------------
 
-function bucketAge(value: unknown): AgeGroup {
+const GOOGLE_SHEETS_URL_MISSING_ERROR = "GOOGLE_SHEETS_URL not set";
+const GOOGLE_SHEETS_FETCH_ERROR_MESSAGE =
+  "Google Sheets URL not reachable or returned no rows. Ensure the sheet is published or publicly viewable.";
+
+const resolveGoogleSheetsUrl = (): string => {
+  const envUrl = process.env.GOOGLE_SHEETS_URL || process.env.VITE_GOOGLE_SHEETS_URL || "";
+  return envUrl.trim();
+};
+
+function bucketAge(value: unknown): SheetSubmissionRow["Age Group"] {
   const n = Number(value);
   if (Number.isFinite(n)) {
     if (n >= 15 && n <= 24) return "15-24";
@@ -94,15 +94,17 @@ function buildFallbackTargets() {
   const perAge = Math.round(OVERALL_STATE_TARGET / AGE_GROUPS.length);
   const perGender = Math.round(OVERALL_STATE_TARGET / GENDER_GROUPS.length);
 
-  const stateTargets = [{ State: OGUN_STATE_NAME, "State Target": OVERALL_STATE_TARGET }];
+  const stateTargets: SheetStateTargetRow[] = [
+    { State: OGUN_STATE_NAME, "State Target": OVERALL_STATE_TARGET },
+  ];
 
-  const stateAgeTargets = AGE_GROUPS.map((g) => ({
+  const stateAgeTargets: SheetStateAgeTargetRow[] = AGE_GROUPS.map((g) => ({
     State: OGUN_STATE_NAME,
     "Age Group": g,
     "Age Group Target": perAge,
   }));
 
-  const stateGenderTargets = GENDER_GROUPS.map((g) => ({
+  const stateGenderTargets: SheetStateGenderTargetRow[] = GENDER_GROUPS.map((g) => ({
     State: OGUN_STATE_NAME,
     Gender: g,
     "Gender Target": perGender,
@@ -112,62 +114,37 @@ function buildFallbackTargets() {
 }
 
 export const loadSubmissionRows = async (): Promise<SheetSubmissionRow[]> => {
-  const spreadsheetId = getEnv("GOOGLE_SHEETS_ID");
-  const submissionsSheetName = getEnv("GOOGLE_SHEETS_SUBMISSIONS_SHEET");
-  // We will not rely on default_state here; we force "Ogun State" above.
+  const googleSheetsUrl = resolveGoogleSheetsUrl();
 
-  if (!spreadsheetId) {
-    // local fallback sample
-    return sheetSubmissions;
+  if (!googleSheetsUrl) {
+    throw new Error(GOOGLE_SHEETS_URL_MISSING_ERROR);
   }
 
-  const rawRows = await fetchGoogleSheetRows({
-    spreadsheetId,
-    sheetName: submissionsSheetName || undefined, // undefined => first tab
-  });
+  let rawRows: Record<string, unknown>[];
+  try {
+    rawRows = await fetchGoogleSheetFromUrl(googleSheetsUrl);
+  } catch (error) {
+    console.error("Failed to fetch Google Sheets data:", error);
+    throw new Error(GOOGLE_SHEETS_FETCH_ERROR_MESSAGE);
+  }
 
-  // Normalize headers/values for your sheet
-  const enriched = enrichSubmissionRows(
-    mapSheetRowsToSubmissions(rawRows, { defaultState: OGUN_STATE_NAME })
-  );
+  if (!rawRows || rawRows.length === 0) {
+    throw new Error(GOOGLE_SHEETS_FETCH_ERROR_MESSAGE);
+  }
+
+  const submissions = mapSheetRowsToSubmissions(rawRows, { defaultState: OGUN_STATE_NAME });
+  const enriched = enrichSubmissionRows(submissions);
 
   return enriched;
 };
 
 export const loadDashboardData = async (): Promise<DashboardData> => {
-  const spreadsheetId = getEnv("GOOGLE_SHEETS_ID");
-  if (!spreadsheetId) {
-    return sampleDashboardData;
-  }
-
   const submissions = await loadSubmissionRows();
 
   if (!submissions || submissions.length === 0) {
-    throw new Error(
-      "No submissions found. Ensure the Google Sheet is public (or 'Published to the web'), the tab name is correct, and that at least one data row exists beneath the header row."
-    );
+    throw new Error(GOOGLE_SHEETS_FETCH_ERROR_MESSAGE);
   }
 
-  // Try reading targets from optional tabs; if not present, build fallbacks.
-  const stateTargetsSheetName = getEnv("GOOGLE_SHEETS_STATE_TARGETS_SHEET");
-  const stateAgeTargetsSheetName = getEnv("GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET");
-  const stateGenderTargetsSheetName = getEnv("GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET");
-
-  let stateTargetsRows: any[] | null = null;
-  let stateAgeTargetsRows: any[] | null = null;
-  let stateGenderTargetsRows: any[] | null = null;
-
-  if (stateTargetsSheetName) {
-    stateTargetsRows = await fetchGoogleSheetRows({ spreadsheetId, sheetName: stateTargetsSheetName });
-  }
-  if (stateAgeTargetsSheetName) {
-    stateAgeTargetsRows = await fetchGoogleSheetRows({ spreadsheetId, sheetName: stateAgeTargetsSheetName });
-  }
-  if (stateGenderTargetsSheetName) {
-    stateGenderTargetsRows = await fetchGoogleSheetRows({ spreadsheetId, sheetName: stateGenderTargetsSheetName });
-  }
-
-  // If any targets missing, generate sensible fallbacks for a single-state deployment
   const {
     stateTargets: fallbackStateTargets,
     stateAgeTargets: fallbackStateAgeTargets,
@@ -176,14 +153,9 @@ export const loadDashboardData = async (): Promise<DashboardData> => {
 
   return buildDashboardData({
     submissions,
-    stateTargets: stateTargetsRows
-      ? mapSheetRowsToStateTargets(stateTargetsRows)
-      : mapSheetRowsToStateTargets(fallbackStateTargets as any),
-    stateAgeTargets: stateAgeTargetsRows
-      ? mapSheetRowsToStateAgeTargets(stateAgeTargetsRows)
-      : mapSheetRowsToStateAgeTargets(fallbackStateAgeTargets as any),
-    stateGenderTargets: stateGenderTargetsRows
-      ? mapSheetRowsToStateGenderTargets(stateGenderTargetsRows)
-      : mapSheetRowsToStateGenderTargets(fallbackStateGenderTargets as any),
+    stateTargets: fallbackStateTargets,
+    stateAgeTargets: fallbackStateAgeTargets,
+    stateGenderTargets: fallbackStateGenderTargets,
+    analysisRows: submissions,
   });
 };

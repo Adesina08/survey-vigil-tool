@@ -29,14 +29,8 @@ const formatEnvValue = (value: string | undefined) => {
 export const handler = async () => {
   return jsonResponse(200, {
     env: {
-      GOOGLE_SHEETS_ID: formatEnvValue(process.env.GOOGLE_SHEETS_ID),
-      GOOGLE_SHEETS_SUBMISSIONS_SHEET: formatEnvValue(process.env.GOOGLE_SHEETS_SUBMISSIONS_SHEET),
-      GOOGLE_SHEETS_DEFAULT_STATE: formatEnvValue(process.env.GOOGLE_SHEETS_DEFAULT_STATE),
-      GOOGLE_SHEETS_STATE_TARGETS_SHEET: formatEnvValue(process.env.GOOGLE_SHEETS_STATE_TARGETS_SHEET),
-      GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET: formatEnvValue(process.env.GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET),
-      GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET: formatEnvValue(
-        process.env.GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET,
-      ),
+      GOOGLE_SHEETS_URL: formatEnvValue(process.env.GOOGLE_SHEETS_URL),
+      VITE_GOOGLE_SHEETS_URL: formatEnvValue(process.env.VITE_GOOGLE_SHEETS_URL),
     },
     timestamp: new Date().toISOString(),
   });
