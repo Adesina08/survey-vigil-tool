@@ -299,6 +299,7 @@ export async function fetchDashboard(): Promise<DashboardData> {
       },
       lastUpdated: lastUpdatedCandidate,
       analysisRows: data.analysisRows ?? [],
+      lgaCatalog: data.lgaCatalog ?? [],
     };
 
     console.log("DASHBOARD OK", normalized);

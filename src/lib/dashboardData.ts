@@ -95,6 +95,12 @@ interface AchievementByLGARow extends AchievementRow {
   state: string;
 }
 
+export interface LGACatalogEntry {
+  state: string;
+  lga: string;
+  properties?: Record<string, unknown>;
+}
+
 export interface DashboardData {
   summary: SummaryData;
   statusBreakdown: StatusBreakdown;
@@ -117,6 +123,7 @@ export interface DashboardData {
   };
   lastUpdated: string;
   analysisRows: AnalysisRow[];
+  lgaCatalog: LGACatalogEntry[];
 }
 
 const parseDate = (date: string, time: string) => new Date(`${date}T${time}:00Z`);
@@ -162,6 +169,7 @@ interface DashboardDataInput {
   stateAgeTargets?: SheetStateAgeTargetRow[];
   stateGenderTargets?: SheetStateGenderTargetRow[];
   analysisRows?: AnalysisRow[];
+  lgaCatalog?: LGACatalogEntry[];
 }
 
 export const buildDashboardData = ({
@@ -170,6 +178,7 @@ export const buildDashboardData = ({
   stateAgeTargets = [],
   stateGenderTargets = [],
   analysisRows,
+  lgaCatalog = [],
 }: DashboardDataInput): DashboardData => {
   const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(submissions);
 
@@ -201,6 +210,21 @@ export const buildDashboardData = ({
   const totalsByStateGender = new Map<string, number>();
 
   const interviewerNames = new Map<string, string>();
+
+  const ageGroupSet = new Set<string>();
+  const genderSet = new Set<string>();
+
+  stateAgeTargets.forEach((row) => {
+    if (row["Age Group"]) {
+      ageGroupSet.add(row["Age Group"]);
+    }
+  });
+
+  stateGenderTargets.forEach((row) => {
+    if (row.Gender) {
+      genderSet.add(row.Gender);
+    }
+  });
 
   const errorTypes: ErrorType[] = [
     "OddHour",
@@ -254,6 +278,12 @@ export const buildDashboardData = ({
     }
 
     lgaSet.add(lga);
+    if (ageGroup) {
+      ageGroupSet.add(ageGroup);
+    }
+    if (gender) {
+      genderSet.add(gender);
+    }
     interviewerSet.add(interviewerLabel);
     errorFlags.forEach((flag) => errorTypeSet.add(flag));
 
@@ -292,7 +322,7 @@ export const buildDashboardData = ({
     }
 
     errorFlags.forEach((errorType) => {
-    errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
+      errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
       switch (errorType) {
         case "OddHour":
           interviewerError.oddHour += 1;
@@ -332,6 +362,66 @@ export const buildDashboardData = ({
       }),
       status: (metadata?.isValid ?? isApproved) ? "approved" : "not_approved",
       sortKey: timestamp.getTime(),
+    });
+  });
+
+  const geofenceEntries = new Map<string, LGACatalogEntry>();
+  lgaCatalog.forEach((entry) => {
+    const state = entry.state.trim() || "Unknown State";
+    const lga = entry.lga.trim() || "Unknown LGA";
+    const key = `${state}|${lga}`;
+
+    if (!geofenceEntries.has(key)) {
+      geofenceEntries.set(key, {
+        state,
+        lga,
+        properties: entry.properties ? { ...entry.properties } : undefined,
+      });
+    }
+
+    lgaSet.add(lga);
+
+    if (!totalsByLGA.has(key)) {
+      totalsByLGA.set(key, 0);
+    }
+    if (!approvedByLGA.has(key)) {
+      approvedByLGA.set(key, 0);
+    }
+    if (!notApprovedByLGA.has(key)) {
+      notApprovedByLGA.set(key, 0);
+    }
+  });
+
+  const allAgeGroups = Array.from(ageGroupSet);
+  const allGenders = Array.from(genderSet);
+
+  geofenceEntries.forEach((_, key) => {
+    const [state, lga] = key.split("|");
+
+    allAgeGroups.forEach((ageGroup) => {
+      const ageKey = `${state}|${lga}|${ageGroup}`;
+      if (!totalsByLGAAge.has(ageKey)) {
+        totalsByLGAAge.set(ageKey, 0);
+      }
+      if (!approvedByLGAAge.has(ageKey)) {
+        approvedByLGAAge.set(ageKey, 0);
+      }
+      if (!notApprovedByLGAAge.has(ageKey)) {
+        notApprovedByLGAAge.set(ageKey, 0);
+      }
+    });
+
+    allGenders.forEach((gender) => {
+      const genderKey = `${state}|${lga}|${gender}`;
+      if (!totalsByLGAGender.has(genderKey)) {
+        totalsByLGAGender.set(genderKey, 0);
+      }
+      if (!approvedByLGAGender.has(genderKey)) {
+        approvedByLGAGender.set(genderKey, 0);
+      }
+      if (!notApprovedByLGAGender.has(genderKey)) {
+        notApprovedByLGAGender.set(genderKey, 0);
+      }
     });
   });
 
@@ -589,6 +679,9 @@ export const buildDashboardData = ({
     },
     lastUpdated,
     analysisRows: normalizedRows,
+    lgaCatalog: Array.from(geofenceEntries.values()).sort((a, b) =>
+      a.lga.localeCompare(b.lga)
+    ),
   };
 };
 
@@ -597,4 +690,5 @@ export const dashboardData = buildDashboardData({
   stateTargets: sheetStateTargets,
   stateAgeTargets: sheetStateAgeTargets,
   stateGenderTargets: sheetStateGenderTargets,
+  lgaCatalog: [],
 });
