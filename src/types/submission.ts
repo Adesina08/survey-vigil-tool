@@ -20,7 +20,12 @@ export interface MapSubmission {
   interviewerName: string;
   lga: string;
   state: string;
-  errorTypes: string[];
-  timestamp: string;
+  errorTypes: ErrorType[];
+  timestamp: string; // ISO
   status: QCStatus;
+  deviceId?: string | null;
+  phone?: string | null;
+  starttime?: string | null;
+  endtime?: string | null;
+  durationMinutes?: number | null;
 }

@@ -1,86 +1,64 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ReactDOMServer from "react-dom/server";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.markercluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 
-import { Download, MapPin, ListFilter } from "lucide-react";
+import type { FeatureCollection, Geometry, MultiPolygon, Polygon } from "geojson";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
-import { formatErrorLabel } from "@/lib/utils";
-import { loadLgaBoundaries, type LgaBoundaryFeature } from "@/lib/geo/lgaBoundaries";
-import type { QCOverrideRecord } from "@/hooks/useQcOverrides";
-import type { MapSubmission, QCStatus } from "@/types/submission";
-
-const APPROVED_COLOR = "#16a34a";
-const NOT_APPROVED_COLOR = "#dc2626";
-
-const APPROVED_LABEL = "APPROVED";
-const NOT_APPROVED_LABEL = "NOT APPROVED";
+import type { StoredStatus } from "@/components/qc/SingleForceAction";
+import { useSingleForceAction } from "@/components/qc/SingleForceAction";
+import { featureCentroid } from "@/lib/geo/pip";
+import type { ErrorType, MapSubmission, QCStatus } from "@/types/submission";
 
 const STATUS_COLORS: Record<QCStatus, string> = {
-  approved: APPROVED_COLOR,
-  not_approved: NOT_APPROVED_COLOR,
+  approved: "#16a34a",
+  not_approved: "#dc2626",
 };
 
-delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
+const KNOWN_ERROR_TYPES: ErrorType[] = [
+  "Low LOI",
+  "High LOI",
+  "OddHour",
+  "DuplicatePhone",
+  "Interwoven",
+  "ShortGap",
+  "Terminated",
+  "Force Cancelled",
+  "Outside LGA Boundary",
+  "ClusteredInterview",
+];
 
-type DecoratedSubmission = MapSubmission & {
-  override?: QCOverrideRecord;
-  derivedErrors: string[];
-};
+const isBrowser = typeof window !== "undefined";
 
-interface InteractiveMapProps {
+type Props = {
   submissions: MapSubmission[];
   interviewers: string[];
-  errorTypes: string[];
+  errorTypes: ErrorType[];
   showLabels?: boolean;
-  overrides: Record<string, QCOverrideRecord>;
-  onSetOverride: (id: string, record: QCOverrideRecord) => void;
-}
+  lgaGeo?: FeatureCollection<Geometry, Record<string, unknown>>;
+};
+
+type DecoratedSubmission = MapSubmission & {
+  combinedErrors: ErrorType[];
+  autoFlags: ErrorType[];
+  override?: StoredStatus;
+};
 
 type LeafletImageFn = (
   map: L.Map,
   callback: (error: unknown, canvas: HTMLCanvasElement) => void,
 ) => void;
 
-const loadLeafletImage = async (): Promise<LeafletImageFn> => {
-  if (typeof window === "undefined") {
-    throw new Error("leaflet-image can only be used in the browser");
+const ensureLeafletImage = async (): Promise<LeafletImageFn> => {
+  if (!isBrowser) {
+    throw new Error("leaflet-image can only run in the browser");
   }
-
-  const globalObject = window as unknown as { leafletImage?: LeafletImageFn };
-
-  if (typeof globalObject.leafletImage === "function") {
-    return globalObject.leafletImage;
+  const globalScope = window as unknown as { leafletImage?: LeafletImageFn };
+  if (typeof globalScope.leafletImage === "function") {
+    return globalScope.leafletImage;
   }
 
   const existingScript = document.querySelector<HTMLScriptElement>("script[data-leaflet-image]");
@@ -89,10 +67,10 @@ const loadLeafletImage = async (): Promise<LeafletImageFn> => {
       existingScript.addEventListener(
         "load",
         () => {
-          if (typeof globalObject.leafletImage === "function") {
-            resolve(globalObject.leafletImage);
+          if (typeof globalScope.leafletImage === "function") {
+            resolve(globalScope.leafletImage);
           } else {
-            reject(new Error("leaflet-image failed to initialize"));
+            reject(new Error("leaflet-image failed to initialise"));
           }
         },
         { once: true },
@@ -107,10 +85,10 @@ const loadLeafletImage = async (): Promise<LeafletImageFn> => {
     script.async = true;
     script.dataset.leafletImage = "true";
     script.onload = () => {
-      if (typeof globalObject.leafletImage === "function") {
-        resolve(globalObject.leafletImage);
+      if (typeof globalScope.leafletImage === "function") {
+        resolve(globalScope.leafletImage);
       } else {
-        reject(new Error("leaflet-image failed to initialize"));
+        reject(new Error("leaflet-image failed to initialise"));
       }
     };
     script.onerror = (event) => reject(event);
@@ -118,602 +96,383 @@ const loadLeafletImage = async (): Promise<LeafletImageFn> => {
   });
 };
 
-const createMarkerIcon = (status: QCStatus) =>
-  L.divIcon({
-    className: "qc-marker",
-    html: `<div style="background:${STATUS_COLORS[status]};width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 2px 4px rgba(15,23,42,0.35);"></div>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
-  });
+const createMarkerIcon = (() => {
+  const cache = new Map<QCStatus, L.DivIcon>();
+  return (status: QCStatus) => {
+    if (cache.has(status)) {
+      return cache.get(status)!;
+    }
+    const icon = L.divIcon({
+      className: "qc-marker",
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+      html: `<div style="width:16px;height:16px;border-radius:50%;background:${STATUS_COLORS[status]};border:2px solid white;box-shadow:0 2px 6px rgba(15,23,42,0.35);"></div>`,
+    });
+    cache.set(status, icon);
+    return icon;
+  };
+})();
 
-const formatPopup = (submission: DecoratedSubmission) => {
-  const statusColor = STATUS_COLORS[submission.status];
-  const statusLabel = submission.status === "approved" ? APPROVED_LABEL : NOT_APPROVED_LABEL;
-  const errors = submission.derivedErrors.length
-    ? submission.derivedErrors.map((error) => formatErrorLabel(error)).join(", ")
-    : "None";
-
-  const actionButtons = `
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
-      <button type="button" data-action="approve" data-instance="${submission.id}" style="flex:1;min-width:120px;padding:8px 12px;border-radius:6px;border:1px solid #16a34a;background:#16a34a;color:white;font-weight:600;cursor:pointer;">Force Approve</button>
-      <button type="button" data-action="cancel" data-instance="${submission.id}" style="flex:1;min-width:120px;padding:8px 12px;border-radius:6px;border:1px solid #dc2626;background:white;color:#dc2626;font-weight:600;cursor:pointer;">Force Cancel</button>
-    </div>
-  `;
-
-  const overrideDetails = submission.override
-    ? `<div style="margin-top:8px;padding:8px;border-radius:6px;background:rgba(37,99,235,0.08);font-size:12px;line-height:1.4;">
-        <div><strong>QC Officer:</strong> ${submission.override.officer}</div>
-        <div><strong>Comment:</strong> ${submission.override.comment}</div>
-        <div><strong>Override:</strong> ${new Date(submission.override.timestamp).toLocaleString()}</div>
-      </div>`
-    : "";
-
-  return ReactDOMServer.renderToString(
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        minWidth: "240px",
-        fontFamily: "Inter, system-ui, sans-serif",
-      }}
-    >
-      <div style={{ fontWeight: 700, color: "#1d4ed8", fontSize: "15px" }}>Submission #{submission.id}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "13px" }}>
-        <div>
-          <strong>Interviewer ID:</strong> {submission.interviewerId}
-        </div>
-        {submission.interviewerName && submission.interviewerName.trim() &&
-        submission.interviewerName.trim() !== submission.interviewerId ? (
-          <div>
-            <strong>Interviewer:</strong> {submission.interviewerName}
-          </div>
-        ) : null}
-        <div>
-          <strong>LGA:</strong> {submission.lga}
-        </div>
-        <div>
-          <strong>Status:</strong> <span style={{ color: statusColor, fontWeight: 700 }}>{statusLabel}</span>
-        </div>
-        <div>
-          <strong>Errors:</strong> {errors}
-        </div>
-        <div style={{ fontSize: "12px", color: "#64748b" }}>{submission.timestamp}</div>
-      </div>
-      <div dangerouslySetInnerHTML={{ __html: actionButtons }} />
-      <div dangerouslySetInnerHTML={{ __html: overrideDetails }} />
-    </div>,
-  );
+const formatTimestamp = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
 };
 
-const fitToContent = (map: L.Map, boundaries: L.Layer | null, points: DecoratedSubmission[]) => {
-  const bounds = L.latLngBounds([]);
-
-  if (boundaries) {
-    try {
-      const boundaryBounds = (boundaries as L.GeoJSON).getBounds?.();
-      if (boundaryBounds?.isValid()) {
-        bounds.extend(boundaryBounds);
-      }
-    } catch (error) {
-      console.warn("Unable to extend map bounds from boundaries", error);
-    }
-  }
-
-  points.forEach((submission) => {
-    if (typeof submission.lat === "number" && typeof submission.lng === "number") {
-      bounds.extend([submission.lat, submission.lng]);
-    }
-  });
-
-  if (bounds.isValid()) {
-    map.fitBounds(bounds, { padding: [48, 48] });
-  }
+const normalizeError = (error: string): ErrorType | null => {
+  const match = KNOWN_ERROR_TYPES.find((item) => item.toLowerCase() === error.toLowerCase());
+  return match ?? null;
 };
 
-export function InteractiveMap({
+const getFeatureName = (properties: Record<string, unknown> = {}): string | undefined => {
+  const keys = ["LGA", "lga", "name", "NAME", "LGAName", "lga_name"];
+  for (const key of keys) {
+    const value = properties[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+
+const InteractiveMap = ({
   submissions,
   interviewers,
   errorTypes,
-  showLabels = true,
-  overrides,
-  onSetOverride,
-}: InteractiveMapProps) {
-  const { toast } = useToast();
-
-  const [selectedError, setSelectedError] = useState<string>("all");
-  const [selectedInterviewer, setSelectedInterviewer] = useState<string>("all");
-  const [labelsEnabled, setLabelsEnabled] = useState<boolean>(showLabels);
-  const [modalState, setModalState] = useState<{
-    submission: DecoratedSubmission;
-    mode: "approve" | "cancel";
-  } | null>(null);
-  const [officer, setOfficer] = useState("");
-  const [comment, setComment] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
-
+  showLabels: initialShowLabels = false,
+  lgaGeo,
+}: Props) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
+  const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
   const labelLayerRef = useRef<L.LayerGroup | null>(null);
-  const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
-  const markersByIdRef = useRef<Map<string, L.Marker>>(new Map());
-  const [boundaries, setBoundaries] = useState<LgaBoundaryFeature[]>([]);
+  const polygonLayerRef = useRef<L.GeoJSON | null>(null);
 
-  useEffect(() => {
-    setLabelsEnabled(showLabels);
-  }, [showLabels]);
+  const [errorFilter, setErrorFilter] = useState<ErrorType | "all">("all");
+  const [interviewerFilter, setInterviewerFilter] = useState<string>("all");
+  const [labelsVisible, setLabelsVisible] = useState<boolean>(Boolean(initialShowLabels));
 
-  const submissionsWithOverrides = useMemo<DecoratedSubmission[]>(() => {
+  const { openForceAction, modal, overrides } = useSingleForceAction();
+
+  const decoratedSubmissions = useMemo<DecoratedSubmission[]>(() => {
+    const knownErrors = new Set<ErrorType>([...KNOWN_ERROR_TYPES, ...errorTypes]);
     return submissions.map((submission) => {
+      const candidate = submission as MapSubmission & { autoFlags?: ErrorType[] };
+      const autoFlagsRaw = Array.isArray(candidate.autoFlags) ? candidate.autoFlags : [];
+      const autoFlags = autoFlagsRaw
+        .map((item) => (typeof item === "string" ? normalizeError(item) : null))
+        .filter((item): item is ErrorType => Boolean(item));
+      const combined = new Set<ErrorType>();
+      submission.errorTypes.forEach((error) => {
+        if (knownErrors.has(error)) {
+          combined.add(error);
+        }
+      });
+      autoFlags.forEach((error) => combined.add(error));
       const override = overrides[submission.id];
-      const nextStatus = override?.status ?? submission.status;
-      const derivedErrors = new Set(submission.errorTypes);
-
-      if (override?.status === "not_approved") {
-        derivedErrors.add("Force Cancelled");
-      } else if (derivedErrors.has("Force Cancelled")) {
-        derivedErrors.delete("Force Cancelled");
-      }
-
       return {
         ...submission,
-        status: nextStatus,
+        status: override?.status ?? submission.status,
+        combinedErrors: Array.from(combined),
+        autoFlags,
         override,
-        derivedErrors: Array.from(derivedErrors),
       };
     });
-  }, [overrides, submissions]);
-
-  const availableErrorTypes = useMemo(() => {
-    const combined = new Set<string>([...errorTypes]);
-    submissionsWithOverrides.forEach((submission) => {
-      submission.derivedErrors.forEach((error) => combined.add(error));
-    });
-    return Array.from(combined).sort((a, b) => a.localeCompare(b));
-  }, [errorTypes, submissionsWithOverrides]);
-
-  const interviewerDirectory = useMemo(() => {
-    const map = new Map<string, string>();
-    submissionsWithOverrides.forEach((submission) => {
-      const existing = map.get(submission.interviewerId);
-      const candidate = submission.interviewerName?.trim() ?? "";
-      if (!existing) {
-        map.set(submission.interviewerId, candidate);
-      } else if (!existing.trim() && candidate) {
-        map.set(submission.interviewerId, candidate);
-      }
-    });
-    return map;
-  }, [submissionsWithOverrides]);
-
-  const interviewerOptions = useMemo(() => {
-    const ids = interviewers.length > 0 ? interviewers : Array.from(interviewerDirectory.keys());
-    const unique = Array.from(new Set(ids));
-    return unique
-      .map((id) => ({ id, label: interviewerDirectory.get(id) || id }))
-      .map(({ id, label }) => ({
-        id,
-        label: label && label.trim() && label !== id ? `${id} · ${label}` : id,
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [interviewers, interviewerDirectory]);
+  }, [errorTypes, overrides, submissions]);
 
   const filteredSubmissions = useMemo(() => {
-    return submissionsWithOverrides.filter((submission) => {
-      const matchesError =
-        selectedError === "all" || submission.derivedErrors.includes(selectedError);
-      const matchesInterviewer =
-        selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer;
-      return matchesError && matchesInterviewer;
+    return decoratedSubmissions.filter((submission) => {
+      if (errorFilter !== "all" && !submission.combinedErrors.includes(errorFilter)) {
+        return false;
+      }
+      if (interviewerFilter !== "all" && submission.interviewerId !== interviewerFilter) {
+        return false;
+      }
+      return true;
     });
-  }, [selectedError, selectedInterviewer, submissionsWithOverrides]);
-
-  const handleExportMap = useCallback(async () => {
-    if (!mapRef.current) return;
-    try {
-      const leafletImage = await loadLeafletImage();
-      leafletImage(mapRef.current, (error, canvas) => {
-        if (error || !canvas) {
-          console.error("Failed to export map", error);
-          toast({
-            title: "Export failed",
-            description: "Unable to export the current map view. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const link = document.createElement("a");
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-        link.href = canvas.toDataURL("image/png");
-        link.download = `stream-qc-map-${timestamp}.png`;
-        link.click();
-      });
-    } catch (error) {
-      console.error("Failed to export map", error);
-      toast({
-        title: "Export failed",
-        description: "Unable to export the current map view. Please try again.",
-        variant: "destructive",
-      });
-    }
-  }, [toast]);
+  }, [decoratedSubmissions, errorFilter, interviewerFilter]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (mapRef.current || !mapContainerRef.current) return;
+    if (!isBrowser) return;
+    if (mapRef.current || !containerRef.current) return;
 
-    mapRef.current = L.map(mapContainerRef.current, {
-      center: [7.15, 3.35],
-      zoom: 8,
-      scrollWheelZoom: true,
+    const map = L.map(containerRef.current, {
       preferCanvas: true,
+      center: [9.07, 7.48],
+      zoom: 6,
+      maxZoom: 18,
     });
-
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(mapRef.current);
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    const clusterGroup = L.markerClusterGroup();
+    clusterGroup.addTo(map);
+
+    mapRef.current = map;
+    clusterGroupRef.current = clusterGroup;
 
     setTimeout(() => {
-      mapRef.current?.invalidateSize();
-    }, 200);
+      map.invalidateSize();
+    }, 0);
 
     return () => {
-      mapRef.current?.remove();
+      clusterGroup.clearLayers();
+      clusterGroup.remove();
+      map.remove();
       mapRef.current = null;
-      clusterRef.current?.remove();
-      clusterRef.current = null;
-      labelLayerRef.current?.remove();
-      labelLayerRef.current = null;
-      boundaryLayerRef.current?.remove();
-      boundaryLayerRef.current = null;
-      markersByIdRef.current.clear();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    let cancelled = false;
-
-    loadLgaBoundaries().then((features) => {
-      if (cancelled) return;
-      setBoundaries(features);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    boundaryLayerRef.current?.remove();
-
-    if (boundaries.length === 0) {
-      boundaryLayerRef.current = null;
-      return;
-    }
-
-    const geoJsonLayer = L.geoJSON(boundaries.map((entry) => entry.feature), {
-      style: () => ({
-        color: "#1d4ed8",
-        weight: 1.2,
-        fillOpacity: 0,
-      }),
-    });
-
-    geoJsonLayer.addTo(mapRef.current);
-    boundaryLayerRef.current = geoJsonLayer;
-  }, [boundaries]);
-
-  useEffect(() => {
-    if (!mapRef.current) return;
-
-    if (!clusterRef.current) {
-      clusterRef.current = L.markerClusterGroup({
-        chunkedLoading: true,
-        disableClusteringAtZoom: 14,
-        spiderfyOnMaxZoom: true,
-        showCoverageOnHover: false,
-      }).addTo(mapRef.current);
-    }
-
-    const cluster = clusterRef.current;
-    cluster.clearLayers();
-    markersByIdRef.current.clear();
-
-    const createMarker = (submission: DecoratedSubmission) => {
-      if (typeof submission.lat !== "number" || typeof submission.lng !== "number") {
-        return null;
+      clusterGroupRef.current = null;
+      if (polygonLayerRef.current) {
+        polygonLayerRef.current.remove();
+        polygonLayerRef.current = null;
       }
-
-      const marker = L.marker([submission.lat, submission.lng], {
-        icon: createMarkerIcon(submission.status),
-        title: `Submission ${submission.id}`,
-      });
-
-      marker.bindPopup(formatPopup(submission), { maxWidth: 320 });
-
-      const listeners: Array<{ element: Element; handler: (event: Event) => void }> = [];
-
-      const teardown = () => {
-        listeners.forEach(({ element, handler }) => {
-          element.removeEventListener("click", handler);
-        });
-        listeners.length = 0;
-      };
-
-      marker.on("popupopen", () => {
-        teardown();
-        const popupElement = marker.getPopup()?.getElement();
-        if (!popupElement) return;
-        ("approve cancel".split(" ") as Array<"approve" | "cancel">).forEach((action) => {
-          const button = popupElement.querySelector<HTMLButtonElement>(
-            `[data-action="${action}"][data-instance="${submission.id}"]`,
-          );
-          if (!button) return;
-          const handler = (event: Event) => {
-            event.preventDefault();
-            setFormError(null);
-            setOfficer(submission.override?.officer ?? "");
-            setComment(submission.override?.comment ?? "");
-            setModalState({ submission, mode: action });
-          };
-          button.addEventListener("click", handler);
-          listeners.push({ element: button, handler });
-        });
-      });
-
-      marker.on("popupclose", () => {
-        teardown();
-      });
-
-      markersByIdRef.current.set(submission.id, marker);
-      return marker;
+      if (labelLayerRef.current) {
+        labelLayerRef.current.remove();
+        labelLayerRef.current = null;
+      }
     };
-
-    const markers = filteredSubmissions
-      .map((submission) => createMarker(submission))
-      .filter((marker): marker is L.Marker => Boolean(marker));
-
-    cluster.addLayers(markers);
-  }, [filteredSubmissions]);
+  }, []);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    const map = mapRef.current;
+    const clusterGroup = clusterGroupRef.current;
+    if (!map || !clusterGroup) return;
 
-    if (!labelLayerRef.current) {
-      labelLayerRef.current = L.layerGroup().addTo(mapRef.current);
-    }
-
-    const layer = labelLayerRef.current;
-    layer.clearLayers();
-
-    if (!labelsEnabled) {
-      layer.remove();
-      return;
-    }
-
-    if (!mapRef.current.hasLayer(layer)) {
-      layer.addTo(mapRef.current);
-    }
-
-    if (boundaries.length > 0) {
-      boundaries.forEach((entry) => {
-        const marker = L.marker([entry.centroid[0], entry.centroid[1]], {
-          interactive: false,
-          opacity: 0,
-        });
-        marker.bindTooltip(entry.name, {
-          permanent: true,
-          direction: "center",
-          className: "qc-map-label",
-          opacity: 0.96,
-        });
-        marker.addTo(layer);
-      });
-      return;
-    }
-
-    const lgaAggregates = new Map<
-      string,
-      { lat: number; lng: number; count: number; name: string }
-    >();
+    clusterGroup.clearLayers();
 
     filteredSubmissions.forEach((submission) => {
       if (typeof submission.lat !== "number" || typeof submission.lng !== "number") return;
-      const key = submission.lga;
-      const aggregate = lgaAggregates.get(key) ?? {
-        lat: 0,
-        lng: 0,
-        count: 0,
-        name: submission.lga,
+
+      const marker = L.marker([submission.lat, submission.lng], {
+        icon: createMarkerIcon(submission.status),
+      });
+
+      const errors = submission.combinedErrors.length
+        ? `<ul style="padding-left:18px;margin:4px 0 0;">${submission.combinedErrors
+            .map((error) => `<li>${error}</li>`)
+            .join("")}</ul>`
+        : "<p style=\"margin:4px 0 0;\">No flags</p>";
+
+      const autoFlags = submission.autoFlags.length
+        ? `<div style="margin-top:8px;font-size:12px;color:#2563eb;">Auto flags: ${submission.autoFlags.join(", ")}</div>`
+        : "";
+
+      const overrideDetails = submission.override
+        ? `<div style="margin-top:8px;padding:8px;border-radius:6px;background:rgba(37,99,235,0.08);font-size:12px;">` +
+          `<div><strong>QC Officer:</strong> ${submission.override.officer}</div>` +
+          `<div><strong>Comment:</strong> ${submission.override.comment}</div>` +
+          `<div><strong>Updated:</strong> ${formatTimestamp(submission.override.timestamp)}</div>` +
+          `</div>`
+        : "";
+
+      const popupHtml = `
+        <div style="min-width:240px;font-family:Inter,system-ui,sans-serif;">
+          <h3 style="margin:0 0 8px;font-size:16px;font-weight:600;">Submission ${submission.id}</h3>
+          <div style="font-size:13px;line-height:1.5;">
+            <div><strong>Interviewer:</strong> ${submission.interviewerId} (${submission.interviewerName})</div>
+            <div><strong>LGA:</strong> ${submission.lga || "Unknown"}</div>
+            <div><strong>Status:</strong> <span style="color:${STATUS_COLORS[submission.status]};font-weight:600;">${
+              submission.status === "approved" ? "Approved" : "Not Approved"
+            }</span></div>
+            <div><strong>Timestamp:</strong> ${formatTimestamp(submission.timestamp)}</div>
+            <div style="margin-top:8px;"><strong>Flags:</strong>${errors}</div>
+            ${autoFlags}
+            ${overrideDetails}
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+            <button type="button" data-action="approve" style="flex:1;min-width:120px;padding:8px 12px;border-radius:6px;border:1px solid #16a34a;background:#16a34a;color:white;font-weight:600;cursor:pointer;">Force Approve</button>
+            <button type="button" data-action="cancel" style="flex:1;min-width:120px;padding:8px 12px;border-radius:6px;border:1px solid #dc2626;background:white;color:#dc2626;font-weight:600;cursor:pointer;">Force Cancel</button>
+          </div>
+        </div>
+      `;
+
+      marker.bindPopup(popupHtml, { maxWidth: 320 });
+
+      const handlePopupOpen = (event: L.PopupEvent) => {
+        const element = event.popup.getElement();
+        if (!element) return;
+        const attach = (selector: string, status: QCStatus) => {
+          const button = element.querySelector<HTMLButtonElement>(selector);
+          if (!button) return;
+          const listener = (ev: Event) => {
+            ev.preventDefault();
+            openForceAction(submission, status);
+          };
+          button.addEventListener("click", listener);
+          marker.once("popupclose", () => {
+            button.removeEventListener("click", listener);
+          });
+        };
+        attach("button[data-action=approve]", "approved");
+        attach("button[data-action=cancel]", "not_approved");
       };
-      aggregate.lat += submission.lat;
-      aggregate.lng += submission.lng;
-      aggregate.count += 1;
-      lgaAggregates.set(key, aggregate);
+
+      marker.on("popupopen", handlePopupOpen);
+
+      clusterGroup.addLayer(marker);
     });
 
-    lgaAggregates.forEach((aggregate) => {
-      if (aggregate.count === 0) return;
-      const marker = L.marker([aggregate.lat / aggregate.count, aggregate.lng / aggregate.count], {
-        interactive: false,
-        opacity: 0,
-      });
-      marker.bindTooltip(aggregate.name, {
-        permanent: true,
-        direction: "center",
-        className: "qc-map-label",
-        opacity: 0.96,
-      });
-      marker.addTo(layer);
-    });
-  }, [labelsEnabled, boundaries, filteredSubmissions]);
+    if (filteredSubmissions.length > 0) {
+      const points = filteredSubmissions
+        .filter((submission) => typeof submission.lat === "number" && typeof submission.lng === "number")
+        .map((submission) => [submission.lat as number, submission.lng as number]) as [number, number][];
+      if (points.length > 0) {
+        const bounds = L.latLngBounds(points);
+        if (lgaGeo) {
+          const polygonBounds = L.geoJSON(lgaGeo).getBounds();
+          if (polygonBounds.isValid()) {
+            bounds.extend(polygonBounds);
+          }
+        }
+        map.fitBounds(bounds.pad(0.15));
+      }
+    }
+  }, [filteredSubmissions, lgaGeo, openForceAction]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    fitToContent(map, boundaryLayerRef.current, filteredSubmissions);
-  }, [filteredSubmissions, boundaries]);
+    if (polygonLayerRef.current) {
+      polygonLayerRef.current.remove();
+      polygonLayerRef.current = null;
+    }
+
+    if (!lgaGeo) return;
+
+    const polygonLayer = L.geoJSON(lgaGeo, {
+      style: {
+        color: "#1d4ed8",
+        weight: 1,
+        fillOpacity: 0.04,
+      },
+    });
+    polygonLayer.addTo(map);
+    polygonLayerRef.current = polygonLayer;
+  }, [lgaGeo]);
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    setTimeout(() => {
-      mapRef.current?.invalidateSize();
-    }, 200);
-  }, [filteredSubmissions.length]);
+    const map = mapRef.current;
+    if (!map) return;
 
-  const handleOverride = useCallback(
-    (submission: DecoratedSubmission, mode: "approve" | "cancel", officerName: string, note: string) => {
-      const record: QCOverrideRecord = {
-        status: mode === "approve" ? "approved" : "not_approved",
-        officer: officerName.trim(),
-        comment: note.trim(),
-        timestamp: new Date().toISOString(),
-      };
-      onSetOverride(submission.id, record);
-      toast({
-        title: mode === "approve" ? "Submission approved" : "Submission cancelled",
-        description: `Instance ${submission.id} updated by ${record.officer}.`,
+    if (labelLayerRef.current) {
+      labelLayerRef.current.remove();
+      labelLayerRef.current = null;
+    }
+
+    if (!lgaGeo || !labelsVisible) return;
+
+    const labelLayer = L.layerGroup();
+    lgaGeo.features.forEach((feature) => {
+      if (!feature.geometry) return;
+      const geometry = feature.geometry as Geometry;
+      if (geometry.type !== "Polygon" && geometry.type !== "MultiPolygon") return;
+      const [lng, lat] = featureCentroid(geometry as Polygon | MultiPolygon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const marker = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: "lga-label-marker",
+          html: "",
+          iconSize: [0, 0],
+        }),
       });
-      setModalState(null);
-    },
-    [setOverride, toast],
-  );
+      marker.bindTooltip(getFeatureName(feature.properties ?? {}) ?? "", {
+        permanent: true,
+        direction: "center",
+        className: "lga-label",
+      });
+      labelLayer.addLayer(marker);
+    });
+    labelLayer.addTo(map);
+    labelLayerRef.current = labelLayer;
+  }, [labelsVisible, lgaGeo]);
 
-  const confirmOverride = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!modalState) return;
-
-    const officerName = officer.trim();
-    const note = comment.trim();
-
-    if (!officerName) {
-      setFormError("Please provide the QC officer's name.");
-      return;
+  const handleExport = useCallback(async () => {
+    if (!mapRef.current) return;
+    try {
+      const leafletImage = await ensureLeafletImage();
+      leafletImage(mapRef.current, (error, canvas) => {
+        if (error || !canvas) {
+          console.error("Failed to render map", error);
+          return;
+        }
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const link = document.createElement("a");
+          const stamp = new Date();
+          const pad = (value: number) => value.toString().padStart(2, "0");
+          const filename = `map_${stamp.getFullYear()}${pad(stamp.getMonth() + 1)}${pad(stamp.getDate())}-${pad(
+            stamp.getHours(),
+          )}${pad(stamp.getMinutes())}.png`;
+          const url = URL.createObjectURL(blob);
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        });
+      });
+    } catch (error) {
+      console.error("Unable to export map", error);
     }
-
-    if (!note) {
-      setFormError("Please provide a short comment to justify the override.");
-      return;
-    }
-
-    handleOverride(modalState.submission, modalState.mode, officerName, note);
-  };
+  }, []);
 
   return (
-    <Card className="fade-in">
-      <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-primary" />
-          <CardTitle className="text-left">QC Map</CardTitle>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-600" htmlFor="error-filter">
+            Error filter
+          </label>
+          <select
+            id="error-filter"
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm shadow-sm focus:border-slate-500 focus:outline-none"
+            value={errorFilter}
+            onChange={(event) => setErrorFilter(event.target.value as ErrorType | "all")}
+          >
+            <option value="all">All errors</option>
+            {errorTypes.map((error) => (
+              <option key={error} value={error}>
+                {error}
+              </option>
+            ))}
+          </select>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Select value={selectedError} onValueChange={setSelectedError}>
-            <SelectTrigger className="min-w-[180px]">
-              <SelectValue placeholder="All Error Types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Error Types</SelectItem>
-              {availableErrorTypes.map((error) => (
-                <SelectItem key={error} value={error}>
-                  {formatErrorLabel(error)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
-            <SelectTrigger className="min-w-[200px]">
-              <SelectValue placeholder="All Interviewers" />
-            </SelectTrigger>
-            <SelectContent className="z-[2000]">
-              <SelectItem value="all">All Interviewers</SelectItem>
-              {interviewerOptions.map((option) => (
-                <SelectItem key={option.id} value={option.id}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-            <Switch id="toggle-labels" checked={labelsEnabled} onCheckedChange={setLabelsEnabled} />
-            <Label htmlFor="toggle-labels" className="cursor-pointer select-none">
-              Show LGA labels
-            </Label>
-          </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-slate-600" htmlFor="interviewer-filter">
+            Interviewer
+          </label>
+          <select
+            id="interviewer-filter"
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm shadow-sm focus:border-slate-500 focus:outline-none"
+            value={interviewerFilter}
+            onChange={(event) => setInterviewerFilter(event.target.value)}
+          >
+            <option value="all">All interviewers</option>
+            {interviewers.map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
+          </select>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="relative h-[500px] w-full overflow-hidden rounded-lg border">
-          <div ref={mapContainerRef} className="h-full w-full" />
-          <div className="pointer-events-none absolute inset-0" />
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <ListFilter className="hidden h-4 w-4 text-muted-foreground sm:block" />
-            Showing {filteredSubmissions.length.toLocaleString()} submissions
-          </div>
-          <Button variant="outline" size="sm" onClick={handleExportMap} className="gap-2">
-            <Download className="h-4 w-4" />
+        <Button type="button" variant="outline" onClick={() => setLabelsVisible((value) => !value)}>
+          {labelsVisible ? "Hide LGA Labels" : "Show LGA Labels"}
+        </Button>
+      </div>
+      <div className="relative">
+        <div ref={containerRef} className="h-[640px] w-full rounded-lg border border-slate-200" />
+        <div className="absolute right-4 top-4 z-[1000]">
+          <Button type="button" variant="secondary" onClick={handleExport}>
             Export Map PNG
           </Button>
         </div>
-      </CardContent>
-
-      <Dialog open={Boolean(modalState)} onOpenChange={(open) => !open && setModalState(null)}>
-        <DialogContent className="sm:max-w-md">
-          <form onSubmit={confirmOverride} className="space-y-4">
-            <DialogHeader>
-              <DialogTitle>
-                {modalState?.mode === "approve" ? "Force approve submission" : "Force cancel submission"}
-              </DialogTitle>
-              <DialogDescription>
-                Provide your details and a short comment. The action will be stored locally on this device and
-                reflected on the map immediately.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="qc-officer">QC Officer</Label>
-              <Input
-                id="qc-officer"
-                value={officer}
-                onChange={(event) => setOfficer(event.target.value)}
-                placeholder="Enter officer name"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="qc-comment">Comment</Label>
-              <Textarea
-                id="qc-comment"
-                value={comment}
-                onChange={(event) => setComment(event.target.value)}
-                placeholder="Why is this submission being updated?"
-                rows={4}
-              />
-            </div>
-            {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setModalState(null)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" className="gap-2">
-                {modalState?.mode === "approve" ? "Confirm Approval" : "Confirm Cancellation"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </Card>
+      </div>
+      {modal}
+    </div>
   );
-}
+};
+
+export { InteractiveMap };
+export default InteractiveMap;

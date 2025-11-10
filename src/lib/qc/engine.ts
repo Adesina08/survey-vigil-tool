@@ -1,212 +1,263 @@
-import type { Feature, MultiPolygon, Polygon } from "geojson";
+import type { MapSubmission, ErrorType } from "@/types/submission";
+import type { FeatureCollection, Geometry, MultiPolygon, Polygon } from "geojson";
 
-import { isPointInsideFeature } from "@/lib/geo/lgaBoundaries";
-import type { ErrorType } from "@/types/submission";
+import { isPointInFeature } from "@/lib/geo/pip";
 
-export interface QualityRow {
-  id: string;
-  interviewStart: string;
-  interviewEnd: string;
-  durationSeconds?: number | null;
-  interviewerId: string;
-  deviceId?: string | null;
-  phone?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  lgaFeature?: Feature<Polygon | MultiPolygon> | null;
+export interface QCOptions {
+  clusterRadiusMeters?: number; // default 5
+  lgaGeo?: FeatureCollection<Geometry, Record<string, unknown>>; // optional LGA shapes
 }
 
-export interface QualityCheckOptions {
-  clusterRadiusMeters?: number;
-  meanDurationSeconds?: number | null;
-  getFeatureForRow?: (
-    row: QualityRow,
-  ) => Feature<Polygon | MultiPolygon> | null | undefined;
+export interface QCAnnotated extends MapSubmission {
+  autoFlags: ErrorType[];
+  geotagStatus?: "inside" | "outside" | "unknown";
+  actualLGA?: string;
+  clusterWithIds: string[];
+  proximityDistanceMeters: number | null;
 }
 
-export interface AnnotatedQualityRow extends QualityRow {
-  flags: ErrorType[];
-}
+export function applyQualityChecks(rows: MapSubmission[], options: QCOptions = {}): QCAnnotated[] {
+  const clusterRadius = options.clusterRadiusMeters ?? 5;
 
-const DEFAULT_CLUSTER_RADIUS_METERS = 5;
-const SHORT_GAP_SECONDS = 60;
-
-const toDate = (value: string): Date | null => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-};
-
-const normalizePhoneNumber = (value: string): string => value.replace(/[^0-9+]/g, "");
-
-const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-
-const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6_371_000;
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
-
-const computeMeanDuration = (rows: QualityRow[]): number | null => {
   const durations = rows
-    .map((row) => row.durationSeconds)
-    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
-  if (durations.length === 0) return null;
-  const total = durations.reduce((sum, duration) => sum + duration, 0);
-  return total / durations.length;
-};
+    .map((row) => row.durationMinutes)
+    .filter((duration): duration is number => typeof duration === "number" && Number.isFinite(duration) && duration > 0);
 
-const ensureFeature = (
-  row: QualityRow,
-  options: QualityCheckOptions,
-): Feature<Polygon | MultiPolygon> | null => {
-  if (row.lgaFeature?.geometry) return row.lgaFeature;
-  if (options.getFeatureForRow) {
-    const feature = options.getFeatureForRow(row);
-    if (feature?.geometry) return feature;
-  }
-  return null;
-};
+  const meanDuration = durations.length
+    ? durations.reduce((total, value) => total + value, 0) / durations.length
+    : null;
 
-const uniqueFlags = (...flags: Array<ErrorType | null | undefined>) =>
-  Array.from(new Set(flags.filter((flag): flag is ErrorType => Boolean(flag))));
+  const normalizePhone = (value: string): string => value.replace(/[^0-9+]/g, "");
 
-export const applyQualityChecks = (
-  rows: QualityRow[],
-  options: QualityCheckOptions = {},
-): AnnotatedQualityRow[] => {
-  const meanDuration = options.meanDurationSeconds ?? computeMeanDuration(rows);
-  const clusterRadius = options.clusterRadiusMeters ?? DEFAULT_CLUSTER_RADIUS_METERS;
-
-  const phoneDirectory = new Map<string, string[]>();
+  const duplicatePhones = new Map<string, string[]>();
   rows.forEach((row) => {
     if (!row.phone) return;
-    const normalized = normalizePhoneNumber(row.phone);
+    const normalized = normalizePhone(row.phone);
     if (!normalized) return;
-    const entries = phoneDirectory.get(normalized) ?? [];
-    entries.push(row.id);
-    phoneDirectory.set(normalized, entries);
+    const list = duplicatePhones.get(normalized) ?? [];
+    list.push(row.id);
+    duplicatePhones.set(normalized, list);
   });
 
   const duplicatePhoneIds = new Set<string>();
-  phoneDirectory.forEach((ids) => {
+  duplicatePhones.forEach((ids) => {
     if (ids.length > 1) {
       ids.forEach((id) => duplicatePhoneIds.add(id));
     }
   });
 
-  const deviceGroups = new Map<string, Array<{ row: QualityRow; start: Date | null; end: Date | null }>>();
+  const parseDate = (value: string | null | undefined): Date | null => {
+    if (!value) return null;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
+  const toTimestamp = (row: MapSubmission) => parseDate(row.starttime ?? row.timestamp);
+  const toEnd = (row: MapSubmission) => parseDate(row.endtime ?? row.timestamp);
+
+  const deviceBuckets = new Map<string, Array<{ row: MapSubmission; start: Date | null; end: Date | null }>>();
   rows.forEach((row) => {
-    const deviceKey = (row.deviceId ?? row.interviewerId).toString();
-    const start = toDate(row.interviewStart);
-    const end = toDate(row.interviewEnd);
-    const list = deviceGroups.get(deviceKey) ?? [];
-    list.push({ row, start, end });
-    deviceGroups.set(deviceKey, list);
+    const key = row.deviceId ?? row.interviewerId;
+    const bucket = deviceBuckets.get(key) ?? [];
+    bucket.push({ row, start: toTimestamp(row), end: toEnd(row) });
+    deviceBuckets.set(key, bucket);
   });
 
   const interwovenIds = new Set<string>();
   const shortGapIds = new Set<string>();
 
-  deviceGroups.forEach((entries) => {
-    const sorted = entries.sort((a, b) => {
-      const timeA = a.start?.getTime() ?? 0;
-      const timeB = b.start?.getTime() ?? 0;
-      return timeA - timeB;
+  deviceBuckets.forEach((entries) => {
+    entries.sort((a, b) => {
+      const aTime = a.start?.getTime() ?? 0;
+      const bTime = b.start?.getTime() ?? 0;
+      return aTime - bTime;
     });
 
-    for (let index = 1; index < sorted.length; index += 1) {
-      const current = sorted[index];
-      const previous = sorted[index - 1];
-      if (!current.start || !previous.end) continue;
-
-      if (previous.end.getTime() > current.start.getTime()) {
-        interwovenIds.add(current.row.id);
+    for (let i = 1; i < entries.length; i += 1) {
+      const previous = entries[i - 1];
+      const current = entries[i];
+      if (previous.end && current.start && previous.end > current.start) {
         interwovenIds.add(previous.row.id);
+        interwovenIds.add(current.row.id);
       }
-
-      const gapSeconds = (current.start.getTime() - previous.end.getTime()) / 1000;
-      if (gapSeconds >= 0 && gapSeconds < SHORT_GAP_SECONDS) {
-        shortGapIds.add(current.row.id);
-      }
-    }
-  });
-
-  const interviewerGroups = new Map<string, QualityRow[]>();
-  rows.forEach((row) => {
-    const list = interviewerGroups.get(row.interviewerId) ?? [];
-    list.push(row);
-    interviewerGroups.set(row.interviewerId, list);
-  });
-
-  const clusteredIds = new Set<string>();
-  interviewerGroups.forEach((group) => {
-    for (let i = 0; i < group.length; i += 1) {
-      const a = group[i];
-      if (typeof a.latitude !== "number" || typeof a.longitude !== "number") continue;
-      for (let j = i + 1; j < group.length; j += 1) {
-        const b = group[j];
-        if (typeof b.latitude !== "number" || typeof b.longitude !== "number") continue;
-        const distance = haversineDistance(a.latitude, a.longitude, b.latitude, b.longitude);
-        if (distance <= clusterRadius) {
-          clusteredIds.add(a.id);
-          clusteredIds.add(b.id);
+      if (previous.end && current.start) {
+        const gapMinutes = (current.start.getTime() - previous.end.getTime()) / 60000;
+        if (gapMinutes >= 0 && gapMinutes < 1) {
+          shortGapIds.add(current.row.id);
         }
       }
     }
   });
 
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const haversine = (a: [number, number], b: [number, number]) => {
+    const R = 6371000;
+    const dLat = toRadians(b[0] - a[0]);
+    const dLng = toRadians(b[1] - a[1]);
+    const sinLat = Math.sin(dLat / 2);
+    const sinLng = Math.sin(dLng / 2);
+    const lat1 = toRadians(a[0]);
+    const lat2 = toRadians(b[0]);
+    const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+    const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    return R * c;
+  };
+
+  const interviewerBuckets = new Map<string, MapSubmission[]>();
+  rows.forEach((row) => {
+    const bucket = interviewerBuckets.get(row.interviewerId) ?? [];
+    bucket.push(row);
+    interviewerBuckets.set(row.interviewerId, bucket);
+  });
+
+  const clusteredIds = new Map<string, Set<string>>();
+  const proximityDistance = new Map<string, number>();
+
+  interviewerBuckets.forEach((group) => {
+    for (let i = 0; i < group.length; i += 1) {
+      const first = group[i];
+      if (typeof first.lat !== "number" || typeof first.lng !== "number") continue;
+      for (let j = i + 1; j < group.length; j += 1) {
+        const second = group[j];
+        if (typeof second.lat !== "number" || typeof second.lng !== "number") continue;
+        const distance = haversine([first.lat, first.lng], [second.lat, second.lng]);
+        const existingFirst = proximityDistance.get(first.id);
+        const existingSecond = proximityDistance.get(second.id);
+        if (existingFirst === undefined || distance < existingFirst) {
+          proximityDistance.set(first.id, distance);
+        }
+        if (existingSecond === undefined || distance < existingSecond) {
+          proximityDistance.set(second.id, distance);
+        }
+        if (distance <= clusterRadius) {
+          const firstSet = clusteredIds.get(first.id) ?? new Set<string>();
+          firstSet.add(second.id);
+          clusteredIds.set(first.id, firstSet);
+
+          const secondSet = clusteredIds.get(second.id) ?? new Set<string>();
+          secondSet.add(first.id);
+          clusteredIds.set(second.id, secondSet);
+        }
+      }
+    }
+  });
+
+  const lgaFeatures = options.lgaGeo?.features ?? [];
+  const normalizeName = (value: string | number | undefined | null) =>
+    typeof value === "string" ? value.trim().toLowerCase() : typeof value === "number" ? String(value) : "";
+
+  const featureLookup = new Map<string, Polygon | MultiPolygon>();
+  const featureName = new Map<Polygon | MultiPolygon, string>();
+
+  lgaFeatures.forEach((feature) => {
+    if (!feature.geometry) return;
+    const geometry = feature.geometry as Polygon | MultiPolygon;
+    const properties = feature.properties ?? {};
+    const names = [
+      properties.LGA,
+      properties.lga,
+      properties.name,
+      properties.NAME,
+      properties.LGAName,
+      properties.lga_name,
+    ];
+    const displayNameCandidate = names.find((value) => typeof value === "string" && value.trim().length > 0);
+    const displayName = typeof displayNameCandidate === "string" ? displayNameCandidate.trim() : undefined;
+    names
+      .map((value) => normalizeName(value))
+      .filter((value) => value.length > 0)
+      .forEach((value) => {
+        featureLookup.set(value, geometry);
+        if (displayName) {
+          featureName.set(geometry, displayName);
+        }
+      });
+  });
+
+  const findGeometryByPoint = (lng: number, lat: number): { geometry: Polygon | MultiPolygon; name: string | undefined } | null => {
+    for (const feature of lgaFeatures) {
+      if (!feature.geometry) continue;
+      const geometry = feature.geometry as Polygon | MultiPolygon;
+      if (isPointInFeature([lng, lat], geometry)) {
+        return { geometry, name: featureName.get(geometry) };
+      }
+    }
+    return null;
+  };
+
   return rows.map((row) => {
-    const flags: ErrorType[] = [];
-    const duration = row.durationSeconds ?? null;
-    const startDate = toDate(row.interviewStart);
+    const autoFlags: ErrorType[] = [];
 
-    if (meanDuration && duration && duration < meanDuration * 0.25) {
-      flags.push("Low LOI");
+    if (meanDuration && row.durationMinutes && row.durationMinutes < meanDuration * 0.25) {
+      autoFlags.push("Low LOI");
+    }
+    if (meanDuration && row.durationMinutes && row.durationMinutes > meanDuration * 2) {
+      autoFlags.push("High LOI");
     }
 
-    if (meanDuration && duration && duration > meanDuration * 2) {
-      flags.push("High LOI");
-    }
-
+    const startDate = parseDate(row.starttime ?? row.timestamp);
     if (startDate) {
-      const hour = startDate.getHours() + startDate.getMinutes() / 60;
+      const hour = startDate.getHours();
       if (hour < 7 || hour > 20) {
-        flags.push("OddHour");
+        autoFlags.push("OddHour");
       }
     }
 
     if (duplicatePhoneIds.has(row.id)) {
-      flags.push("DuplicatePhone");
+      autoFlags.push("DuplicatePhone");
     }
 
     if (interwovenIds.has(row.id)) {
-      flags.push("Interwoven");
+      autoFlags.push("Interwoven");
     }
 
     if (shortGapIds.has(row.id)) {
-      flags.push("ShortGap");
+      autoFlags.push("ShortGap");
     }
 
-    if (typeof row.latitude === "number" && typeof row.longitude === "number") {
-      const feature = ensureFeature(row, options);
-      if (feature && !isPointInsideFeature([row.longitude, row.latitude], feature)) {
-        flags.push("Outside LGA Boundary");
+    let geotagStatus: "inside" | "outside" | "unknown" | undefined = "unknown";
+    let actualLGA: string | undefined;
+
+    if (typeof row.lat === "number" && typeof row.lng === "number" && lgaFeatures.length > 0) {
+      const expectedKey = normalizeName(row.lga);
+      const expectedGeometry = expectedKey ? featureLookup.get(expectedKey) : undefined;
+      const inExpected = expectedGeometry
+        ? isPointInFeature([row.lng, row.lat], expectedGeometry)
+        : undefined;
+
+      const located = findGeometryByPoint(row.lng, row.lat);
+      if (located) {
+        actualLGA = located.name ?? actualLGA;
+      }
+
+      if (inExpected === true) {
+        geotagStatus = "inside";
+      } else if (inExpected === false) {
+        geotagStatus = "outside";
+        autoFlags.push("Outside LGA Boundary");
+      } else {
+        geotagStatus = "unknown";
       }
     }
 
     if (clusteredIds.has(row.id)) {
-      flags.push("ClusteredInterview");
+      autoFlags.push("ClusteredInterview");
     }
+
+    const clusterWithIds = Array.from(clusteredIds.get(row.id) ?? new Set<string>());
+    const proximityDistanceMeters = proximityDistance.has(row.id)
+      ? proximityDistance.get(row.id) ?? null
+      : clusterWithIds.length > 0
+      ? clusterRadius
+      : null;
 
     return {
       ...row,
-      flags: uniqueFlags(...flags),
+      autoFlags: Array.from(new Set(autoFlags)),
+      geotagStatus,
+      actualLGA,
+      clusterWithIds,
+      proximityDistanceMeters: proximityDistanceMeters ?? null,
     };
   });
-};
+}
