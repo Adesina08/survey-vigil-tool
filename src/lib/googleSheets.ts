@@ -166,9 +166,8 @@ const convertGVizDate = (value: string): string | null => {
     return null;
   }
 
-  const [year, month, day, hour = "0", minute = "0", second = "0"] = match
-    .slice(1)
-    .map((part) => Number.parseInt(part ?? "0", 10));
+  const parts = match.slice(1).map((part) => Number.parseInt(part ?? "0", 10));
+  const [year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0] = parts;
 
   const date = new Date(Date.UTC(year, month, day, hour, minute, second));
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
