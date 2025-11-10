@@ -13,6 +13,17 @@ export type ErrorType =
   | "Terminated";
 
 export interface SheetSubmissionRow {
+  id?: string;
+  uuid?: string;
+  lga?: string;
+  ward?: string;
+  interviewer?: string;
+  submissionTime?: string;
+  status?: string;
+  approved?: boolean;
+  notApproved?: boolean;
+  lat?: number;
+  lng?: number;
   "Submission ID": string;
   "Submission Date": string;
   "Submission Time": string;

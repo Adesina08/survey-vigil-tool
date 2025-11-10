@@ -624,6 +624,54 @@ export const mapSheetRowsToSubmissions = (
         "Unknown State";
       const lga =
         toStringValue(getFromRow(normalisedRow, "A3. select the LGA")) || "Unknown LGA";
+      const ward =
+        toStringValue(getFromRow(normalisedRow, "A3b. Select the Ward")) || undefined;
+
+      const submissionTimeRaw = toStringValue(
+        getFromRow(normalisedRow, "_submission_time")
+      );
+      const uuidRaw = toStringValue(getFromRow(normalisedRow, "_uuid"));
+
+      const validationStatusRaw = toStringValue(
+        getFromRow(normalisedRow, "_validation_status")
+      );
+      const fallbackStatusRaw = toStringValue(getFromRow(normalisedRow, "_status"));
+      const normalisedValidationStatus = validationStatusRaw
+        ? validationStatusRaw.toLowerCase()
+        : "";
+
+      let approvalStatus: ApprovalStatus | null = null;
+      if (normalisedValidationStatus === "approved") {
+        approvalStatus = "Approved";
+      } else if (normalisedValidationStatus === "not approved") {
+        approvalStatus = "Not Approved";
+      } else {
+        const fallbackNormalised = fallbackStatusRaw ? fallbackStatusRaw.toLowerCase() : "";
+        if (fallbackNormalised === "approved" || fallbackNormalised === "valid") {
+          approvalStatus = "Approved";
+        } else if (
+          fallbackNormalised === "not approved" ||
+          fallbackNormalised === "rejected" ||
+          fallbackNormalised === "invalid"
+        ) {
+          approvalStatus = "Not Approved";
+        }
+      }
+
+      if (!approvalStatus) {
+        const consentRaw = toStringValue(
+          getFromRow(normalisedRow, "A6. Consent to participate")
+        ).toLowerCase();
+        approvalStatus =
+          consentRaw.includes("not") ||
+          consentRaw === "no" ||
+          consentRaw === "0" ||
+          consentRaw === "false"
+            ? "Not Approved"
+            : "Approved";
+      }
+
+      const finalApprovalStatus: ApprovalStatus = approvalStatus ?? "Approved";
 
       const age = toNumberValue(getFromRow(normalisedRow, "A8. Age")) ?? undefined;
       const ageGroup = determineAgeGroup(age);
@@ -638,17 +686,6 @@ export const mapSheetRowsToSubmissions = (
 
       const respondentPhone =
         toStringValue(getFromRow(normalisedRow, "Respondent phone number")) || undefined;
-
-      const approvalRaw = toStringValue(
-        getFromRow(normalisedRow, "A6. Consent to participate")
-      ).toLowerCase();
-      const approvalStatus: ApprovalStatus =
-        approvalRaw.includes("not") ||
-        approvalRaw === "no" ||
-        approvalRaw === "0" ||
-        approvalRaw === "false"
-          ? "Not Approved"
-          : "Approved";
 
       const interviewLength = (() => {
         const explicit = toNumberValue(
@@ -683,12 +720,28 @@ export const mapSheetRowsToSubmissions = (
 
       const resolvedLatitude = latitude ?? parsedCoordinates?.lat;
       const resolvedLongitude = longitude ?? parsedCoordinates?.lng;
+      const uuid = uuidRaw || undefined;
+      const resolvedStatus = validationStatusRaw || fallbackStatusRaw || undefined;
+      const resolvedSubmissionTime = submissionTimeRaw || startIso || endIso || undefined;
+      const approvedFlag = normalisedValidationStatus === "approved";
+      const notApprovedFlag = normalisedValidationStatus === "not approved";
 
       const errorFlags = parseErrorFlags(
         getFromRow(normalisedRow, "Error Flags", "Errors", "Error Flag")
       );
 
       const submission: SheetSubmissionRow = {
+        id: submissionId,
+        uuid,
+        lga,
+        ward,
+        interviewer: enumeratorId,
+        submissionTime: resolvedSubmissionTime,
+        status: resolvedStatus,
+        approved: approvedFlag,
+        notApproved: notApprovedFlag,
+        lat: resolvedLatitude,
+        lng: resolvedLongitude,
         "Submission ID": submissionId,
         "Submission Date": submissionDateString,
         "Submission Time": submissionTimeString,
@@ -710,7 +763,7 @@ export const mapSheetRowsToSubmissions = (
         simserial,
         "Age Group": ageGroup,
         Gender: gender,
-        "Approval Status": approvalStatus,
+        "Approval Status": finalApprovalStatus,
         "Error Flags": errorFlags,
         "Interview Length (mins)": interviewLength,
         Resp_No: respondentPhone,
