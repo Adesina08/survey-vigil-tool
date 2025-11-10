@@ -1,6 +1,12 @@
 // server/dashboard.ts
+import { readFile } from "node:fs/promises";
 import { fetchGoogleSheetFromUrl, mapSheetRowsToSubmissions } from "../src/lib/googleSheets";
-import { buildDashboardData, type DashboardData } from "../src/lib/dashboardData";
+import {
+  buildDashboardData,
+  type DashboardData,
+  type LGACatalogEntry,
+} from "../src/lib/dashboardData";
+import type { FeatureCollection } from "geojson";
 import type {
   SheetStateAgeTargetRow,
   SheetStateGenderTargetRow,
@@ -22,6 +28,52 @@ const GOOGLE_SHEETS_FETCH_ERROR_MESSAGE =
 const resolveGoogleSheetsUrl = (): string => {
   const envUrl = process.env.GOOGLE_SHEETS_URL || process.env.VITE_GOOGLE_SHEETS_URL || "";
   return envUrl.trim();
+};
+
+const GEOJSON_PATH = "../public/ogun-lga.geojson";
+
+const normalizeStateName = (state: unknown): string => {
+  const value = String(state ?? "").trim();
+  if (!value) return OGUN_STATE_NAME;
+  if (value.toLowerCase() === "ogun") return OGUN_STATE_NAME;
+  return value;
+};
+
+const normalizeLgaName = (lga: unknown): string => {
+  const value = String(lga ?? "").trim();
+  return value || "Unknown LGA";
+};
+
+const loadLgaCatalog = async (): Promise<LGACatalogEntry[]> => {
+  try {
+    const file = await readFile(new URL(GEOJSON_PATH, import.meta.url), "utf8");
+    const collection = JSON.parse(file) as FeatureCollection;
+    const seen = new Map<string, LGACatalogEntry>();
+
+    for (const feature of collection.features ?? []) {
+      const properties = (feature.properties ?? {}) as Record<string, unknown>;
+      const state = normalizeStateName(
+        properties["statename"] ?? properties["state"] ?? properties["State"]
+      );
+      const lga = normalizeLgaName(
+        properties["lganame"] ?? properties["lga"] ?? properties["LGA"]
+      );
+
+      const key = `${state}|${lga}`;
+      if (!seen.has(key)) {
+        seen.set(key, {
+          state,
+          lga,
+          properties: Object.keys(properties).length > 0 ? { ...properties } : {},
+        });
+      }
+    }
+
+    return Array.from(seen.values());
+  } catch (error) {
+    console.error("Failed to load LGA GeoJSON catalog", error);
+    return [];
+  }
 };
 
 /* ----------------- HELPERS ----------------- */
@@ -195,6 +247,8 @@ export const loadDashboardData = async (): Promise<DashboardData> => {
     throw new Error(GOOGLE_SHEETS_FETCH_ERROR_MESSAGE);
   }
 
+  const lgaCatalog = await loadLgaCatalog();
+
   // Derive genders present from the data (Male/Female only)
   const genderSet = new Set<PresentGender>();
   for (const row of submissions as any[]) {
@@ -211,5 +265,6 @@ export const loadDashboardData = async (): Promise<DashboardData> => {
     stateAgeTargets,
     stateGenderTargets,
     analysisRows: submissions,
+    lgaCatalog,
   });
 };
