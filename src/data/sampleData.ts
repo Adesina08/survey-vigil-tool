@@ -1,6 +1,6 @@
 export type ApprovalStatus = "Approved" | "Not Approved";
 export type Gender = "Male" | "Female" | "Unknown";
-export type AgeGroup = "18-25" | "26-35" | "36-45" | "46+" | "Unknown";
+export type AgeGroup = "15-24" | "25-34" | "35-44" | "45+" | "Unknown";
 export type ErrorType =
   | "OddHour"
   | "Low LOI"
@@ -196,10 +196,10 @@ export const sheetStateTargets: SheetStateTargetRow[] = [
 ];
 
 export const sheetStateAgeTargets: SheetStateAgeTargetRow[] = [
-  { State: "Ogun", "Age Group": "18-25", "Age Group Target": 0 },
-  { State: "Ogun", "Age Group": "26-35", "Age Group Target": 0 },
-  { State: "Ogun", "Age Group": "36-45", "Age Group Target": 0 },
-  { State: "Ogun", "Age Group": "46+", "Age Group Target": 0 },
+  { State: "Ogun", "Age Group": "15-24", "Age Group Target": 0 },
+  { State: "Ogun", "Age Group": "25-34", "Age Group Target": 0 },
+  { State: "Ogun", "Age Group": "35-44", "Age Group Target": 0 },
+  { State: "Ogun", "Age Group": "45+", "Age Group Target": 0 },
 ];
 
 export const sheetStateGenderTargets: SheetStateGenderTargetRow[] = [
