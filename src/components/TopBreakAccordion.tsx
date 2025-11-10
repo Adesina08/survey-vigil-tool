@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Download, FileSpreadsheet } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -34,6 +35,7 @@ import {
   type AnalysisTableResponse,
   getAnalysisTable,
 } from "@/lib/api.analysis";
+import { exportAnalysisToCSV, exportAnalysisToExcel } from "@/lib/exportAnalysis";
 
 interface TopBreakAccordionProps {
   topbreak: string;
@@ -239,6 +241,28 @@ const TopBreakAccordion = ({ topbreak, allVariables, formatLabel }: TopBreakAcco
 
           {!loading && !error && response && (
             <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-medium text-muted-foreground">Analysis Results</h3>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportAnalysisToCSV(response.html, topbreak, selectedVariable, stat)}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    CSV
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => exportAnalysisToExcel(response.html, topbreak, selectedVariable, stat)}
+                  >
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Excel
+                  </Button>
+                </div>
+              </div>
+              
               <Card>
                 <CardContent className="prose max-w-none overflow-x-auto py-4" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
               </Card>
