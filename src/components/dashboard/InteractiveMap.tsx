@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Tag, Download } from "lucide-react";
+import { MapPin, Download } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -74,7 +74,6 @@ const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
 };
 
 export function InteractiveMap({ submissions, interviewers, errorTypes }: InteractiveMapProps) {
-  const [showLabels, setShowLabels] = useState(true);
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
   const mapRef = useRef<L.Map | null>(null);
@@ -249,10 +248,6 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
     const layer = labelLayerRef.current;
     layer.clearLayers();
 
-    if (!showLabels) {
-      return;
-    }
-
     const addLabel = (name: string, center: L.LatLngExpression) => {
       const icon = L.divIcon({
         className: "lga-label",
@@ -298,7 +293,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
       const avgLng = data.lng / data.count;
       addLabel(lga, [avgLat, avgLng]);
     });
-  }, [showLabels, filteredSubmissions, geoJsonFeatures]);
+  }, [filteredSubmissions, geoJsonFeatures]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -352,15 +347,6 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
             Showing {filteredSubmissions.length.toLocaleString()} submissions
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowLabels((value) => !value)}
-              className="gap-2"
-            >
-              <Tag className="h-4 w-4" />
-              {showLabels ? "Hide" : "Show"} LGA Labels
-            </Button>
             <Button variant="outline" size="sm" onClick={handleExportMap} className="gap-2">
               <Download className="h-4 w-4" />
               Export Map
