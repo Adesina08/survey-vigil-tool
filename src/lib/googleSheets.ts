@@ -458,21 +458,16 @@ export const mapSheetRowsToSubmissions = (
       const normalisedRow = createNormalisedRow(row);
 
       const submissionId =
-        toStringValue(getFromRow(normalisedRow, "Submission ID", "_id", "_uuid")) ||
-        `submission-${index}`;
+        toStringValue(getFromRow(normalisedRow, "_id", "_uuid")) || `submission-${index}`;
 
-      const startDate =
-        parseDateValue(getFromRow(normalisedRow, "start", "Start", "Submission Start")) ??
-        parseDateValue(getFromRow(normalisedRow, "starttime", "Start Time"));
-      const endDate =
-        parseDateValue(getFromRow(normalisedRow, "end", "End", "Submission End")) ??
-        parseDateValue(getFromRow(normalisedRow, "endtime", "End Time"));
+      const startDate = parseDateValue(getFromRow(normalisedRow, "start"));
+      const endDate = parseDateValue(getFromRow(normalisedRow, "end"));
       const startIso = startDate?.toISOString();
       const endIso = endDate?.toISOString();
 
       const submissionDateSource =
-        parseDateValue(getFromRow(normalisedRow, "Submission Date", "A2. Date", "Date")) ??
-        parseDateValue(getFromRow(normalisedRow, "today", "Today")) ??
+        parseDateValue(getFromRow(normalisedRow, "A2. Date")) ??
+        parseDateValue(getFromRow(normalisedRow, "today")) ??
         startDate ??
         endDate;
 
@@ -486,25 +481,9 @@ export const mapSheetRowsToSubmissions = (
         : "";
 
       const enumeratorId =
-        toStringValue(
-          getFromRow(
-            normalisedRow,
-            "A1. Enumerator ID",
-            "Enumerator ID",
-            "Interviewer ID",
-            "InterviewerID"
-          )
-        ) || "Unknown";
+        toStringValue(getFromRow(normalisedRow, "A1. Enumerator ID")) || "Unknown";
       const enumeratorName =
-        toStringValue(
-          getFromRow(
-            normalisedRow,
-            "Enumerator Name",
-            "Interviewer Name",
-            "Interviewer",
-            "Enumerator"
-          )
-        ) || enumeratorId;
+        toStringValue(getFromRow(normalisedRow, "_submitted_by")) || enumeratorId;
       const username =
         toStringValue(getFromRow(normalisedRow, "username", "User Name")) || enumeratorId;
 
@@ -513,43 +492,30 @@ export const mapSheetRowsToSubmissions = (
         defaultState ||
         "Unknown State";
       const lga =
-        toStringValue(
-          getFromRow(normalisedRow, "A3. select the LGA", "LGA", "Local Government Area")
-        ) || "Unknown LGA";
+        toStringValue(getFromRow(normalisedRow, "A3. select the LGA")) || "Unknown LGA";
 
-      const age =
-        toNumberValue(getFromRow(normalisedRow, "A8. Age", "Age", "Respondent Age")) ?? undefined;
+      const age = toNumberValue(getFromRow(normalisedRow, "A8. Age")) ?? undefined;
       const ageGroup = determineAgeGroup(age);
 
-      const gender = normaliseGender(
-        getFromRow(normalisedRow, "A7. Sex", "Gender", "Respondent Gender")
-      );
+      const gender = normaliseGender(getFromRow(normalisedRow, "A7. Sex"));
 
-      const deviceid =
-        toStringValue(
-          getFromRow(normalisedRow, "deviceid", "deviceId", "DeviceID", "device id")
-        ) || undefined;
-      const imei = toStringValue(getFromRow(normalisedRow, "imei", "IMEI")) || undefined;
+      const deviceid = toStringValue(getFromRow(normalisedRow, "deviceid")) || undefined;
+      const imei = toStringValue(getFromRow(normalisedRow, "imei")) || undefined;
       const subscriberid =
-        toStringValue(getFromRow(normalisedRow, "subscriberid", "Subscriber ID")) || undefined;
-      const simserial = toStringValue(getFromRow(normalisedRow, "simserial", "SIM Serial")) || undefined;
+        toStringValue(getFromRow(normalisedRow, "subscriberid")) || undefined;
+      const simserial = toStringValue(getFromRow(normalisedRow, "simserial")) || undefined;
 
       const respondentPhone =
-        toStringValue(
-          getFromRow(normalisedRow, "Respondent phone number", "Resp_No", "Phone Number")
-        ) || undefined;
+        toStringValue(getFromRow(normalisedRow, "Respondent phone number")) || undefined;
 
       const approvalRaw = toStringValue(
-        getFromRow(
-          normalisedRow,
-          "Approval Status",
-          "Outcome Status",
-          "A6. Consent to participate",
-          "Consent"
-        )
+        getFromRow(normalisedRow, "A6. Consent to participate")
       ).toLowerCase();
       const approvalStatus: ApprovalStatus =
-        approvalRaw.includes("not") || approvalRaw === "no" || approvalRaw === "0" || approvalRaw === "false"
+        approvalRaw.includes("not") ||
+        approvalRaw === "no" ||
+        approvalRaw === "0" ||
+        approvalRaw === "false"
           ? "Not Approved"
           : "Approved";
 
@@ -570,26 +536,14 @@ export const mapSheetRowsToSubmissions = (
       })();
 
       const latitude = toNumberValue(
-        getFromRow(
-          normalisedRow,
-          "_A5. GPS Coordinates_latitude",
-          "latitude",
-          "Latitude",
-          "GPS Latitude"
-        )
+        getFromRow(normalisedRow, "_A5. GPS Coordinates_latitude")
       );
       const longitude = toNumberValue(
-        getFromRow(
-          normalisedRow,
-          "_A5. GPS Coordinates_longitude",
-          "longitude",
-          "Longitude",
-          "GPS Longitude"
-        )
+        getFromRow(normalisedRow, "_A5. GPS Coordinates_longitude")
       );
 
       const coordinatesText = toStringValue(
-        getFromRow(normalisedRow, "A5. GPS Coordinates", "GPS Coordinates")
+        getFromRow(normalisedRow, "A5. GPS Coordinates")
       );
       const parsedCoordinates =
         (latitude === undefined || longitude === undefined) && coordinatesText
