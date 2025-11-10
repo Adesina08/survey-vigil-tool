@@ -10,7 +10,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import L from "leaflet";
+import "leaflet.markercluster";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { formatErrorLabel } from "@/lib/utils";
 
@@ -40,6 +43,51 @@ interface InteractiveMapProps {
 }
 
 type Html2CanvasFn = (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+
+const getMarkerColor = (status: Submission["status"]) => {
+  switch (status) {
+    case "approved":
+      return "#16a34a";
+    case "not_approved":
+    default:
+      return "#dc2626";
+  }
+};
+
+const createCustomIcon = (status: Submission["status"]) => {
+  const color = getMarkerColor(status);
+  return L.divIcon({
+    className: "custom-marker",
+    html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 6],
+  });
+};
+
+const createPopupContent = (submission: Submission) => {
+  const statusColor = getMarkerColor(submission.status);
+  const errorsSection =
+    submission.errorTypes.length > 0
+      ? `<div><span style="font-weight: 600;">Errors:</span> ${submission.errorTypes
+          .map((value) => formatErrorLabel(value))
+          .join(", ")}</div>`
+      : "<div><span style=\"font-weight: 600;\">Errors:</span> None</div>";
+
+  const statusLabel = submission.status === "approved" ? "APPROVED" : "NOT APPROVED";
+
+  return `
+      <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
+        <div style="font-weight:700;color:#2563eb;">Submission #${submission.id}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div><span style="font-weight:600;">Interviewer:</span> ${submission.interviewer}</div>
+          <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
+          <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
+          ${errorsSection}
+          <div style="font-size:12px;color:#64748b;">${submission.timestamp}</div>
+        </div>
+      </div>
+    `;
+};
 
 const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
   if (typeof window === "undefined") {
@@ -78,7 +126,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const markerLayerRef = useRef<L.LayerGroup | null>(null);
+  const markerClusterRef = useRef<L.MarkerClusterGroup | null>(null);
   const labelLayerRef = useRef<L.LayerGroup | null>(null);
   const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
   const [geoJsonFeatures, setGeoJsonFeatures] = useState<
@@ -113,51 +161,6 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
     }
   };
 
-  const getMarkerColor = (status: Submission["status"]) => {
-    switch (status) {
-      case "approved":
-        return "#16a34a";
-      case "not_approved":
-      default:
-        return "#dc2626";
-    }
-  };
-
-  const createCustomIcon = (status: Submission["status"]) => {
-    const color = getMarkerColor(status);
-    return L.divIcon({
-      className: "custom-marker",
-      html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-      iconSize: [12, 12],
-      iconAnchor: [6, 6],
-    });
-  };
-
-  const createPopupContent = (submission: Submission) => {
-    const statusColor = getMarkerColor(submission.status);
-    const errorsSection =
-      submission.errorTypes.length > 0
-        ? `<div><span style="font-weight: 600;">Errors:</span> ${submission.errorTypes
-            .map((value) => formatErrorLabel(value))
-            .join(", ")}</div>`
-        : "<div><span style=\"font-weight: 600;\">Errors:</span> None</div>";
-
-    const statusLabel = submission.status === "approved" ? "APPROVED" : "NOT APPROVED";
-
-    return `
-      <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
-        <div style="font-weight:700;color:#2563eb;">Submission #${submission.id}</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <div><span style="font-weight:600;">Interviewer:</span> ${submission.interviewer}</div>
-          <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
-          <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
-          ${errorsSection}
-          <div style="font-size:12px;color:#64748b;">${submission.timestamp}</div>
-        </div>
-      </div>
-    `;
-  };
-
   useEffect(() => {
     if (!mapRef.current && mapContainerRef.current) {
       mapRef.current = L.map(mapContainerRef.current, {
@@ -179,7 +182,8 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
     return () => {
       mapRef.current?.remove();
       mapRef.current = null;
-      markerLayerRef.current = null;
+      markerClusterRef.current?.remove();
+      markerClusterRef.current = null;
       labelLayerRef.current = null;
       boundaryLayerRef.current = null;
     };
@@ -221,21 +225,32 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
   useEffect(() => {
     if (!mapRef.current) return;
 
-    if (!markerLayerRef.current) {
-      markerLayerRef.current = L.layerGroup().addTo(mapRef.current);
+    if (!markerClusterRef.current) {
+      markerClusterRef.current = L.markerClusterGroup({
+        chunkedLoading: true,
+        chunkDelay: 50,
+        chunkInterval: 100,
+        disableClusteringAtZoom: 13,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false,
+      });
+
+      markerClusterRef.current.addTo(mapRef.current);
     }
 
-    const layer = markerLayerRef.current;
+    const layer = markerClusterRef.current;
     layer.clearLayers();
 
-    filteredSubmissions.forEach((submission) => {
+    const markers = filteredSubmissions.map((submission) => {
       const marker = L.marker([submission.lat, submission.lng], {
         icon: createCustomIcon(submission.status),
       });
 
       marker.bindPopup(createPopupContent(submission));
-      marker.addTo(layer);
+      return marker;
     });
+
+    layer.addLayers(markers);
   }, [filteredSubmissions]);
 
   useEffect(() => {

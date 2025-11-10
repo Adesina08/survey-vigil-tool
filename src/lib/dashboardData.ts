@@ -622,7 +622,6 @@ export const buildDashboardData = ({
 
   const sortedMapSubmissions = mapSubmissions
     .sort((a, b) => b.sortKey - a.sortKey)
-    .slice(0, 500)
     .map(({ sortKey, ...entry }) => entry);
 
   const lastUpdated = totalSubmissions > 0
