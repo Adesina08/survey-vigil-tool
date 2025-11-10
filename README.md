@@ -71,3 +71,23 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Connecting to Google Sheets data
+
+The dashboard reads live data from a Google Sheet through a Netlify serverless function. Make sure the following environment
+variables are configured in your deployment:
+
+- `GOOGLE_SHEETS_ID` (or `VITE_GOOGLE_SHEETS_ID`)
+- `GOOGLE_SHEETS_SUBMISSIONS_SHEET` (or `VITE_GOOGLE_SHEETS_SUBMISSIONS_SHEET`)
+- `GOOGLE_SHEETS_DEFAULT_STATE` (or `VITE_GOOGLE_SHEETS_DEFAULT_STATE`)
+- `GOOGLE_SHEETS_STATE_TARGETS_SHEET` (or `VITE_GOOGLE_SHEETS_STATE_TARGETS_SHEET`)
+- `GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET` (or `VITE_GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET`)
+- `GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET` (or `VITE_GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET`)
+
+The serverless function checks for both variable names, so you can keep the `VITE_` prefix used in local development or omit it
+when configuring Netlify/production environments.
+
+> **Important:** The Google Visualization API only reads data from published sheets. From Google Sheets, go to
+> **File → Share → Publish to web**, publish the document, and ensure anyone with the link can view. Additionally, verify the
+> tab names in your sheet match the environment variable values exactly; any mismatch will cause the dashboard to fall back to
+> sample data or show "No data available".

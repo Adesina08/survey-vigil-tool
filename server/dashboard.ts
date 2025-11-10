@@ -12,10 +12,14 @@ import {
 } from "../src/lib/dashboardData";
 import { sheetSubmissions, type SheetSubmissionRow } from "../src/data/sampleData";
 
+const getEnvVar = (key: string): string | undefined => {
+  return process.env[key] ?? process.env[`VITE_${key}`];
+};
+
 export const loadSubmissionRows = async (): Promise<SheetSubmissionRow[]> => {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
-  const submissionsSheetName = process.env.GOOGLE_SHEETS_SUBMISSIONS_SHEET;
-  const defaultState = process.env.GOOGLE_SHEETS_DEFAULT_STATE;
+  const spreadsheetId = getEnvVar("GOOGLE_SHEETS_ID");
+  const submissionsSheetName = getEnvVar("GOOGLE_SHEETS_SUBMISSIONS_SHEET");
+  const defaultState = getEnvVar("GOOGLE_SHEETS_DEFAULT_STATE");
 
   if (!spreadsheetId) {
     return sheetSubmissions;
@@ -32,10 +36,10 @@ export const loadSubmissionRows = async (): Promise<SheetSubmissionRow[]> => {
 };
 
 export const loadDashboardData = async (): Promise<DashboardData> => {
-  const spreadsheetId = process.env.GOOGLE_SHEETS_ID;
-  const stateTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_TARGETS_SHEET;
-  const stateAgeTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET;
-  const stateGenderTargetsSheetName = process.env.GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET;
+  const spreadsheetId = getEnvVar("GOOGLE_SHEETS_ID");
+  const stateTargetsSheetName = getEnvVar("GOOGLE_SHEETS_STATE_TARGETS_SHEET");
+  const stateAgeTargetsSheetName = getEnvVar("GOOGLE_SHEETS_STATE_AGE_TARGETS_SHEET");
+  const stateGenderTargetsSheetName = getEnvVar("GOOGLE_SHEETS_STATE_GENDER_TARGETS_SHEET");
 
   const shouldUseGoogleSheets = Boolean(spreadsheetId);
 
