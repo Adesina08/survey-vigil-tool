@@ -1,12 +1,6 @@
 // server/dashboard.ts
-import { readFile } from "node:fs/promises";
 import { fetchGoogleSheetFromUrl, mapSheetRowsToSubmissions } from "../src/lib/googleSheets";
-import {
-  buildDashboardData,
-  type DashboardData,
-  type LGACatalogEntry,
-} from "../src/lib/dashboardData";
-import type { FeatureCollection } from "geojson";
+import { buildDashboardData, type DashboardData } from "../src/lib/dashboardData";
 import type {
   SheetStateAgeTargetRow,
   SheetStateGenderTargetRow,
@@ -28,52 +22,6 @@ const GOOGLE_SHEETS_FETCH_ERROR_MESSAGE =
 const resolveGoogleSheetsUrl = (): string => {
   const envUrl = process.env.GOOGLE_SHEETS_URL || process.env.VITE_GOOGLE_SHEETS_URL || "";
   return envUrl.trim();
-};
-
-const GEOJSON_PATH = "../public/ogun-lga.geojson";
-
-const normalizeStateName = (state: unknown): string => {
-  const value = String(state ?? "").trim();
-  if (!value) return OGUN_STATE_NAME;
-  if (value.toLowerCase() === "ogun") return OGUN_STATE_NAME;
-  return value;
-};
-
-const normalizeLgaName = (lga: unknown): string => {
-  const value = String(lga ?? "").trim();
-  return value || "Unknown LGA";
-};
-
-const loadLgaCatalog = async (): Promise<LGACatalogEntry[]> => {
-  try {
-    const file = await readFile(new URL(GEOJSON_PATH, import.meta.url), "utf8");
-    const collection = JSON.parse(file) as FeatureCollection;
-    const seen = new Map<string, LGACatalogEntry>();
-
-    for (const feature of collection.features ?? []) {
-      const properties = (feature.properties ?? {}) as Record<string, unknown>;
-      const state = normalizeStateName(
-        properties["statename"] ?? properties["state"] ?? properties["State"]
-      );
-      const lga = normalizeLgaName(
-        properties["lganame"] ?? properties["lga"] ?? properties["LGA"]
-      );
-
-      const key = `${state}|${lga}`;
-      if (!seen.has(key)) {
-        seen.set(key, {
-          state,
-          lga,
-          properties: Object.keys(properties).length > 0 ? { ...properties } : {},
-        });
-      }
-    }
-
-    return Array.from(seen.values());
-  } catch (error) {
-    console.error("Failed to load LGA GeoJSON catalog", error);
-    return [];
-  }
 };
 
 /* ----------------- HELPERS ----------------- */
@@ -224,34 +172,7 @@ function buildFallbackTargets(presentGenders: PresentGender[]) {
 }
 
 /* ----------------- LOADERS ----------------- */
-interface SubmissionLoadResult {
-  submissions: SheetSubmissionRow[];
-  totalFromFirstColumn: number;
-}
-
-const countFirstColumnEntries = (rows: Record<string, unknown>[]) => {
-  if (rows.length === 0) {
-    return 0;
-  }
-
-  const firstRow = rows[0] ?? {};
-  const firstKey = Object.keys(firstRow)[0];
-
-  const nonBlank = rows.reduce((accumulator, row) => {
-    const primaryCell = row["start"] ?? (firstKey ? row[firstKey] : undefined);
-
-    if (primaryCell === null || primaryCell === undefined) {
-      return accumulator;
-    }
-
-    const text = String(primaryCell).trim();
-    return text.length > 0 ? accumulator + 1 : accumulator;
-  }, 0);
-
-  return Math.max(0, nonBlank - 1);
-};
-
-export const loadSubmissionRows = async (): Promise<SubmissionLoadResult> => {
+export const loadSubmissionRows = async (): Promise<SheetSubmissionRow[]> => {
   const googleSheetsUrl = resolveGoogleSheetsUrl();
   if (!googleSheetsUrl) throw new Error(GOOGLE_SHEETS_URL_MISSING_ERROR);
 
@@ -264,21 +185,15 @@ export const loadSubmissionRows = async (): Promise<SubmissionLoadResult> => {
   }
   if (!rawRows || rawRows.length === 0) throw new Error(GOOGLE_SHEETS_FETCH_ERROR_MESSAGE);
 
-  const totalFromFirstColumn = countFirstColumnEntries(rawRows);
   const submissions = mapSheetRowsToSubmissions(rawRows, { defaultState: OGUN_STATE_NAME });
-  return {
-    submissions: enrichSubmissionRows(submissions),
-    totalFromFirstColumn,
-  };
+  return enrichSubmissionRows(submissions);
 };
 
 export const loadDashboardData = async (): Promise<DashboardData> => {
-  const { submissions, totalFromFirstColumn } = await loadSubmissionRows();
+  const submissions = await loadSubmissionRows();
   if (!submissions || submissions.length === 0) {
     throw new Error(GOOGLE_SHEETS_FETCH_ERROR_MESSAGE);
   }
-
-  const lgaCatalog = await loadLgaCatalog();
 
   // Derive genders present from the data (Male/Female only)
   const genderSet = new Set<PresentGender>();
@@ -296,8 +211,5 @@ export const loadDashboardData = async (): Promise<DashboardData> => {
     stateAgeTargets,
     stateGenderTargets,
     analysisRows: submissions,
-    lgaCatalog,
-    totalSubmissionsOverride: totalFromFirstColumn,
-    totalsDenominatorOverride: totalFromFirstColumn,
   });
 };

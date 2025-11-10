@@ -13,17 +13,6 @@ export type ErrorType =
   | "Terminated";
 
 export interface SheetSubmissionRow {
-  id?: string;
-  uuid?: string;
-  lga?: string;
-  ward?: string;
-  interviewer?: string;
-  submissionTime?: string;
-  status?: string;
-  approved?: boolean;
-  notApproved?: boolean;
-  lat?: number;
-  lng?: number;
   "Submission ID": string;
   "Submission Date": string;
   "Submission Time": string;
@@ -56,8 +45,6 @@ export interface SheetSubmissionRow {
   "_A5. GPS Coordinates_longitude": number;
   Latitude?: number;
   Longitude?: number;
-  _ageRaw?: number | string | null;
-  _sexRaw?: string | null;
 }
 
 export interface SheetStateTargetRow {

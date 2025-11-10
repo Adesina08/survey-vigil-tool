@@ -3,15 +3,14 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Download, Award } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMemo } from "react";
 
 interface StateAchievement {
   state: string;
@@ -44,84 +43,26 @@ interface AchievementsTablesProps {
   byLGA: LGAAchievement[];
 }
 
-const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
-
-const escapeCsvValue = (value: unknown): string => {
-  if (value === null || value === undefined) return "";
-  const stringValue = String(value);
-  if (stringValue.includes(",") || stringValue.includes("\"") || stringValue.includes("\n")) {
-    return `"${stringValue.replace(/"/g, '""')}"`;
-  }
-  return stringValue;
-};
-
-const downloadCsv = (headers: string[], rows: Array<Record<string, unknown>>, filename: string) => {
-  const headerLine = headers.map(escapeCsvValue).join(",");
-  const dataLines = rows.map((row) => headers.map((header) => escapeCsvValue(row[header])).join(","));
-  const csv = [headerLine, ...dataLines].join("\r\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
-
-const formatTotals = <T extends { total: number; approved: number; notApproved: number }>(rows: T[]) => {
-  return rows.reduce(
-    (acc, row) => ({
-      total: acc.total + row.total,
-      approved: acc.approved + row.approved,
-      notApproved: acc.notApproved + row.notApproved,
-    }),
-    { total: 0, approved: 0, notApproved: 0 },
-  );
-};
-
-export function AchievementsTables({ byState, byInterviewer, byLGA }: AchievementsTablesProps) {
-  const stateTotals = useMemo(() => formatTotals(byState), [byState]);
-  const interviewerTotals = useMemo(() => formatTotals(byInterviewer), [byInterviewer]);
-  const lgaTotals = useMemo(() => formatTotals(byLGA), [byLGA]);
-
-  const exportState = () => {
-    const headers = ["state", "total", "approved", "notApproved", "percentageApproved"];
-    const rows = byState.map((row) => ({
-      state: row.state,
-      total: row.total,
-      approved: row.approved,
-      notApproved: row.notApproved,
-      percentageApproved: formatPercentage(row.percentageApproved),
-    }));
-    downloadCsv(headers, rows, `achievements_state_${new Date().toISOString().slice(0, 10)}.csv`);
+export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: AchievementsTablesProps) {
+  const handleExport = (type: string) => {
+    console.log(`Exporting ${type} achievements...`);
   };
 
-  const exportInterviewer = () => {
-    const headers = ["interviewer", "total", "approved", "notApproved", "percentageApproved"];
-    const rows = byInterviewer.map((row) => ({
-      interviewer: row.interviewer,
-      total: row.total,
-      approved: row.approved,
-      notApproved: row.notApproved,
-      percentageApproved: formatPercentage(row.percentageApproved),
-    }));
-    downloadCsv(headers, rows, `achievements_interviewer_${new Date().toISOString().slice(0, 10)}.csv`);
+  const calculateTotals = (data: any[]) => {
+    return data.reduce(
+      (acc, row) => ({
+        total: acc.total + row.total,
+        approved: acc.approved + row.approved,
+        notApproved: acc.notApproved + row.notApproved,
+      }),
+      { total: 0, approved: 0, notApproved: 0 }
+    );
   };
 
-  const exportLga = () => {
-    const headers = ["state", "lga", "total", "approved", "notApproved", "percentageApproved"];
-    const rows = byLGA.map((row) => ({
-      state: row.state,
-      lga: row.lga,
-      total: row.total,
-      approved: row.approved,
-      notApproved: row.notApproved,
-      percentageApproved: formatPercentage(row.percentageApproved),
-    }));
-    downloadCsv(headers, rows, `achievements_lga_${new Date().toISOString().slice(0, 10)}.csv`);
-  };
+  const interviewerTotals = calculateTotals(byInterviewer);
+  const lgaTotals = calculateTotals(byLGA);
+
+  const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
   return (
     <Card className="fade-in">
@@ -133,62 +74,15 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="interviewer" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="state">By State</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="interviewer">By Interviewer</TabsTrigger>
             <TabsTrigger value="lga">By LGA</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="state">
-            <div className="space-y-4">
-              <div className="flex justify-end">
-                <Button onClick={exportState} variant="outline" size="sm" className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Export State Data
-                </Button>
-              </div>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>State</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Approved</TableHead>
-                      <TableHead className="text-right">Not Approved</TableHead>
-                      <TableHead className="text-right">% Approved</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {byState.map((row) => (
-                      <TableRow key={row.state}>
-                        <TableCell className="font-medium">{row.state}</TableCell>
-                        <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-success">{row.approved.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-destructive">{row.notApproved.toLocaleString()}</TableCell>
-                        <TableCell className="text-right font-semibold">{formatPercentage(row.percentageApproved)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell className="font-bold">Overall Total</TableCell>
-                      <TableCell className="text-right font-bold">{stateTotals.total.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-bold text-success">{stateTotals.approved.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-bold text-destructive">{stateTotals.notApproved.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-bold">
-                        {stateTotals.total > 0 ? formatPercentage((stateTotals.approved / stateTotals.total) * 100) : "0.0%"}
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </div>
-            </div>
-          </TabsContent>
-
           <TabsContent value="interviewer">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={exportInterviewer} variant="outline" size="sm" className="gap-2">
+                <Button onClick={() => handleExport("interviewer")} variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export Interviewer Data
                 </Button>
@@ -223,7 +117,7 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell className="font-bold">Overall Total</TableCell>
+                      <TableCell className="font-bold">Total</TableCell>
                       <TableCell className="text-right font-bold">
                         {interviewerTotals.total.toLocaleString()}
                       </TableCell>
@@ -248,7 +142,7 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
           <TabsContent value="lga">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={exportLga} variant="outline" size="sm" className="gap-2">
+                <Button onClick={() => handleExport("lga")} variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export LGA Data
                 </Button>
@@ -283,7 +177,7 @@ export function AchievementsTables({ byState, byInterviewer, byLGA }: Achievemen
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell className="font-bold">Overall Total</TableCell>
+                      <TableCell className="font-bold">Total</TableCell>
                       <TableCell className="text-right font-bold">
                         {lgaTotals.total.toLocaleString()}
                       </TableCell>

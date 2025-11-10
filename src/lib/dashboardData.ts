@@ -16,10 +16,9 @@ export type AnalysisRow = Record<string, unknown>;
 
 interface MapSubmission {
   id: string;
-  lat: number | null;
-  lng: number | null;
-  interviewerId: string;
-  interviewerName: string;
+  lat: number;
+  lng: number;
+  interviewer: string;
   lga: string;
   state: string;
   errorTypes: string[];
@@ -35,7 +34,6 @@ interface SummaryData {
   notApprovedSubmissions: number;
   notApprovedRate: number;
   latestSubmissionTime?: string | null;
-  totalDenominator?: number;
 }
 
 interface StatusBreakdown {
@@ -97,12 +95,6 @@ interface AchievementByLGARow extends AchievementRow {
   state: string;
 }
 
-export interface LGACatalogEntry {
-  state: string;
-  lga: string;
-  properties?: Record<string, unknown>;
-}
-
 export interface DashboardData {
   summary: SummaryData;
   statusBreakdown: StatusBreakdown;
@@ -125,7 +117,6 @@ export interface DashboardData {
   };
   lastUpdated: string;
   analysisRows: AnalysisRow[];
-  lgaCatalog: LGACatalogEntry[];
 }
 
 const parseDate = (date: string, time: string) => new Date(`${date}T${time}:00Z`);
@@ -136,26 +127,20 @@ const incrementMap = (map: Map<string, number>, key: string, amount = 1) => {
 
 const getNumber = (value: number | undefined | null) => (value ?? 0);
 
-const extractCoordinate = (value: unknown): number | null => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string" && value.trim().length > 0) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  return null;
-};
-
 const getCoordinate = (row: SheetSubmissionRow, key: "lat" | "lng") => {
-  const rawValue =
-    key === "lat"
-      ? row["_A5. GPS Coordinates_latitude"] ?? (row.Latitude as unknown)
-      : row["_A5. GPS Coordinates_longitude"] ?? (row.Longitude as unknown);
+  if (key === "lat") {
+    return (
+      row["_A5. GPS Coordinates_latitude"] ??
+      (row.Latitude as number | undefined) ??
+      0
+    );
+  }
 
-  return extractCoordinate(rawValue);
+  return (
+    row["_A5. GPS Coordinates_longitude"] ??
+    (row.Longitude as number | undefined) ??
+    0
+  );
 };
 
 const getLGA = (row: SheetSubmissionRow) => row["A3. select the LGA"] ?? row.LGA ?? "Unknown LGA";
@@ -177,9 +162,6 @@ interface DashboardDataInput {
   stateAgeTargets?: SheetStateAgeTargetRow[];
   stateGenderTargets?: SheetStateGenderTargetRow[];
   analysisRows?: AnalysisRow[];
-  lgaCatalog?: LGACatalogEntry[];
-  totalSubmissionsOverride?: number;
-  totalsDenominatorOverride?: number;
 }
 
 export const buildDashboardData = ({
@@ -188,23 +170,10 @@ export const buildDashboardData = ({
   stateAgeTargets = [],
   stateGenderTargets = [],
   analysisRows,
-  lgaCatalog = [],
-  totalSubmissionsOverride,
-  totalsDenominatorOverride,
 }: DashboardDataInput): DashboardData => {
   const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(submissions);
 
-  const derivedTotalSubmissions = processedSubmissions.length;
-  const normaliseOverride = (value?: number) =>
-    typeof value === "number" && Number.isFinite(value)
-      ? Math.max(Math.round(value), 0)
-      : null;
-
-  const overrideTotal = normaliseOverride(totalSubmissionsOverride);
-  const overrideDenominator = normaliseOverride(totalsDenominatorOverride);
-
-  const totalSubmissions = overrideTotal ?? derivedTotalSubmissions;
-  const totalDenominator = overrideDenominator ?? totalSubmissions;
+  const totalSubmissions = processedSubmissions.length;
 
   const approvedByState = new Map<string, number>();
   const approvedByStateAge = new Map<string, number>();
@@ -232,21 +201,6 @@ export const buildDashboardData = ({
   const totalsByStateGender = new Map<string, number>();
 
   const interviewerNames = new Map<string, string>();
-
-  const ageGroupSet = new Set<string>();
-  const genderSet = new Set<string>();
-
-  stateAgeTargets.forEach((row) => {
-    if (row["Age Group"]) {
-      ageGroupSet.add(row["Age Group"]);
-    }
-  });
-
-  stateGenderTargets.forEach((row) => {
-    if (row.Gender) {
-      genderSet.add(row.Gender);
-    }
-  });
 
   const errorTypes: ErrorType[] = [
     "OddHour",
@@ -286,18 +240,13 @@ export const buildDashboardData = ({
     const gender = row.Gender ?? "Unknown";
     const interviewerId = getInterviewerId(row);
     const interviewerName = getInterviewerName(row);
+    const interviewerLabel = `${interviewerId} · ${interviewerName}`;
     const lga = getLGA(row);
     const approvalStatus = getApprovalStatus(row);
     const errorFlags = row["Error Flags"] ?? [];
 
     const lat = getCoordinate(row, "lat");
     const lng = getCoordinate(row, "lng");
-    const hasCoordinates =
-      typeof lat === "number" &&
-      typeof lng === "number" &&
-      !(lat === 0 && lng === 0);
-    const resolvedLat = hasCoordinates ? lat : null;
-    const resolvedLng = hasCoordinates ? lng : null;
 
     const timestamp = parseDate(row["Submission Date"], row["Submission Time"]);
     if (timestamp > latestTimestamp) {
@@ -305,13 +254,7 @@ export const buildDashboardData = ({
     }
 
     lgaSet.add(lga);
-    if (ageGroup) {
-      ageGroupSet.add(ageGroup);
-    }
-    if (gender) {
-      genderSet.add(gender);
-    }
-    interviewerSet.add(interviewerId);
+    interviewerSet.add(interviewerLabel);
     errorFlags.forEach((flag) => errorTypeSet.add(flag));
 
     incrementMap(totalsByState, state);
@@ -349,7 +292,7 @@ export const buildDashboardData = ({
     }
 
     errorFlags.forEach((errorType) => {
-      errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
+    errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
       switch (errorType) {
         case "OddHour":
           interviewerError.oddHour += 1;
@@ -374,10 +317,9 @@ export const buildDashboardData = ({
 
     mapSubmissions.push({
       id: row["Submission ID"],
-      lat: resolvedLat,
-      lng: resolvedLng,
-      interviewerId,
-      interviewerName,
+      lat,
+      lng,
+      interviewer: interviewerLabel,
       lga,
       state,
       errorTypes: errorFlags,
@@ -393,71 +335,8 @@ export const buildDashboardData = ({
     });
   });
 
-  const geofenceEntries = new Map<string, LGACatalogEntry>();
-  lgaCatalog.forEach((entry) => {
-    const state = entry.state.trim() || "Unknown State";
-    const lga = entry.lga.trim() || "Unknown LGA";
-    const key = `${state}|${lga}`;
-
-    if (!geofenceEntries.has(key)) {
-      geofenceEntries.set(key, {
-        state,
-        lga,
-        properties: entry.properties ? { ...entry.properties } : undefined,
-      });
-    }
-
-    lgaSet.add(lga);
-
-    if (!totalsByLGA.has(key)) {
-      totalsByLGA.set(key, 0);
-    }
-    if (!approvedByLGA.has(key)) {
-      approvedByLGA.set(key, 0);
-    }
-    if (!notApprovedByLGA.has(key)) {
-      notApprovedByLGA.set(key, 0);
-    }
-  });
-
-  const allAgeGroups = Array.from(ageGroupSet);
-  const allGenders = Array.from(genderSet);
-
-  geofenceEntries.forEach((_, key) => {
-    const [state, lga] = key.split("|");
-
-    allAgeGroups.forEach((ageGroup) => {
-      const ageKey = `${state}|${lga}|${ageGroup}`;
-      if (!totalsByLGAAge.has(ageKey)) {
-        totalsByLGAAge.set(ageKey, 0);
-      }
-      if (!approvedByLGAAge.has(ageKey)) {
-        approvedByLGAAge.set(ageKey, 0);
-      }
-      if (!notApprovedByLGAAge.has(ageKey)) {
-        notApprovedByLGAAge.set(ageKey, 0);
-      }
-    });
-
-    allGenders.forEach((gender) => {
-      const genderKey = `${state}|${lga}|${gender}`;
-      if (!totalsByLGAGender.has(genderKey)) {
-        totalsByLGAGender.set(genderKey, 0);
-      }
-      if (!approvedByLGAGender.has(genderKey)) {
-        approvedByLGAGender.set(genderKey, 0);
-      }
-      if (!notApprovedByLGAGender.has(genderKey)) {
-        notApprovedByLGAGender.set(genderKey, 0);
-      }
-    });
-  });
-
   const totalApproved = [...approvedByState.values()].reduce((sum, value) => sum + value, 0);
-  const totalNotApproved =
-    overrideTotal !== null
-      ? Math.max(totalSubmissions - totalApproved, 0)
-      : Math.max(derivedTotalSubmissions - totalApproved, 0);
+  const totalNotApproved = totalSubmissions - totalApproved;
 
   const effectiveStateTargets =
     stateTargets.length > 0
@@ -496,55 +375,25 @@ export const buildDashboardData = ({
     0
   );
 
-  const approvalRate = totalDenominator > 0 ? (totalApproved / totalDenominator) * 100 : 0;
-  const notApprovedRate = totalDenominator > 0 ? (totalNotApproved / totalDenominator) * 100 : 0;
+  const approvalRate = totalSubmissions > 0 ? (totalApproved / totalSubmissions) * 100 : 0;
+  const notApprovedRate = totalSubmissions > 0 ? (totalNotApproved / totalSubmissions) * 100 : 0;
 
   const quotaProgress = overallTarget > 0 ? (totalApproved / overallTarget) * 100 : 0;
 
-  const quotaByLGAMap = new Map<string, QuotaLGARow>();
-  totalsByLGA.forEach((total, key) => {
-    const [state, lga] = key.split("|");
-    const achieved = approvedByLGA.get(key) ?? 0;
-    const balance = Math.max(total - achieved, 0);
-    quotaByLGAMap.set(key, {
-      state,
-      lga,
-      target: total,
-      achieved,
-      balance,
-    });
-  });
-
-  const catalogOrderedLGAs: QuotaLGARow[] = [];
-  geofenceEntries.forEach((entry, key) => {
-    const existing = quotaByLGAMap.get(key);
-    if (existing) {
-      catalogOrderedLGAs.push(existing);
-      quotaByLGAMap.delete(key);
-      return;
-    }
-
-    catalogOrderedLGAs.push({
-      state: entry.state,
-      lga: entry.lga,
-      target: 0,
-      achieved: 0,
-      balance: 0,
-    });
-  });
-
-  const remainingLGAs = Array.from(quotaByLGAMap.values()).sort((a, b) => {
-    const lgaComparison = a.lga.localeCompare(b.lga);
-    if (lgaComparison !== 0) return lgaComparison;
-    return a.state.localeCompare(b.state);
-  });
-
-  const lgaOrder = new Map<string, number>();
-  catalogOrderedLGAs.forEach((row, index) => {
-    lgaOrder.set(`${row.state}|${row.lga}`, index);
-  });
-
-  const quotaByLGA: QuotaLGARow[] = [...catalogOrderedLGAs, ...remainingLGAs];
+  const quotaByLGA: QuotaLGARow[] = [...totalsByLGA.entries()]
+    .map(([key, total]) => {
+      const [state, lga] = key.split("|");
+      const achieved = approvedByLGA.get(key) ?? 0;
+      const balance = Math.max(total - achieved, 0);
+      return {
+        state,
+        lga,
+        target: total,
+        achieved,
+        balance,
+      };
+    })
+    .sort((a, b) => a.lga.localeCompare(b.lga));
 
   const quotaByLGAAge: QuotaLGAAgeRow[] = [...totalsByLGAAge.entries()]
     .map(([key, total]) => {
@@ -561,9 +410,8 @@ export const buildDashboardData = ({
       };
     })
     .sort((a, b) => {
-      const orderA = lgaOrder.get(`${a.state}|${a.lga}`) ?? Number.MAX_SAFE_INTEGER;
-      const orderB = lgaOrder.get(`${b.state}|${b.lga}`) ?? Number.MAX_SAFE_INTEGER;
-      if (orderA !== orderB) return orderA - orderB;
+      const lgaComparison = a.lga.localeCompare(b.lga);
+      if (lgaComparison !== 0) return lgaComparison;
       return a.ageGroup.localeCompare(b.ageGroup);
     });
 
@@ -582,9 +430,8 @@ export const buildDashboardData = ({
       };
     })
     .sort((a, b) => {
-      const orderA = lgaOrder.get(`${a.state}|${a.lga}`) ?? Number.MAX_SAFE_INTEGER;
-      const orderB = lgaOrder.get(`${b.state}|${b.lga}`) ?? Number.MAX_SAFE_INTEGER;
-      if (orderA !== orderB) return orderA - orderB;
+      const lgaComparison = a.lga.localeCompare(b.lga);
+      if (lgaComparison !== 0) return lgaComparison;
       return a.gender.localeCompare(b.gender);
     });
 
@@ -676,8 +523,6 @@ export const buildDashboardData = ({
     approvalRate: Number(approvalRate.toFixed(1)),
     notApprovedSubmissions: totalNotApproved,
     notApprovedRate: Number(notApprovedRate.toFixed(1)),
-    latestSubmissionTime: totalSubmissions > 0 ? latestTimestamp.toISOString() : null,
-    totalDenominator,
   };
 
   const statusBreakdown: StatusBreakdown = {
@@ -687,6 +532,7 @@ export const buildDashboardData = ({
 
   const sortedMapSubmissions = mapSubmissions
     .sort((a, b) => b.sortKey - a.sortKey)
+    .slice(0, 500)
     .map(({ sortKey, ...entry }) => entry);
 
   const lastUpdated = totalSubmissions > 0
@@ -737,22 +583,12 @@ export const buildDashboardData = ({
       byLGA: achievementsByLGA,
     },
     filters: {
-      lgas:
-        geofenceEntries.size > 0
-          ? Array.from(
-              new Set(
-                Array.from(geofenceEntries.values()).map((entry) => entry.lga),
-              ),
-            ).sort((a, b) => a.localeCompare(b))
-          : Array.from(lgaSet).sort(),
+      lgas: Array.from(lgaSet).sort(),
       interviewers: Array.from(interviewerSet).sort(),
       errorTypes: Array.from(errorTypeSet).sort(),
     },
     lastUpdated,
     analysisRows: normalizedRows,
-    lgaCatalog: Array.from(geofenceEntries.values()).sort((a, b) =>
-      a.lga.localeCompare(b.lga)
-    ),
   };
 };
 
@@ -761,5 +597,4 @@ export const dashboardData = buildDashboardData({
   stateTargets: sheetStateTargets,
   stateAgeTargets: sheetStateAgeTargets,
   stateGenderTargets: sheetStateGenderTargets,
-  lgaCatalog: [],
 });

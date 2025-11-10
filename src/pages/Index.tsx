@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { ExportBar } from "@/components/dashboard/ExportBar";
 import { Button } from "@/components/ui/button";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { AlertCircle, Loader2 } from "lucide-react";
 import TabsQCAnalysis from "@/components/TabsQCAnalysis";
 import QualityControl from "./QualityControl";
-import { APP_VERSION } from "@/constants/app";
 
 function filterByLga<T>(rows: T[], lga: string | null): T[] {
   if (!lga || lga === "all" || lga === "All LGAs") {
@@ -31,42 +31,24 @@ function filterByLga<T>(rows: T[], lga: string | null): T[] {
 const Index = () => {
   const { data: dashboardData, isLoading, isFetching, isError, error, refetch } = useDashboardData();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<string>("");
+  const [lastRefreshed, setLastRefreshed] = useState<string>("");
   const [selectedLga, setSelectedLga] = useState<string | null>(null);
 
   useEffect(() => {
     if (dashboardData?.lastUpdated) {
-      setStatusMessage(`Last refresh: ${dashboardData.lastUpdated} · v${APP_VERSION}`);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("appVersion", APP_VERSION);
-      }
+      setLastRefreshed(dashboardData.lastUpdated);
     } else if (!dashboardData) {
-      setStatusMessage("");
+      setLastRefreshed("");
     }
   }, [dashboardData]);
 
   const handleRefresh = async () => {
-    setStatusMessage("Loading latest data…");
     setIsRefreshing(true);
     try {
-      if (typeof window !== "undefined") {
-        const storedVersion = window.localStorage.getItem("appVersion");
-        if (storedVersion && storedVersion !== APP_VERSION) {
-          window.localStorage.setItem("appVersion", APP_VERSION);
-          window.location.reload();
-          return;
-        }
-        window.localStorage.setItem("appVersion", APP_VERSION);
-      }
       const result = await refetch();
       if (result.data) {
-        setStatusMessage(`Last refresh: ${result.data.lastUpdated} · v${APP_VERSION}`);
-      } else {
-        setStatusMessage(`Last refresh: ${new Date().toLocaleString()} · v${APP_VERSION}`);
+        setLastRefreshed(result.data.lastUpdated);
       }
-    } catch (refreshError) {
-      console.error("Refresh failed", refreshError);
-      setStatusMessage(`Refresh failed · v${APP_VERSION}`);
     } finally {
       setIsRefreshing(false);
     }
@@ -137,7 +119,7 @@ const Index = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <DashboardHeader
-        statusMessage={statusMessage}
+        lastRefreshed={lastRefreshed}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing || isFetching}
       />
@@ -154,6 +136,8 @@ const Index = () => {
           }
         />
       </main>
+
+      <ExportBar />
 
       <footer className="border-t bg-background py-4">
         <div className="mx-auto max-w-7xl px-6 text-center text-sm text-muted-foreground">
