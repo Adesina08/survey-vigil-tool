@@ -1,14 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,112 +22,45 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import type { QCAnnotated } from "@/lib/qc/engine";
 import { formatErrorLabel } from "@/lib/utils";
-import type { QCStatus } from "@/types/submission";
+import type { MapSubmission } from "@/types/submission";
+import type { QCOverrideRecord } from "@/hooks/useQcOverrides";
 
-export type CommitPayload = Record<
-  string,
-  {
-    status: QCStatus;
-    officer: string;
-    comment: string;
-    timestamp: string;
-  }
->;
+interface BulkActionDrawerProps {
+  submissions: MapSubmission[];
+  errorTypes: string[];
+  overrides: Record<string, QCOverrideRecord>;
+  onSetOverride: (id: string, record: QCOverrideRecord) => void;
+}
 
-const STORAGE_KEY = "qcStatuses";
-
-type Props = {
-  rows: QCAnnotated[];
-  onCommit: (payload: CommitPayload) => void;
-};
-
-const readStoredStatuses = (): CommitPayload => {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return {};
-    }
-    return Object.entries(parsed).reduce<CommitPayload>((acc, [key, value]) => {
-      if (!value || typeof value !== "object") {
-        return acc;
-      }
-      const candidate = value as Record<string, unknown>;
-      const status = candidate.status === "approved" ? "approved" : candidate.status === "not_approved" ? "not_approved" : null;
-      if (!status) {
-        return acc;
-      }
-      const officer = typeof candidate.officer === "string" ? candidate.officer : "";
-      const comment = typeof candidate.comment === "string" ? candidate.comment : "";
-      const timestamp = typeof candidate.timestamp === "string" ? candidate.timestamp : new Date().toISOString();
-      acc[key] = { status, officer, comment, timestamp };
-      return acc;
-    }, {});
-  } catch (error) {
-    console.warn("Unable to parse stored QC statuses", error);
-    return {};
-  }
-};
-
-const persistStatuses = (payload: CommitPayload) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    const existing = readStoredStatuses();
-    const merged: CommitPayload = { ...existing, ...payload };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-  } catch (error) {
-    console.warn("Failed to persist QC statuses", error);
-  }
-};
-
-const buildErrorSet = (row: QCAnnotated) => {
-  const combined = new Set<string>();
-  row.errorTypes.forEach((item) => combined.add(item));
-  row.autoFlags.forEach((item) => combined.add(item));
-  return combined;
-};
-
-export function BulkActionDrawer({ rows, onCommit }: Props) {
+export function BulkActionDrawer({ submissions, errorTypes, overrides, onSetOverride }: BulkActionDrawerProps) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [errorFilter, setErrorFilter] = useState<string>("all");
+  const [errorFilter, setErrorFilter] = useState("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [officer, setOfficer] = useState("");
   const [comment, setComment] = useState("");
 
-  const errorOptions = useMemo(() => {
-    const set = new Set<string>();
-    rows.forEach((row) => {
-      buildErrorSet(row).forEach((value) => set.add(value));
+  const availableErrors = useMemo(() => {
+    const set = new Set<string>(errorTypes);
+    submissions.forEach((submission) => {
+      submission.errorTypes.forEach((error) => set.add(error));
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [rows]);
+  }, [errorTypes, submissions]);
 
-  const filteredRows = useMemo(() => {
+  const filteredSubmissions = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return rows.filter((row) => {
-      const matchesTerm = term ? row.id.toLowerCase().includes(term) : true;
-      if (!matchesTerm) return false;
-      if (errorFilter === "all") {
-        return true;
-      }
-      const errors = buildErrorSet(row);
-      return errors.has(errorFilter);
+    return submissions.filter((submission) => {
+      const matchesTerm = term ? submission.id.toLowerCase().includes(term) : true;
+      const matchesError =
+        errorFilter === "all" || submission.errorTypes.includes(errorFilter) || overrides[submission.id]?.status === "not_approved";
+      return matchesTerm && matchesError;
     });
-  }, [rows, searchTerm, errorFilter]);
+  }, [searchTerm, submissions, errorFilter, overrides]);
 
-  const isAllSelected = filteredRows.length > 0 && filteredRows.every((row) => selectedIds.has(row.id));
+  const isAllSelected = filteredSubmissions.length > 0 && filteredSubmissions.every((submission) => selectedIds.has(submission.id));
 
   const toggleSelection = (id: string) => {
     setSelectedIds((current) => {
@@ -150,13 +76,13 @@ export function BulkActionDrawer({ rows, onCommit }: Props) {
 
   const handleToggleAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(filteredRows.map((row) => row.id)));
+      setSelectedIds(new Set(filteredSubmissions.map((submission) => submission.id)));
     } else {
       setSelectedIds(new Set());
     }
   };
 
-  const applyBulkChange = (status: QCStatus) => {
+  const applyBulkOverride = (mode: "approve" | "cancel") => {
     const officerName = officer.trim();
     const commentText = comment.trim();
 
@@ -172,7 +98,7 @@ export function BulkActionDrawer({ rows, onCommit }: Props) {
     if (!officerName) {
       toast({
         title: "QC officer required",
-        description: "Provide the QC officer's name before committing a change.",
+        description: "Provide the QC officer's name for audit purposes.",
         variant: "destructive",
       });
       return;
@@ -181,36 +107,32 @@ export function BulkActionDrawer({ rows, onCommit }: Props) {
     if (!commentText) {
       toast({
         title: "Comment required",
-        description: "Add a short comment that covers all selected submissions.",
+        description: "Add a brief comment that applies to all selected submissions.",
         variant: "destructive",
       });
       return;
     }
 
     const timestamp = new Date().toISOString();
-    const payload: CommitPayload = {};
 
     selectedIds.forEach((id) => {
-      payload[id] = {
-        status,
+      const record: QCOverrideRecord = {
+        status: mode === "approve" ? "approved" : "not_approved",
         officer: officerName,
         comment: commentText,
         timestamp,
       };
+      onSetOverride(id, record);
     });
 
-    persistStatuses(payload);
-    onCommit(payload);
-
     toast({
-      title: status === "approved" ? "Bulk approval complete" : "Bulk cancellation complete",
+      title: mode === "approve" ? "Bulk approval complete" : "Bulk cancellation complete",
       description: `${selectedIds.size} submission${selectedIds.size === 1 ? "" : "s"} updated by ${officerName}.`,
     });
 
     setSelectedIds(new Set());
     setOfficer("");
     setComment("");
-    setOpen(false);
   };
 
   return (
@@ -232,7 +154,7 @@ export function BulkActionDrawer({ rows, onCommit }: Props) {
                 id="bulk-search"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Enter instance ID"
+                placeholder="Enter submission ID"
               />
             </div>
             <div className="space-y-2">
@@ -243,7 +165,7 @@ export function BulkActionDrawer({ rows, onCommit }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All errors</SelectItem>
-                  {errorOptions.map((error) => (
+                  {availableErrors.map((error) => (
                     <SelectItem key={error} value={error}>
                       {formatErrorLabel(error)}
                     </SelectItem>
@@ -264,52 +186,46 @@ export function BulkActionDrawer({ rows, onCommit }: Props) {
                       onCheckedChange={(checked) => handleToggleAll(Boolean(checked))}
                     />
                   </TableHead>
-                  <TableHead>ID</TableHead>
                   <TableHead>Instance ID</TableHead>
-                  <TableHead>User</TableHead>
+                  <TableHead>Interviewer</TableHead>
                   <TableHead>State</TableHead>
                   <TableHead>LGA</TableHead>
-                  <TableHead>Errors / Status</TableHead>
+                  <TableHead>Current Status</TableHead>
+                  <TableHead>Errors</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRows.map((row, index) => {
-                  const combinedErrors = Array.from(buildErrorSet(row));
+                {filteredSubmissions.map((submission) => {
+                  const override = overrides[submission.id];
+                  const statusLabel = override?.status ?? submission.status;
                   return (
-                    <TableRow key={row.id} className={selectedIds.has(row.id) ? "bg-primary/5" : undefined}>
+                    <TableRow key={submission.id} className={selectedIds.has(submission.id) ? "bg-primary/5" : undefined}>
                       <TableCell>
                         <Checkbox
-                          aria-label={`Select submission ${row.id}`}
-                          checked={selectedIds.has(row.id)}
-                          onCheckedChange={() => toggleSelection(row.id)}
+                          aria-label={`Select submission ${submission.id}`}
+                          checked={selectedIds.has(submission.id)}
+                          onCheckedChange={() => toggleSelection(submission.id)}
                         />
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                      <TableCell className="font-medium">{row.id}</TableCell>
-                      <TableCell>{row.interviewerName ?? row.interviewerId}</TableCell>
-                      <TableCell>{row.state}</TableCell>
-                      <TableCell>{row.lga}</TableCell>
-                      <TableCell className="max-w-xs whitespace-pre-line text-sm">
-                        <div
-                          className={`font-semibold ${row.status === "approved" ? "text-success" : "text-destructive"}`}
-                        >
-                          {row.status === "approved" ? "Approved" : "Not approved"}
-                        </div>
-                        {combinedErrors.length > 0 ? (
-                          <div className="mt-1 text-muted-foreground">
-                            {combinedErrors.map((error) => formatErrorLabel(error)).join(", ")}
-                          </div>
-                        ) : (
-                          <div className="mt-1 text-muted-foreground">No errors</div>
-                        )}
+                      <TableCell className="font-medium">{submission.id}</TableCell>
+                      <TableCell>{submission.interviewerId}</TableCell>
+                      <TableCell>{submission.state}</TableCell>
+                      <TableCell>{submission.lga}</TableCell>
+                      <TableCell className={statusLabel === "approved" ? "text-success" : "text-destructive"}>
+                        {statusLabel === "approved" ? "Approved" : "Not approved"}
+                      </TableCell>
+                      <TableCell className="max-w-xs whitespace-pre-line text-sm text-muted-foreground">
+                        {submission.errorTypes.length > 0
+                          ? submission.errorTypes.map((error) => formatErrorLabel(error)).join(", ")
+                          : "—"}
                       </TableCell>
                     </TableRow>
                   );
                 })}
-                {filteredRows.length === 0 ? (
+                {filteredSubmissions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                      No submissions match the current filters.
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                      No submissions match the selected filters.
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -324,7 +240,7 @@ export function BulkActionDrawer({ rows, onCommit }: Props) {
                 id="bulk-officer"
                 value={officer}
                 onChange={(event) => setOfficer(event.target.value)}
-                placeholder="Officer name"
+                placeholder="Enter QC officer name"
               />
             </div>
             <div className="space-y-2 sm:col-span-2">
@@ -333,21 +249,21 @@ export function BulkActionDrawer({ rows, onCommit }: Props) {
                 id="bulk-comment"
                 value={comment}
                 onChange={(event) => setComment(event.target.value)}
-                placeholder="Add a short justification"
+                placeholder="Provide a short justification"
                 rows={3}
               />
             </div>
           </div>
         </div>
-        <DrawerFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <DrawerFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between">
           <div className="text-sm text-muted-foreground">
             {selectedIds.size} submission{selectedIds.size === 1 ? "" : "s"} selected
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="outline" onClick={() => applyBulkChange("approved")} className="gap-2">
+            <Button variant="outline" onClick={() => applyBulkOverride("approve")} className="gap-2">
               Confirm Bulk Approval
             </Button>
-            <Button variant="destructive" onClick={() => applyBulkChange("not_approved")} className="gap-2">
+            <Button variant="destructive" onClick={() => applyBulkOverride("cancel")} className="gap-2">
               Confirm Bulk Cancellation
             </Button>
           </div>

@@ -93,6 +93,17 @@ export function ExportBar({ submissions }: ExportBarProps) {
     const headers = ["id", "flag", "timestamp", "state", "lga", "interviewerId"];
     const rows: Array<Record<string, unknown>> = [];
     submissions.forEach((submission) => {
+      if (submission.errorTypes.length === 0) {
+        rows.push({
+          id: submission.id,
+          flag: "None",
+          timestamp: submission.timestamp,
+          state: submission.state,
+          lga: submission.lga,
+          interviewerId: submission.interviewerId,
+        });
+        return;
+      }
       submission.errorTypes.forEach((error) => {
         rows.push({
           id: submission.id,

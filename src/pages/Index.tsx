@@ -1,49 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
-
-import { DashboardHeader } from "@/components/layout/DashboardHeader";
+import { useEffect, useMemo, useState } from "react";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Button } from "@/components/ui/button";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { AlertCircle, Loader2 } from "lucide-react";
 import TabsQCAnalysis from "@/components/TabsQCAnalysis";
 import QualityControl from "./QualityControl";
 import { APP_VERSION } from "@/constants/app";
-import type { StoredStatus } from "@/components/qc/SingleForceAction";
-import type { CommitPayload } from "@/components/qc/BulkActionDrawer";
-
-const QC_STORAGE_KEY = "qcStatuses";
-
-const readStoredStatuses = (): Record<string, StoredStatus> => {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  try {
-    const raw = window.localStorage.getItem(QC_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return {};
-    }
-    return Object.entries(parsed).reduce<Record<string, StoredStatus>>((acc, [key, value]) => {
-      if (!value || typeof value !== "object") {
-        return acc;
-      }
-      const candidate = value as Record<string, unknown>;
-      const status = candidate.status === "approved" || candidate.status === "not_approved" ? candidate.status : null;
-      if (!status) {
-        return acc;
-      }
-      const officer = typeof candidate.officer === "string" ? candidate.officer : "";
-      const comment = typeof candidate.comment === "string" ? candidate.comment : "";
-      const timestamp = typeof candidate.timestamp === "string" ? candidate.timestamp : new Date().toISOString();
-      acc[key] = { status, officer, comment, timestamp };
-      return acc;
-    }, {});
-  } catch (error) {
-    console.warn("Failed to parse QC statuses", error);
-    return {};
-  }
-};
 
 function filterByLga<T>(rows: T[], lga: string | null): T[] {
   if (!lga || lga === "all" || lga === "All LGAs") {
@@ -57,7 +19,10 @@ function filterByLga<T>(rows: T[], lga: string | null): T[] {
 
     const record = row as Record<string, unknown>;
     const candidate =
-      record["lga"] ?? record["a3_select_the_lga"] ?? record["A3. select the LGA"] ?? record["LGA"];
+      record["lga"] ??
+      record["a3_select_the_lga"] ??
+      record["A3. select the LGA"] ??
+      record["LGA"];
 
     return candidate === lga;
   });
@@ -66,49 +31,63 @@ function filterByLga<T>(rows: T[], lga: string | null): T[] {
 const Index = () => {
   const { data: dashboardData, isLoading, isFetching, isError, error, refetch } = useDashboardData();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string>("");
   const [selectedLga, setSelectedLga] = useState<string | null>(null);
-  const [overrides, setOverrides] = useState<Record<string, StoredStatus>>(() => readStoredStatuses());
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === QC_STORAGE_KEY) {
-        setOverrides(readStoredStatuses());
+    if (dashboardData?.lastUpdated) {
+      setStatusMessage(`Last refresh: ${dashboardData.lastUpdated} · v${APP_VERSION}`);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("appVersion", APP_VERSION);
       }
-    };
+    } else if (!dashboardData) {
+      setStatusMessage("");
+    }
+  }, [dashboardData]);
 
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = async () => {
+    setStatusMessage("Loading latest data…");
     setIsRefreshing(true);
     try {
-      await refetch();
+      if (typeof window !== "undefined") {
+        const storedVersion = window.localStorage.getItem("appVersion");
+        if (storedVersion && storedVersion !== APP_VERSION) {
+          window.localStorage.setItem("appVersion", APP_VERSION);
+          window.location.reload();
+          return;
+        }
+        window.localStorage.setItem("appVersion", APP_VERSION);
+      }
+      const result = await refetch();
+      if (result.data) {
+        setStatusMessage(`Last refresh: ${result.data.lastUpdated} · v${APP_VERSION}`);
+      } else {
+        setStatusMessage(`Last refresh: ${new Date().toLocaleString()} · v${APP_VERSION}`);
+      }
+    } catch (refreshError) {
+      console.error("Refresh failed", refreshError);
+      setStatusMessage(`Refresh failed · v${APP_VERSION}`);
     } finally {
       setIsRefreshing(false);
     }
-  }, [refetch]);
-
-  const handleBulkCommit = useCallback((payload: CommitPayload) => {
-    setOverrides((current) => ({ ...current, ...payload }));
-  }, []);
+  };
 
   const handleFilterChange = (filterType: string, value: string) => {
     if (filterType === "lga") {
       const normalized = !value || value === "all" || value === "All LGAs" ? null : value;
       setSelectedLga(normalized);
+      console.log(`Filter changed: ${filterType} = ${normalized ?? "All LGAs"}`);
       return;
     }
+
+    console.log(`Filter changed: ${filterType} = ${value}`);
   };
 
   const filteredMapSubmissions = useMemo(() => {
     if (!dashboardData) {
       return [];
     }
+
     return filterByLga(dashboardData.mapSubmissions, selectedLga);
   }, [dashboardData, selectedLga]);
 
@@ -133,7 +112,8 @@ const Index = () => {
     );
   }
 
-  const errorMessage = error?.message ?? "An unexpected error occurred while connecting to the dashboard service.";
+  const errorMessage =
+    error?.message ?? "An unexpected error occurred while connecting to the dashboard service.";
 
   if (isError || !dashboardData?.summary) {
     return (
@@ -143,7 +123,9 @@ const Index = () => {
             <AlertCircle className="h-8 w-8 text-destructive" />
           </div>
           <h2 className="text-lg font-semibold">Unable to load dashboard data</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {errorMessage}
+          </p>
           <Button className="mt-4" onClick={() => refetch()}>
             Retry
           </Button>
@@ -155,10 +137,9 @@ const Index = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <DashboardHeader
-        lastRefreshed={dashboardData.lastUpdated ?? null}
+        statusMessage={statusMessage}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing || isFetching}
-        APP_VERSION={APP_VERSION}
       />
 
       <main className="mx-auto max-w-7xl flex-1 space-y-6 px-6 py-6">
@@ -169,15 +150,15 @@ const Index = () => {
               filteredMapSubmissions={filteredMapSubmissions}
               onFilterChange={handleFilterChange}
               selectedLga={selectedLga}
-              overrides={overrides}
-              onBulkCommit={handleBulkCommit}
             />
           }
         />
       </main>
 
       <footer className="border-t bg-background py-4">
-        <div className="mx-auto max-w-7xl px-6 text-center text-sm text-muted-foreground">© 2025</div>
+        <div className="mx-auto max-w-7xl px-6 text-center text-sm text-muted-foreground">
+          © 2025
+        </div>
       </footer>
     </div>
   );
