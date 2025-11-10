@@ -1,6 +1,7 @@
 [build]
   command = "npm run build"
   publish = "dist"
+  functions = "netlify/functions"
 
 [functions]
   directory = "netlify/functions"
@@ -18,16 +19,6 @@
   to = "https://:splat"
   status = 301
   force = true
-
-[[redirects]]
-  from = "/api/analysis/schema"
-  to = "/.netlify/functions/analysis/schema"
-  status = 200
-
-[[redirects]]
-  from = "/api/analysis/table"
-  to = "/.netlify/functions/analysis/table"
-  status = 200
 
 [[redirects]]
   from = "/api/*"

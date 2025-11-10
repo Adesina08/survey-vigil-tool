@@ -9,12 +9,15 @@ import {
 interface FilterControlsProps {
   lgas: string[];
   onFilterChange: (filterType: string, value: string) => void;
+  selectedLga?: string | null;
 }
 
-export function FilterControls({ lgas, onFilterChange }: FilterControlsProps) {
+export function FilterControls({ lgas, onFilterChange, selectedLga }: FilterControlsProps) {
+  const currentValue = selectedLga && selectedLga !== "all" ? selectedLga : "all";
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:max-w-xs">
-      <Select onValueChange={(value) => onFilterChange("lga", value)}>
+      <Select value={currentValue} onValueChange={(value) => onFilterChange("lga", value)}>
         <SelectTrigger>
           <SelectValue placeholder="All LGAs" />
         </SelectTrigger>
