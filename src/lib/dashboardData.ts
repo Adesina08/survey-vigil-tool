@@ -127,29 +127,116 @@ const incrementMap = (map: Map<string, number>, key: string, amount = 1) => {
 
 const getNumber = (value: number | undefined | null) => (value ?? 0);
 
-const getCoordinate = (row: SheetSubmissionRow, key: "lat" | "lng") => {
-  if (key === "lat") {
-    return (
-      row["_A5. GPS Coordinates_latitude"] ??
-      (row.Latitude as number | undefined) ??
-      0
-    );
+const parseNumeric = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
   }
 
-  return (
-    row["_A5. GPS Coordinates_longitude"] ??
-    (row.Longitude as number | undefined) ??
-    0
-  );
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number.parseFloat(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  return null;
 };
 
-const getLGA = (row: SheetSubmissionRow) => row["A3. select the LGA"] ?? row.LGA ?? "Unknown LGA";
+const getCoordinate = (row: SheetSubmissionRow, key: "lat" | "lng") => {
+  const candidate =
+    key === "lat"
+      ? row["_A5. GPS Coordinates_latitude"] ?? row.Latitude
+      : row["_A5. GPS Coordinates_longitude"] ?? row.Longitude;
 
-const getInterviewerId = (row: SheetSubmissionRow) =>
-  row["A1. Enumerator ID"] ?? row["Interviewer ID"] ?? "Unknown";
+  return parseNumeric(candidate) ?? 0;
+};
 
-const getInterviewerName = (row: SheetSubmissionRow) =>
-  row["Enumerator Name"] ?? row["Interviewer Name"] ?? getInterviewerId(row);
+const getSubmissionIndex = (row: SheetSubmissionRow): number | null => {
+  const candidate =
+    row._index ?? row._id ?? row._uuid ?? (row["Submission ID"] as unknown);
+
+  if (candidate === undefined || candidate === null) {
+    return null;
+  }
+
+  if (typeof candidate === "number" && Number.isFinite(candidate)) {
+    return candidate;
+  }
+
+  if (typeof candidate === "string" && candidate.trim().length > 0) {
+    const parsed = Number.parseInt(candidate, 10);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
+
+const sanitiseText = (value: unknown): string | null => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  return null;
+};
+
+const getLGA = (row: SheetSubmissionRow) => {
+  const candidates = [
+    row["A3. select the LGA"],
+    row.LGA,
+    (row as Record<string, unknown>)["lga"],
+  ];
+
+  for (const candidate of candidates) {
+    const cleaned = sanitiseText(candidate);
+    if (cleaned) {
+      return cleaned;
+    }
+  }
+
+  return null;
+};
+
+const getInterviewerId = (row: SheetSubmissionRow) => {
+  const candidates = [
+    row["A1. Enumerator ID"],
+    row["Interviewer ID"],
+    (row as Record<string, unknown>)["Enumerator ID"],
+    (row as Record<string, unknown>)["enumerator_id"],
+    row.username,
+    row.interviewer,
+    row._submitted_by,
+  ];
+
+  for (const candidate of candidates) {
+    const cleaned = sanitiseText(candidate);
+    if (cleaned) {
+      return cleaned;
+    }
+  }
+
+  return "Unknown";
+};
+
+const getInterviewerName = (row: SheetSubmissionRow) => {
+  const candidates = [
+    row["Enumerator Name"],
+    row["Interviewer Name"],
+    (row as Record<string, unknown>)["interviewer_name"],
+    (row as Record<string, unknown>)["enumerator_name"],
+    row.interviewer,
+    row.username,
+  ];
+
+  for (const candidate of candidates) {
+    const cleaned = sanitiseText(candidate);
+    if (cleaned) {
+      return cleaned;
+    }
+  }
+
+  return getInterviewerId(row);
+};
 
 const getApprovalStatus = (row: SheetSubmissionRow) => {
   const status = row["Approval Status"] ?? row["Outcome Status"] ?? "Valid";
@@ -173,7 +260,14 @@ export const buildDashboardData = ({
 }: DashboardDataInput): DashboardData => {
   const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(submissions);
 
-  const totalSubmissions = processedSubmissions.length;
+  const submissionIndices = processedSubmissions
+    .map((row) => getSubmissionIndex(row))
+    .filter((value): value is number => value !== null && Number.isFinite(value));
+
+  const totalSubmissions =
+    submissionIndices.length > 0
+      ? Math.max(...submissionIndices)
+      : processedSubmissions.length;
 
   const approvedByState = new Map<string, number>();
   const approvedByStateAge = new Map<string, number>();
@@ -248,20 +342,29 @@ export const buildDashboardData = ({
     const lat = getCoordinate(row, "lat");
     const lng = getCoordinate(row, "lng");
 
+    const hasValidCoordinates = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+    const hasValidLGA = typeof lga === "string" && lga.length > 0;
+
     const timestamp = parseDate(row["Submission Date"], row["Submission Time"]);
     if (timestamp > latestTimestamp) {
       latestTimestamp = timestamp;
     }
 
-    lgaSet.add(lga);
-    interviewerSet.add(interviewerLabel);
+    if (hasValidLGA) {
+      lgaSet.add(lga!);
+    }
+    if (interviewerLabel !== "Unknown · Unknown") {
+      interviewerSet.add(interviewerLabel);
+    }
     errorFlags.forEach((flag) => errorTypeSet.add(flag));
 
     incrementMap(totalsByState, state);
     incrementMap(totalsByInterviewer, interviewerId);
-    incrementMap(totalsByLGA, `${state}|${lga}`);
-    incrementMap(totalsByLGAAge, `${state}|${lga}|${ageGroup}`);
-    incrementMap(totalsByLGAGender, `${state}|${lga}|${gender}`);
+    if (hasValidLGA) {
+      incrementMap(totalsByLGA, `${state}|${lga}`);
+      incrementMap(totalsByLGAAge, `${state}|${lga}|${ageGroup}`);
+      incrementMap(totalsByLGAGender, `${state}|${lga}|${gender}`);
+    }
     incrementMap(totalsByStateAge, `${state}|${ageGroup}`);
     incrementMap(totalsByStateGender, `${state}|${gender}`);
 
@@ -280,15 +383,19 @@ export const buildDashboardData = ({
       incrementMap(approvedByStateAge, `${state}|${ageGroup}`);
       incrementMap(approvedByStateGender, `${state}|${gender}`);
       incrementMap(approvedByInterviewer, interviewerId);
-      incrementMap(approvedByLGA, `${state}|${lga}`);
-      incrementMap(approvedByLGAAge, `${state}|${lga}|${ageGroup}`);
-      incrementMap(approvedByLGAGender, `${state}|${lga}|${gender}`);
+      if (hasValidLGA) {
+        incrementMap(approvedByLGA, `${state}|${lga}`);
+        incrementMap(approvedByLGAAge, `${state}|${lga}|${ageGroup}`);
+        incrementMap(approvedByLGAGender, `${state}|${lga}|${gender}`);
+      }
     } else {
       incrementMap(notApprovedByState, state);
       incrementMap(notApprovedByInterviewer, interviewerId);
-      incrementMap(notApprovedByLGA, `${state}|${lga}`);
-      incrementMap(notApprovedByLGAAge, `${state}|${lga}|${ageGroup}`);
-      incrementMap(notApprovedByLGAGender, `${state}|${lga}|${gender}`);
+      if (hasValidLGA) {
+        incrementMap(notApprovedByLGA, `${state}|${lga}`);
+        incrementMap(notApprovedByLGAAge, `${state}|${lga}|${ageGroup}`);
+        incrementMap(notApprovedByLGAGender, `${state}|${lga}|${gender}`);
+      }
     }
 
     errorFlags.forEach((errorType) => {
@@ -315,28 +422,36 @@ export const buildDashboardData = ({
 
     const metadata = row.qualityMetadata;
 
-    mapSubmissions.push({
-      id: row["Submission ID"],
-      lat,
-      lng,
-      interviewer: interviewerLabel,
-      lga,
-      state,
-      errorTypes: errorFlags,
-      timestamp: timestamp.toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      status: (metadata?.isValid ?? isApproved) ? "approved" : "not_approved",
-      sortKey: timestamp.getTime(),
-    });
+    if (hasValidCoordinates && hasValidLGA) {
+      const rowIndex = getSubmissionIndex(row);
+      const submissionId =
+        sanitiseText(row["Submission ID"]) ??
+        (rowIndex !== null ? String(rowIndex) : undefined) ??
+        `${state}-${lga}-${timestamp.getTime()}`;
+
+      mapSubmissions.push({
+        id: submissionId,
+        lat,
+        lng,
+        interviewer: interviewerLabel,
+        lga: lga!,
+        state,
+        errorTypes: errorFlags,
+        timestamp: timestamp.toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        status: (metadata?.isValid ?? isApproved) ? "approved" : "not_approved",
+        sortKey: timestamp.getTime(),
+      });
+    }
   });
 
   const totalApproved = [...approvedByState.values()].reduce((sum, value) => sum + value, 0);
-  const totalNotApproved = totalSubmissions - totalApproved;
+  const totalNotApproved = Math.max(totalSubmissions - totalApproved, 0);
 
   const effectiveStateTargets =
     stateTargets.length > 0
@@ -435,33 +550,35 @@ export const buildDashboardData = ({
       return a.gender.localeCompare(b.gender);
     });
 
-  const userProductivity: ProductivityRow[] = [...totalsByInterviewer.entries()].map(([interviewerId, total]) => {
-    const name = interviewerNames.get(interviewerId) ?? interviewerId;
-    const errorStats = interviewerErrors.get(interviewerId) ?? {
-      oddHour: 0,
-      lowLOI: 0,
-      outsideLGA: 0,
-      duplicate: 0,
-    };
-    const approvedCount = approvedByInterviewer.get(interviewerId) ?? 0;
-    const invalidCount = notApprovedByInterviewer.get(interviewerId) ?? Math.max(total - approvedCount, 0);
+  const userProductivity: ProductivityRow[] = [...totalsByInterviewer.entries()]
+    .map(([interviewerId, total]) => {
+      const name = interviewerNames.get(interviewerId) ?? interviewerId;
+      const errorStats = interviewerErrors.get(interviewerId) ?? {
+        oddHour: 0,
+        lowLOI: 0,
+        outsideLGA: 0,
+        duplicate: 0,
+      };
+      const approvedCount = approvedByInterviewer.get(interviewerId) ?? 0;
+      const invalidCount = notApprovedByInterviewer.get(interviewerId) ?? Math.max(total - approvedCount, 0);
 
-    return {
-      interviewer: `${interviewerId} · ${name}`,
-      totalSubmissions: total,
-      validSubmissions: approvedCount,
-      invalidSubmissions: invalidCount,
-      oddHour: errorStats.oddHour,
-      lowLOI: errorStats.lowLOI,
-      outsideLGA: errorStats.outsideLGA,
-      duplicate: errorStats.duplicate,
-      totalErrors:
-        errorStats.oddHour +
-        errorStats.lowLOI +
-        errorStats.outsideLGA +
-        errorStats.duplicate,
-    };
-  });
+      return {
+        interviewer: `${interviewerId} · ${name}`,
+        totalSubmissions: total,
+        validSubmissions: approvedCount,
+        invalidSubmissions: invalidCount,
+        oddHour: errorStats.oddHour,
+        lowLOI: errorStats.lowLOI,
+        outsideLGA: errorStats.outsideLGA,
+        duplicate: errorStats.duplicate,
+        totalErrors:
+          errorStats.oddHour +
+          errorStats.lowLOI +
+          errorStats.outsideLGA +
+          errorStats.duplicate,
+      };
+    })
+    .filter((row) => !row.interviewer.toLowerCase().includes("unknown"));
 
   const totalErrorEvents = Object.entries(errorCounts).reduce((sum, [, value]) => sum + value, 0);
   const errorBreakdown: ErrorBreakdownRow[] = Object.entries(errorCounts).map(([label, count]) => ({
@@ -532,7 +649,6 @@ export const buildDashboardData = ({
 
   const sortedMapSubmissions = mapSubmissions
     .sort((a, b) => b.sortKey - a.sortKey)
-    .slice(0, 500)
     .map(({ sortKey, ...entry }) => entry);
 
   const lastUpdated = totalSubmissions > 0
@@ -583,8 +699,12 @@ export const buildDashboardData = ({
       byLGA: achievementsByLGA,
     },
     filters: {
-      lgas: Array.from(lgaSet).sort(),
-      interviewers: Array.from(interviewerSet).sort(),
+      lgas: Array.from(lgaSet)
+        .filter((value) => value && value.toLowerCase() !== "unknown")
+        .sort(),
+      interviewers: Array.from(interviewerSet)
+        .filter((value) => !value.toLowerCase().includes("unknown"))
+        .sort(),
       errorTypes: Array.from(errorTypeSet).sort(),
     },
     lastUpdated,

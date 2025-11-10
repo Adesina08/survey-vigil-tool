@@ -39,6 +39,7 @@ const QualityControl = ({
         submissions={filteredMapSubmissions}
         interviewers={dashboardData.filters.interviewers}
         errorTypes={dashboardData.filters.errorTypes}
+        lgas={dashboardData.filters.lgas}
       />
 
       <QuotaTracker
