@@ -1,3 +1,5 @@
+import { ANALYSIS_SCHEMA_ENDPOINT, ANALYSIS_TABLE_ENDPOINT } from "@/lib/api.endpoints";
+
 export interface AnalysisField {
   name: string;
   type: "numeric" | "categorical" | string;
@@ -70,8 +72,6 @@ interface FetchTableOptions {
   signal?: AbortSignal;
 }
 
-const ANALYSIS_BASE = "/api/analysis";
-
 const buildQueryString = (options: FetchTableOptions): string => {
   const params = new URLSearchParams();
   if (options.topbreak) {
@@ -100,7 +100,7 @@ const buildQueryString = (options: FetchTableOptions): string => {
 };
 
 export const getAnalysisSchema = async (signal?: AbortSignal): Promise<AnalysisSchema> => {
-  const response = await fetch(`${ANALYSIS_BASE}/schema`, { signal });
+  const response = await fetch(ANALYSIS_SCHEMA_ENDPOINT, { signal });
   if (!response.ok) {
     throw new Error("Failed to load analysis schema");
   }
@@ -111,7 +111,8 @@ export const getAnalysisTable = async (
   options: FetchTableOptions,
 ): Promise<AnalysisTableResponse> => {
   const query = buildQueryString(options);
-  const response = await fetch(`${ANALYSIS_BASE}/table?${query}`, {
+  const url = query ? `${ANALYSIS_TABLE_ENDPOINT}?${query}` : ANALYSIS_TABLE_ENDPOINT;
+  const response = await fetch(url, {
     signal: options.signal,
   });
 

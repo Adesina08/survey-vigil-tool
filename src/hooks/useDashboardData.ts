@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
+import { DASHBOARD_ENDPOINT } from "@/lib/api.endpoints";
 import { dashboardData as sampleDashboardData, type DashboardData } from "@/lib/dashboardData";
-
-const DASHBOARD_ENDPOINT = "/api/dashboard";
 
 export const useDashboardData = () => {
   return useQuery<DashboardData, Error>({

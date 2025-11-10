@@ -14,13 +14,27 @@
   autoLaunch = false
 
 [[redirects]]
-  from = "/api/analysis/*"
-  to = "/.netlify/functions/analysis/:splat"
-  status = 200
+  from = "http:*"
+  to = "https://:splat"
+  status = 301
   force = true
+
+[[redirects]]
+  from = "/api/analysis/schema"
+  to = "/.netlify/functions/analysis/schema"
+  status = 200
+
+[[redirects]]
+  from = "/api/analysis/table"
+  to = "/.netlify/functions/analysis/table"
+  status = 200
 
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
-  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
