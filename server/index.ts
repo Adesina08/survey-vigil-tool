@@ -13,6 +13,26 @@ const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   res.end(body);
 };
 
+const formatEnvValue = (value: string | undefined) => {
+  if (!value) {
+    return { present: false };
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return { present: true, empty: true };
+  }
+
+  const previewLength = 4;
+  const prefix = trimmed.slice(0, previewLength);
+  const suffix = trimmed.slice(-previewLength);
+  return {
+    present: true,
+    length: trimmed.length,
+    preview: `${prefix}…${suffix}`,
+  };
+};
+
 const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
   const { method, url } = req;
 
@@ -32,6 +52,17 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       console.error("Failed to load dashboard data:", error);
       sendJson(res, 500, { error: message });
     }
+    return;
+  }
+
+  if (method === "GET" && parsedUrl.pathname === "/api/diag") {
+    sendJson(res, 200, {
+      env: {
+        GOOGLE_SHEETS_URL: formatEnvValue(process.env.GOOGLE_SHEETS_URL),
+        VITE_GOOGLE_SHEETS_URL: formatEnvValue(process.env.VITE_GOOGLE_SHEETS_URL),
+      },
+      timestamp: new Date().toISOString(),
+    });
     return;
   }
 

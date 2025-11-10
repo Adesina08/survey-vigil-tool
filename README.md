@@ -64,6 +64,15 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/e281e3e3-daa2-46dd-b066-99dee0aa1b39) and click on Share -> Publish.
 
+## Configuring the Google Sheets data source
+
+Set a single environment variable that points to the published GViz URL for your Google Sheet:
+
+- **Local development (Vite)**: add `VITE_GOOGLE_SHEETS_URL=...` to your `.env` file.
+- **Netlify / serverless functions**: set `GOOGLE_SHEETS_URL=...` (the functions also fall back to `VITE_GOOGLE_SHEETS_URL`).
+
+Use the exact GViz endpoint (for example `https://docs.google.com/spreadsheets/d/<id>/gviz/tq?sheet=Sheet1`) and ensure the sheet is public or published so the API endpoints can read it.
+
 ## Can I connect a custom domain to my Lovable project?
 
 Yes, you can!
