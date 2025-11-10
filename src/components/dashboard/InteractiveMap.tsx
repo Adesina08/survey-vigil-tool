@@ -17,7 +17,7 @@ import "leaflet.markercluster";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { formatErrorLabel } from "@/lib/utils";
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -26,9 +26,10 @@ L.Icon.Default.mergeOptions({
 
 interface Submission {
   id: string;
-  lat: number;
-  lng: number;
-  interviewer: string;
+  lat: number | null;
+  lng: number | null;
+  interviewerId: string;
+  interviewerName: string;
   lga: string;
   state: string;
   errorTypes: string[];
@@ -42,7 +43,38 @@ interface InteractiveMapProps {
   errorTypes: string[];
 }
 
-type Html2CanvasFn = (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+type LeafletImageFn = (
+  map: L.Map,
+  callback: (error: unknown, canvas: HTMLCanvasElement) => void,
+) => void;
+
+const formatInterviewerLabel = (id: string, name: string) =>
+  name && name.trim() && name.trim() !== id.trim() ? `${id} · ${name}` : id;
+
+const fitMapToAll = (map: L.Map, geojsonLayer: L.GeoJSON | null, points: Submission[]) => {
+  const bounds = L.latLngBounds([]);
+
+  if (geojsonLayer) {
+    try {
+      const layerBounds = geojsonLayer.getBounds();
+      if (layerBounds.isValid()) {
+        bounds.extend(layerBounds);
+      }
+    } catch (error) {
+      console.warn("Unable to extend map bounds from GeoJSON layer", error);
+    }
+  }
+
+  points.forEach((submission) => {
+    if (typeof submission.lat === "number" && typeof submission.lng === "number") {
+      bounds.extend([submission.lat, submission.lng]);
+    }
+  });
+
+  if (bounds.isValid()) {
+    map.fitBounds(bounds, { padding: [50, 50] });
+  }
+};
 
 const getMarkerColor = (status: Submission["status"]) => {
   switch (status) {
@@ -74,12 +106,19 @@ const createPopupContent = (submission: Submission) => {
       : "<div><span style=\"font-weight: 600;\">Errors:</span> None</div>";
 
   const statusLabel = submission.status === "approved" ? "APPROVED" : "NOT APPROVED";
+  const interviewerIdLine = `<div><span style="font-weight: 600;">Interviewer ID:</span> ${submission.interviewerId}</div>`;
+  const interviewerNameLine =
+    submission.interviewerName && submission.interviewerName.trim() &&
+    submission.interviewerName.trim() !== submission.interviewerId.trim()
+      ? `<div><span style="font-weight: 600;">Enumerator Name:</span> ${submission.interviewerName}</div>`
+      : "";
 
   return `
       <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
         <div style="font-weight:700;color:#2563eb;">Submission #${submission.id}</div>
         <div style="display:flex;flex-direction:column;gap:4px;">
-          <div><span style="font-weight:600;">Interviewer:</span> ${submission.interviewer}</div>
+          ${interviewerIdLine}
+          ${interviewerNameLine}
           <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
           <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
           ${errorsSection}
@@ -89,22 +128,30 @@ const createPopupContent = (submission: Submission) => {
     `;
 };
 
-const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
+const loadLeafletImage = async (): Promise<LeafletImageFn> => {
   if (typeof window === "undefined") {
-    throw new Error("html2canvas can only be used in the browser");
+    throw new Error("leaflet-image can only be used in the browser");
   }
 
-  if ((window as any).html2canvas) {
-    return (window as any).html2canvas as Html2CanvasFn;
+  const globalObject = window as unknown as { leafletImage?: LeafletImageFn };
+
+  if (typeof globalObject.leafletImage === "function") {
+    return globalObject.leafletImage;
   }
 
-  const existingScript = document.querySelector<HTMLScriptElement>("script[data-html2canvas]");
+  const existingScript = document.querySelector<HTMLScriptElement>("script[data-leaflet-image]");
   if (existingScript) {
     return new Promise((resolve, reject) => {
       existingScript.addEventListener(
         "load",
-        () => resolve((window as any).html2canvas as Html2CanvasFn),
-        { once: true }
+        () => {
+          if (typeof globalObject.leafletImage === "function") {
+            resolve(globalObject.leafletImage);
+          } else {
+            reject(new Error("leaflet-image failed to initialize"));
+          }
+        },
+        { once: true },
       );
       existingScript.addEventListener("error", reject, { once: true });
     });
@@ -112,10 +159,16 @@ const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
 
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+    script.src = "https://unpkg.com/leaflet-image/leaflet-image.js";
     script.async = true;
-    script.dataset.html2canvas = "true";
-    script.onload = () => resolve((window as any).html2canvas as Html2CanvasFn);
+    script.dataset.leafletImage = "true";
+    script.onload = () => {
+      if (typeof globalObject.leafletImage === "function") {
+        resolve(globalObject.leafletImage);
+      } else {
+        reject(new Error("leaflet-image failed to initialize"));
+      }
+    };
     script.onerror = (event) => reject(event);
     document.body.appendChild(script);
   });
@@ -138,24 +191,57 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
       const matchesError =
         selectedErrorType === "all" || submission.errorTypes.includes(selectedErrorType);
       const matchesInterviewer =
-        selectedInterviewer === "all" || submission.interviewer === selectedInterviewer;
+        selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer;
       return matchesError && matchesInterviewer;
     });
   }, [submissions, selectedErrorType, selectedInterviewer]);
 
+  const interviewerOptions = useMemo(() => {
+    const directory = new Map<string, string>();
+
+    submissions.forEach((submission) => {
+      const id = submission.interviewerId;
+      const candidateName = (submission.interviewerName ?? "").trim();
+      const existing = directory.get(id);
+
+      if (existing === undefined) {
+        directory.set(id, candidateName);
+        return;
+      }
+
+      if (!existing.trim() && candidateName) {
+        directory.set(id, candidateName);
+      }
+    });
+
+    const ids = interviewers.length > 0 ? interviewers : Array.from(directory.keys());
+    const uniqueIds = Array.from(new Set(ids));
+
+    return uniqueIds
+      .map((id) => {
+        const name = directory.get(id) ?? "";
+        return { id, label: formatInterviewerLabel(id, name) };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [interviewers, submissions]);
+
   const handleExportMap = async () => {
-    if (!mapContainerRef.current) return;
+    if (!mapRef.current) return;
 
     try {
-      const html2canvas = await loadHtml2Canvas();
-      const canvas = await html2canvas(mapContainerRef.current, {
-        useCORS: true,
-        scale: window.devicePixelRatio || 1,
+      const leafletImage = await loadLeafletImage();
+      leafletImage(mapRef.current, (error, canvas) => {
+        if (error || !canvas) {
+          console.error("Failed to export map", error);
+          return;
+        }
+
+        const link = document.createElement("a");
+        link.href = canvas.toDataURL("image/png");
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+        link.download = `ogun-survey-map-${timestamp}.png`;
+        link.click();
       });
-      const link = document.createElement("a");
-      link.href = canvas.toDataURL("image/png");
-      link.download = `ogun-survey-map-${Date.now()}.png`;
-      link.click();
     } catch (error) {
       console.error("Failed to export map", error);
     }
@@ -241,14 +327,19 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
     const layer = markerClusterRef.current;
     layer.clearLayers();
 
-    const markers = filteredSubmissions.map((submission) => {
-      const marker = L.marker([submission.lat, submission.lng], {
-        icon: createCustomIcon(submission.status),
-      });
+    const markers = filteredSubmissions
+      .filter(
+        (submission): submission is Submission & { lat: number; lng: number } =>
+          typeof submission.lat === "number" && typeof submission.lng === "number",
+      )
+      .map((submission) => {
+        const marker = L.marker([submission.lat, submission.lng], {
+          icon: createCustomIcon(submission.status),
+        });
 
-      marker.bindPopup(createPopupContent(submission));
-      return marker;
-    });
+        marker.bindPopup(createPopupContent(submission));
+        return marker;
+      });
 
     layer.addLayers(markers);
   }, [filteredSubmissions]);
@@ -311,6 +402,13 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
   }, [filteredSubmissions, geoJsonFeatures]);
 
   useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    fitMapToAll(map, boundaryLayerRef.current, filteredSubmissions);
+  }, [filteredSubmissions, geoJsonFeatures]);
+
+  useEffect(() => {
     if (!mapRef.current) return;
     setTimeout(() => {
       mapRef.current?.invalidateSize();
@@ -324,7 +422,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
           <MapPin className="h-5 w-5 text-primary" />
           <CardTitle className="text-left">Submissions on Map</CardTitle>
         </div>
-        <div className="flex items-center gap-3 overflow-x-auto pb-1">
+        <div className="map-filter-dropdown flex items-center gap-3 overflow-x-auto pb-1">
           <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
             <SelectTrigger className="min-w-[180px]">
               <SelectValue placeholder="All Error Types" />
@@ -342,11 +440,11 @@ export function InteractiveMap({ submissions, interviewers, errorTypes }: Intera
             <SelectTrigger className="min-w-[200px]">
               <SelectValue placeholder="All Interviewers" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="z-[2000]">
               <SelectItem value="all">All Interviewers</SelectItem>
-              {interviewers.map((interviewer) => (
-                <SelectItem key={interviewer} value={interviewer}>
-                  {interviewer}
+              {interviewerOptions.map((option) => (
+                <SelectItem key={option.id} value={option.id}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
