@@ -110,6 +110,10 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  .leaflet-pane {
+    z-index: 100;
+  }
 }
 
 @layer utilities {
