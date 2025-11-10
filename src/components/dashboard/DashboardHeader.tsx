@@ -3,12 +3,12 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface DashboardHeaderProps {
-  lastRefreshed: string;
+  statusMessage: string;
   onRefresh: () => void;
   isRefreshing: boolean;
 }
 
-export function DashboardHeader({ lastRefreshed, onRefresh, isRefreshing }: DashboardHeaderProps) {
+export function DashboardHeader({ statusMessage, onRefresh, isRefreshing }: DashboardHeaderProps) {
   return (
     <header className="border-b bg-card px-6 py-4">
       <div className="mx-auto max-w-7xl">
@@ -39,9 +39,8 @@ export function DashboardHeader({ lastRefreshed, onRefresh, isRefreshing }: Dash
           
           <div className="flex items-center gap-3">
             <div className="text-right text-sm">
-              <div className="text-muted-foreground">Last refreshed</div>
-              <div className="font-medium">{lastRefreshed}</div>
-              <div className="text-xs text-muted-foreground">v1.0.0</div>
+              <div className="text-muted-foreground">Status</div>
+              <div className="font-medium">{statusMessage || "—"}</div>
             </div>
             <Button
               onClick={onRefresh}
