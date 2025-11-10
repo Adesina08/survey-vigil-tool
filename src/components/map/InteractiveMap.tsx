@@ -39,6 +39,8 @@ type Props = {
   errorTypes: ErrorType[];
   showLabels?: boolean;
   lgaGeo?: FeatureCollection<Geometry, Record<string, unknown>>;
+  overrides?: Record<string, StoredStatus>;
+  onStatusPersist?: (id: string, record: StoredStatus) => void;
 };
 
 type DecoratedSubmission = MapSubmission & {
@@ -141,6 +143,8 @@ const InteractiveMap = ({
   errorTypes,
   showLabels: initialShowLabels = false,
   lgaGeo,
+  overrides,
+  onStatusPersist,
 }: Props) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -152,10 +156,15 @@ const InteractiveMap = ({
   const [interviewerFilter, setInterviewerFilter] = useState<string>("all");
   const [labelsVisible, setLabelsVisible] = useState<boolean>(Boolean(initialShowLabels));
 
-  const { openForceAction, modal, overrides } = useSingleForceAction();
+  const {
+    openForceAction,
+    modal,
+    overrides: localOverrides,
+  } = useSingleForceAction(onStatusPersist);
 
   const decoratedSubmissions = useMemo<DecoratedSubmission[]>(() => {
     const knownErrors = new Set<ErrorType>([...KNOWN_ERROR_TYPES, ...errorTypes]);
+    const appliedOverrides = overrides ?? localOverrides;
     return submissions.map((submission) => {
       const candidate = submission as MapSubmission & { autoFlags?: ErrorType[] };
       const autoFlagsRaw = Array.isArray(candidate.autoFlags) ? candidate.autoFlags : [];
@@ -169,7 +178,7 @@ const InteractiveMap = ({
         }
       });
       autoFlags.forEach((error) => combined.add(error));
-      const override = overrides[submission.id];
+      const override = appliedOverrides[submission.id];
       return {
         ...submission,
         status: override?.status ?? submission.status,
@@ -178,7 +187,7 @@ const InteractiveMap = ({
         override,
       };
     });
-  }, [errorTypes, overrides, submissions]);
+  }, [errorTypes, localOverrides, overrides, submissions]);
 
   const filteredSubmissions = useMemo(() => {
     return decoratedSubmissions.filter((submission) => {
