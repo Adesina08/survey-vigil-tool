@@ -224,7 +224,34 @@ function buildFallbackTargets(presentGenders: PresentGender[]) {
 }
 
 /* ----------------- LOADERS ----------------- */
-export const loadSubmissionRows = async (): Promise<SheetSubmissionRow[]> => {
+interface SubmissionLoadResult {
+  submissions: SheetSubmissionRow[];
+  totalFromFirstColumn: number;
+}
+
+const countFirstColumnEntries = (rows: Record<string, unknown>[]) => {
+  if (rows.length === 0) {
+    return 0;
+  }
+
+  const firstRow = rows[0] ?? {};
+  const firstKey = Object.keys(firstRow)[0];
+
+  const nonBlank = rows.reduce((accumulator, row) => {
+    const primaryCell = row["start"] ?? (firstKey ? row[firstKey] : undefined);
+
+    if (primaryCell === null || primaryCell === undefined) {
+      return accumulator;
+    }
+
+    const text = String(primaryCell).trim();
+    return text.length > 0 ? accumulator + 1 : accumulator;
+  }, 0);
+
+  return Math.max(0, nonBlank - 1);
+};
+
+export const loadSubmissionRows = async (): Promise<SubmissionLoadResult> => {
   const googleSheetsUrl = resolveGoogleSheetsUrl();
   if (!googleSheetsUrl) throw new Error(GOOGLE_SHEETS_URL_MISSING_ERROR);
 
@@ -237,12 +264,16 @@ export const loadSubmissionRows = async (): Promise<SheetSubmissionRow[]> => {
   }
   if (!rawRows || rawRows.length === 0) throw new Error(GOOGLE_SHEETS_FETCH_ERROR_MESSAGE);
 
+  const totalFromFirstColumn = countFirstColumnEntries(rawRows);
   const submissions = mapSheetRowsToSubmissions(rawRows, { defaultState: OGUN_STATE_NAME });
-  return enrichSubmissionRows(submissions);
+  return {
+    submissions: enrichSubmissionRows(submissions),
+    totalFromFirstColumn,
+  };
 };
 
 export const loadDashboardData = async (): Promise<DashboardData> => {
-  const submissions = await loadSubmissionRows();
+  const { submissions, totalFromFirstColumn } = await loadSubmissionRows();
   if (!submissions || submissions.length === 0) {
     throw new Error(GOOGLE_SHEETS_FETCH_ERROR_MESSAGE);
   }
@@ -266,5 +297,7 @@ export const loadDashboardData = async (): Promise<DashboardData> => {
     stateGenderTargets,
     analysisRows: submissions,
     lgaCatalog,
+    totalSubmissionsOverride: totalFromFirstColumn,
+    totalsDenominatorOverride: totalFromFirstColumn,
   });
 };

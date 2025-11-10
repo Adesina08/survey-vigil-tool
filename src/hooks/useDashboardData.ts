@@ -175,6 +175,13 @@ const normalizeSummary = (
   const totalCandidate = readNumber(summaryRecord, ["totalSubmissions", "total"], rows.length);
   const totalSubmissions = Math.max(Math.round(totalCandidate), 0);
 
+  const denominatorCandidate = readNumber(
+    summaryRecord,
+    ["totalDenominator", "denominator", "totalsDenominator"],
+    totalSubmissions,
+  );
+  const totalDenominator = Math.max(Math.round(denominatorCandidate), 0);
+
   const approvedCandidate = readNumber(summaryRecord, ["approvedSubmissions", "approved", "valid"], Number.NaN);
   let derivedApproved = 0;
   let derivedNotApproved = 0;
@@ -222,8 +229,8 @@ const normalizeSummary = (
   );
   const approvalRate = Number.isFinite(approvalRateCandidate)
     ? Math.max(Math.min(Math.round(approvalRateCandidate), 100), 0)
-    : totalSubmissions > 0
-      ? Math.round((approvedSubmissions / totalSubmissions) * 100)
+    : totalDenominator > 0
+      ? Math.round((approvedSubmissions / totalDenominator) * 100)
       : fallbackSummary.approvalRate;
 
   const notApprovedRateCandidate = readNumber(
@@ -233,8 +240,8 @@ const normalizeSummary = (
   );
   const notApprovedRate = Number.isFinite(notApprovedRateCandidate)
     ? Math.max(Math.min(Math.round(notApprovedRateCandidate), 100), 0)
-    : totalSubmissions > 0
-      ? Math.round((notApprovedSubmissions / totalSubmissions) * 100)
+    : totalDenominator > 0
+      ? Math.round((notApprovedSubmissions / totalDenominator) * 100)
       : fallbackSummary.notApprovedRate;
 
   const latestSubmissionTime = deriveLatestSubmissionTime(summaryRecord, rows);
@@ -247,6 +254,7 @@ const normalizeSummary = (
     notApprovedSubmissions,
     notApprovedRate,
     latestSubmissionTime,
+    totalDenominator,
   };
 };
 

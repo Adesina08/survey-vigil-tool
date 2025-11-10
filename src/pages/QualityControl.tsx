@@ -45,6 +45,7 @@ const QualityControl = ({
         byLGA={dashboardData.quotaByLGA}
         byLGAAge={dashboardData.quotaByLGAAge}
         byLGAGender={dashboardData.quotaByLGAGender}
+        lgaCatalog={dashboardData.lgaCatalog}
       />
 
       <UserProductivity data={dashboardData.userProductivity} />

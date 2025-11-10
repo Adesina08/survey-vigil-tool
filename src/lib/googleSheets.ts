@@ -673,10 +673,13 @@ export const mapSheetRowsToSubmissions = (
 
       const finalApprovalStatus: ApprovalStatus = approvalStatus ?? "Approved";
 
-      const age = toNumberValue(getFromRow(normalisedRow, "A8. Age")) ?? undefined;
+      const ageSource = getFromRow(normalisedRow, "A8. Age");
+      const age = toNumberValue(ageSource) ?? undefined;
       const ageGroup = determineAgeGroup(age);
 
-      const gender = normaliseGender(getFromRow(normalisedRow, "A7. Sex"));
+      const sexSource = getFromRow(normalisedRow, "A7. Sex");
+      const gender = normaliseGender(sexSource);
+      const sexRawString = toStringValue(sexSource);
 
       const deviceid = toStringValue(getFromRow(normalisedRow, "deviceid")) || undefined;
       const imei = toStringValue(getFromRow(normalisedRow, "imei")) || undefined;
@@ -771,6 +774,8 @@ export const mapSheetRowsToSubmissions = (
         "A5. GPS Coordinates": coordinatesText || undefined,
         "_A5. GPS Coordinates_latitude": resolvedLatitude ?? 0,
         "_A5. GPS Coordinates_longitude": resolvedLongitude ?? 0,
+        _ageRaw: ageSource ?? null,
+        _sexRaw: sexRawString ? sexRawString : null,
       };
 
       if (resolvedLatitude !== undefined) {

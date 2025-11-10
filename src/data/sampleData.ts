@@ -56,6 +56,8 @@ export interface SheetSubmissionRow {
   "_A5. GPS Coordinates_longitude": number;
   Latitude?: number;
   Longitude?: number;
+  _ageRaw?: number | string | null;
+  _sexRaw?: string | null;
 }
 
 export interface SheetStateTargetRow {
