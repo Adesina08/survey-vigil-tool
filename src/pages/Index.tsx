@@ -7,15 +7,38 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import TabsQCAnalysis from "@/components/TabsQCAnalysis";
 import QualityControl from "./QualityControl";
 
+function filterByLga<T>(rows: T[], lga: string | null): T[] {
+  if (!lga || lga === "all" || lga === "All LGAs") {
+    return rows;
+  }
+
+  return rows.filter((row) => {
+    if (!row || typeof row !== "object") {
+      return false;
+    }
+
+    const record = row as Record<string, unknown>;
+    const candidate =
+      record["lga"] ??
+      record["a3_select_the_lga"] ??
+      record["A3. select the LGA"] ??
+      record["LGA"];
+
+    return candidate === lga;
+  });
+}
+
 const Index = () => {
   const { data: dashboardData, isLoading, isFetching, isError, error, refetch } = useDashboardData();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<string>("");
-  const [selectedLga, setSelectedLga] = useState<string>("all");
+  const [selectedLga, setSelectedLga] = useState<string | null>(null);
 
   useEffect(() => {
-    if (dashboardData) {
+    if (dashboardData?.lastUpdated) {
       setLastRefreshed(dashboardData.lastUpdated);
+    } else if (!dashboardData) {
+      setLastRefreshed("");
     }
   }, [dashboardData]);
 
@@ -33,8 +56,12 @@ const Index = () => {
 
   const handleFilterChange = (filterType: string, value: string) => {
     if (filterType === "lga") {
-      setSelectedLga(value);
+      const normalized = !value || value === "all" || value === "All LGAs" ? null : value;
+      setSelectedLga(normalized);
+      console.log(`Filter changed: ${filterType} = ${normalized ?? "All LGAs"}`);
+      return;
     }
+
     console.log(`Filter changed: ${filterType} = ${value}`);
   };
 
@@ -43,19 +70,16 @@ const Index = () => {
       return [];
     }
 
-    if (selectedLga === "all") {
-      return dashboardData.mapSubmissions;
-    }
-    return dashboardData.mapSubmissions.filter((submission) => submission.lga === selectedLga);
+    return filterByLga(dashboardData.mapSubmissions, selectedLga);
   }, [dashboardData, selectedLga]);
 
   useEffect(() => {
-    if (selectedLga === "all" || !dashboardData) {
+    if (!selectedLga || !dashboardData) {
       return;
     }
 
     if (!dashboardData.filters.lgas.includes(selectedLga)) {
-      setSelectedLga("all");
+      setSelectedLga(null);
     }
   }, [dashboardData, selectedLga]);
 
@@ -70,7 +94,10 @@ const Index = () => {
     );
   }
 
-  if (isError && !dashboardData) {
+  const errorMessage =
+    error?.message ?? "An unexpected error occurred while connecting to the dashboard service.";
+
+  if (isError || !dashboardData?.summary) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-6">
         <div className="w-full max-w-md rounded-lg border bg-card p-6 text-center">
@@ -79,7 +106,7 @@ const Index = () => {
           </div>
           <h2 className="text-lg font-semibold">Unable to load dashboard data</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {error?.message ?? "An unexpected error occurred while connecting to Google Sheets."}
+            {errorMessage}
           </p>
           <Button className="mt-4" onClick={() => refetch()}>
             Retry
@@ -87,10 +114,6 @@ const Index = () => {
         </div>
       </div>
     );
-  }
-
-  if (!dashboardData) {
-    return null;
   }
 
   return (
@@ -108,6 +131,7 @@ const Index = () => {
               dashboardData={dashboardData}
               filteredMapSubmissions={filteredMapSubmissions}
               onFilterChange={handleFilterChange}
+              selectedLga={selectedLga}
             />
           }
         />

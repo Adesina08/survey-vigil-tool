@@ -14,12 +14,22 @@ interface QualityControlProps {
   dashboardData: DashboardData;
   filteredMapSubmissions: MapSubmission[];
   onFilterChange: (filterType: string, value: string) => void;
+  selectedLga: string | null;
 }
 
-const QualityControl = ({ dashboardData, filteredMapSubmissions, onFilterChange }: QualityControlProps) => {
+const QualityControl = ({
+  dashboardData,
+  filteredMapSubmissions,
+  onFilterChange,
+  selectedLga,
+}: QualityControlProps) => {
   return (
     <div className="space-y-6">
-      <FilterControls lgas={dashboardData.filters.lgas} onFilterChange={onFilterChange} />
+      <FilterControls
+        lgas={dashboardData.filters.lgas}
+        onFilterChange={onFilterChange}
+        selectedLga={selectedLga}
+      />
 
       <SummaryCards data={dashboardData.summary} />
 

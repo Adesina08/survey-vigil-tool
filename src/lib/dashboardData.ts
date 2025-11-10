@@ -33,6 +33,7 @@ interface SummaryData {
   approvalRate: number;
   notApprovedSubmissions: number;
   notApprovedRate: number;
+  latestSubmissionTime?: string | null;
 }
 
 interface StatusBreakdown {
