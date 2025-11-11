@@ -40,3 +40,27 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Keep Leaflet behind UI controls & overlays */
+.leaflet-container {
+  z-index: 0;
+}
+
+.leaflet-control-container {
+  z-index: 10;
+}
+
+.leaflet-pane,
+.leaflet-overlay-pane,
+.leaflet-marker-pane,
+.leaflet-shadow-pane {
+  z-index: 0;
+}
+
+/* For any plain <table> not using the shadcn TableHeader sticky fix */
+.table-sticky thead tr {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: hsl(var(--background));
+}
