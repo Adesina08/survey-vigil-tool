@@ -14,6 +14,7 @@ import L from "leaflet";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { formatErrorLabel } from "@/lib/utils";
 import { SectionHeader } from "./SectionHeader";
+import ogunLgaGeoJsonUrl from "@/assets/ogun-lga.geojson?url";
 
 const defaultIconPrototype = L.Icon.Default.prototype as unknown as {
   _getIconUrl?: unknown;
@@ -234,11 +235,20 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
 
     const loadBoundary = async () => {
       try {
-        let response = await fetch(`${import.meta.env.BASE_URL ?? "/"}ogun-lga.geojson`).catch(() => null as any);
+        let response: Response | null = null;
+
+        try {
+          response = await fetch(ogunLgaGeoJsonUrl);
+        } catch (error) {
+          console.warn("Bundled LGA boundary fetch failed, falling back to public asset", error);
+        }
+
         if (!response || !response.ok) {
           response = await fetch("/ogun-lga.geojson").catch(() => null as any);
         }
+
         if (!response || !response.ok) return;
+
         const geoJson = (await response.json()) as FeatureCollection<Geometry, Record<string, unknown>>;
 
         boundaryLayerRef.current?.remove();

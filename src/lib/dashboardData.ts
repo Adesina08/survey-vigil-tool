@@ -129,7 +129,91 @@ export interface DashboardData {
   analysisRows: AnalysisRow[];
 }
 
-const parseDate = (date: string, time: string) => new Date(`${date}T${time}:00Z`);
+const normaliseTimePart = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const twelveHour = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+  if (twelveHour) {
+    let hours = Number.parseInt(twelveHour[1] ?? "0", 10);
+    const minutes = Number.parseInt(twelveHour[2] ?? "0", 10);
+    const seconds = Number.parseInt(twelveHour[3] ?? "0", 10) || 0;
+    const modifier = (twelveHour[4] ?? "").toUpperCase();
+
+    if (modifier === "PM" && hours < 12) {
+      hours += 12;
+    }
+    if (modifier === "AM" && hours === 12) {
+      hours = 0;
+    }
+
+    const padded = (num: number) => num.toString().padStart(2, "0");
+    return `${padded(hours)}:${padded(minutes)}:${padded(seconds)}`;
+  }
+
+  if (/^\d{1,2}:\d{2}$/.test(trimmed)) {
+    return `${trimmed}:00`;
+  }
+
+  return trimmed;
+};
+
+const parseDateCandidate = (value: string | null | undefined): Date | null => {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  const withZone = new Date(`${value}Z`);
+  if (!Number.isNaN(withZone.getTime())) {
+    return withZone;
+  }
+
+  return null;
+};
+
+const parseSubmissionTimestamp = (row: SheetSubmissionRow): Date | null => {
+  const dateValue = typeof row["Submission Date"] === "string" ? row["Submission Date"].trim() : "";
+  const timeValue = normaliseTimePart(row["Submission Time"]);
+
+  const candidates: Array<string | null | undefined> = [];
+
+  if (dateValue) {
+    if (timeValue) {
+      candidates.push(`${dateValue}T${timeValue}`);
+      candidates.push(`${dateValue} ${timeValue}`);
+    } else {
+      candidates.push(dateValue);
+    }
+  }
+
+  candidates.push(
+    typeof row._submission_time === "string" ? row._submission_time : null,
+    typeof row.end === "string" ? row.end : null,
+    typeof row.endtime === "string" ? row.endtime : null,
+    typeof row.start === "string" ? row.start : null,
+    typeof row.starttime === "string" ? row.starttime : null,
+  );
+
+  for (const candidate of candidates) {
+    const parsed = parseDateCandidate(candidate);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
 
 const incrementMap = (map: Map<string, number>, key: string, amount = 1) => {
   map.set(key, (map.get(key) ?? 0) + amount);
@@ -310,7 +394,7 @@ export const buildDashboardData = ({
   const errorTypeSet = new Set<string>();
 
   const mapSubmissions: Array<MapSubmission & { sortKey: number }> = [];
-  let latestTimestamp = new Date(0);
+  let latestTimestamp: Date | null = null;
 
   processedSubmissions.forEach((row) => {
     const state = row.State ?? "Unknown State";
@@ -332,9 +416,9 @@ export const buildDashboardData = ({
     const hasValidCoordinates = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
     const hasValidLGA = typeof lga === "string" && lga.length > 0;
 
-    const timestamp = parseDate(row["Submission Date"], row["Submission Time"]);
-    if (timestamp > latestTimestamp) {
-      latestTimestamp = timestamp;
+    const submissionTimestamp = parseSubmissionTimestamp(row);
+    if (submissionTimestamp && (!latestTimestamp || submissionTimestamp > latestTimestamp)) {
+      latestTimestamp = submissionTimestamp;
     }
 
     if (hasValidLGA) {
@@ -392,10 +476,21 @@ export const buildDashboardData = ({
 
     if (hasValidCoordinates && hasValidLGA) {
       const rowIndex = getSubmissionIndex(row);
+      const sortKey = submissionTimestamp?.getTime() ?? 0;
       const submissionId =
         sanitiseText(row["Submission ID"]) ??
         (rowIndex !== null ? String(rowIndex) : undefined) ??
-        `${state}-${lga}-${timestamp.getTime()}`;
+        `${state}-${lga}-${sortKey || mapSubmissions.length}`;
+
+      const timestampLabel = submissionTimestamp
+        ? submissionTimestamp.toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "Timestamp unavailable";
 
       mapSubmissions.push({
         id: submissionId,
@@ -407,15 +502,9 @@ export const buildDashboardData = ({
         lga: lga!,
         state,
         errorTypes: errorFlags,
-        timestamp: timestamp.toLocaleString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        timestamp: timestampLabel,
         status: (metadata?.isValid ?? isApproved) ? "approved" : "not_approved",
-        sortKey: timestamp.getTime(),
+        sortKey,
       });
     }
   });
@@ -626,7 +715,7 @@ export const buildDashboardData = ({
     .sort((a, b) => b.sortKey - a.sortKey)
     .map(({ sortKey, ...entry }) => entry);
 
-  const lastUpdated = totalSubmissions > 0
+  const lastUpdated = latestTimestamp
     ? latestTimestamp.toLocaleString("en-US", {
         month: "short",
         day: "numeric",
@@ -634,7 +723,9 @@ export const buildDashboardData = ({
         hour: "2-digit",
         minute: "2-digit",
       })
-    : "No data available";
+    : totalSubmissions > 0
+      ? "Timestamp unavailable"
+      : "No data available";
 
   const normalizedRows: AnalysisRow[] =
     analysisRows ??

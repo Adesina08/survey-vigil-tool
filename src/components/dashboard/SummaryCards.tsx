@@ -8,6 +8,7 @@ interface SummaryData {
   approvalRate: number;
   notApprovedSubmissions: number;
   notApprovedRate: number;
+  completionRate: number;
 }
 
 interface SummaryCardsProps {
@@ -15,30 +16,40 @@ interface SummaryCardsProps {
 }
 
 export function SummaryCards({ data }: SummaryCardsProps) {
+  const formatNumber = (value: number) => value.toLocaleString();
+  const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
+
   const cards = [
     {
-      title: "Overall Target",
-      value: data.overallTarget.toLocaleString(),
+      title: "Target interviews",
+      value: formatNumber(data.overallTarget),
       icon: Target,
       variant: "default" as const,
+      helper: `Completion: ${formatPercentage(data.completionRate)}`,
     },
     {
-      title: "Total Submissions",
-      value: data.totalSubmissions.toLocaleString(),
+      title: "Total submissions",
+      value: formatNumber(data.totalSubmissions),
       icon: AlertCircle,
       variant: "default" as const,
+      helper:
+        data.overallTarget > 0
+          ? `${((data.totalSubmissions / data.overallTarget) * 100).toFixed(1)}% of target volume`
+          : undefined,
     },
     {
-      title: "Approved Submissions",
-      value: `${data.approvedSubmissions.toLocaleString()} (${data.approvalRate}%)`,
+      title: "Approved interviews",
+      value: formatNumber(data.approvedSubmissions),
       icon: CheckCircle,
       variant: "success" as const,
+      helper: `Approval rate: ${formatPercentage(data.approvalRate)}`,
     },
     {
-      title: "Not Approved Submissions",
-      value: `${data.notApprovedSubmissions.toLocaleString()} (${data.notApprovedRate}%)`,
+      title: "Flagged interviews",
+      value: formatNumber(data.notApprovedSubmissions),
       icon: XCircle,
       variant: "destructive" as const,
+      helper: `Flag rate: ${formatPercentage(data.notApprovedRate)}`,
     },
   ];
 
@@ -74,6 +85,9 @@ export function SummaryCards({ data }: SummaryCardsProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{card.value}</div>
+            {card.helper ? (
+              <p className="mt-2 text-xs text-muted-foreground">{card.helper}</p>
+            ) : null}
           </CardContent>
         </Card>
       ))}

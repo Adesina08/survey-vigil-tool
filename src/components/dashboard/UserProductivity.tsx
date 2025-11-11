@@ -12,19 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  ResponsiveContainer,
-  CartesianGrid,
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-} from "recharts";
-import type { TooltipProps } from "recharts";
-import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
+import { ResponsiveContainer, CartesianGrid, ComposedChart, Bar, XAxis, YAxis } from "recharts";
 import { Crown, TrendingUp, Users } from "lucide-react";
 import {
   ChartContainer,
@@ -49,71 +37,26 @@ interface InterviewerData {
 
 interface UserProductivityProps {
   data: InterviewerData[];
+  errorTypes?: string[];
 }
 
-const tooltipBackground = {
-  backgroundColor: "hsl(var(--popover))",
-  border: "1px solid hsl(var(--border))",
-  borderRadius: "16px",
-  boxShadow: "0 18px 32px rgba(0, 0, 0, 0.12)",
-};
-
-const SubmissionTooltip = ({
-  active,
-  payload,
-  label,
-}: TooltipProps<ValueType, NameType>) => {
-  if (!active || !payload?.length) {
-    return null;
-  }
-
-  const counts = payload.filter((item) => item.dataKey === "valid" || item.dataKey === "invalid");
-  const approval = payload.find((item) => item.dataKey === "approvalRate");
-  const title = String(label);
-
-  return (
-    <div className="rounded-2xl border bg-popover p-4 shadow-lg" style={tooltipBackground}>
-      <p className="text-sm font-semibold text-foreground">{title}</p>
-      <div className="mt-3 space-y-1.5 text-xs">
-        {counts.map((item) => (
-          <div key={item.dataKey} className="flex items-center justify-between gap-4">
-            <span className="text-muted-foreground">{item.name}</span>
-            <span className="font-medium text-foreground">
-              {Number(item.value ?? 0).toLocaleString()}
-            </span>
-          </div>
-        ))}
-        {approval ? (
-          <div className="flex items-center justify-between gap-4 pt-1 text-xs">
-            <span className="text-muted-foreground">Approval rate</span>
-            <span className="font-semibold text-primary">
-              {Number(approval.value ?? 0).toFixed(1)}%
-            </span>
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-};
-
-export function UserProductivity({ data }: UserProductivityProps) {
+export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
   const sortedByValid = useMemo(
     () => [...data].sort((a, b) => b.validSubmissions - a.validSubmissions),
     [data],
   );
 
   const errorColumns = useMemo(() => {
-    const totals = new Map<string, number>();
+    const unique = new Set<string>(errorTypes);
     data.forEach((row) => {
-      Object.entries(row.errors).forEach(([errorType, count]) => {
-        totals.set(errorType, (totals.get(errorType) ?? 0) + count);
+      Object.keys(row.errors).forEach((errorType) => {
+        unique.add(errorType);
       });
     });
-    return Array.from(totals.entries())
-      .filter(([, count]) => count > 0)
-      .sort((a, b) => b[1] - a[1])
-      .map(([errorType]) => errorType);
-  }, [data]);
+    return Array.from(unique)
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .sort((a, b) => a.localeCompare(b));
+  }, [data, errorTypes]);
 
   const chartData = useMemo(
     () =>
@@ -121,13 +64,35 @@ export function UserProductivity({ data }: UserProductivityProps) {
         id: item.interviewerId,
         label: item.interviewerId,
         fullLabel: item.interviewerId,
-        valid: item.validSubmissions,
-        invalid: item.invalidSubmissions,
-        approvalRate: Number(item.approvalRate.toFixed(1)),
-        total: item.totalSubmissions,
+        ...errorColumns.reduce<Record<string, number>>((acc, errorType) => {
+          acc[errorType] = item.errors[errorType] ?? 0;
+          return acc;
+        }, {}),
       })),
-    [sortedByValid],
+    [errorColumns, sortedByValid],
   );
+
+  const chartConfig = useMemo(() => {
+    const palette = [
+      "hsl(var(--chart-1, var(--primary)))",
+      "hsl(var(--chart-2, #9333ea))",
+      "hsl(var(--chart-3, #f97316))",
+      "hsl(var(--chart-4, #0ea5e9))",
+      "hsl(var(--chart-5, #22c55e))",
+      "hsl(var(--chart-6, #eab308))",
+      "hsl(var(--chart-7, #ec4899))",
+      "hsl(var(--chart-8, #14b8a6))",
+      "hsl(var(--chart-9, #6366f1))",
+    ];
+
+    return errorColumns.reduce<Record<string, { label: string; color: string }>>((acc, errorType, index) => {
+      acc[errorType] = {
+        label: formatErrorLabel(errorType),
+        color: palette[index % palette.length],
+      };
+      return acc;
+    }, {});
+  }, [errorColumns]);
 
   const totals = useMemo(
     () =>
@@ -192,7 +157,7 @@ export function UserProductivity({ data }: UserProductivityProps) {
                 <p className="mt-2 text-2xl font-semibold text-success">{totals.valid.toLocaleString()}</p>
               </div>
               <div className="rounded-lg bg-muted/40 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Not approved</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Flagged</p>
                 <p className="mt-2 text-2xl font-semibold text-destructive">{totals.invalid.toLocaleString()}</p>
               </div>
             </div>
@@ -260,38 +225,9 @@ export function UserProductivity({ data }: UserProductivityProps) {
 
             <TabsContent value="chart" className="mt-6">
               <div className="rounded-2xl border bg-gradient-to-br from-background via-card to-muted/40 p-6 shadow-inner">
-                <ChartContainer
-                  config={{
-                    valid: {
-                      label: "Approved",
-                      color: "hsl(var(--success))",
-                    },
-                    invalid: {
-                      label: "Not Approved",
-                      color: "hsl(var(--destructive))",
-                    },
-                    approvalRate: {
-                      label: "Approval rate",
-                      color: "hsl(var(--primary))",
-                    },
-                  }}
-                  className="h-[420px] w-full"
-                >
+                <ChartContainer config={chartConfig} className="h-[420px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart
-                      data={chartData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                    >
-                      <defs>
-                        <linearGradient id="approvedGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.9} />
-                          <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0.4} />
-                        </linearGradient>
-                        <linearGradient id="rejectedGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.9} />
-                          <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.4} />
-                        </linearGradient>
-                      </defs>
+                    <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" vertical={false} />
                       <XAxis
                         dataKey="label"
@@ -300,39 +236,18 @@ export function UserProductivity({ data }: UserProductivityProps) {
                         height={80}
                         tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
                       />
-                      <YAxis yAxisId="left" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
-                      <YAxis
-                        yAxisId="right"
-                        orientation="right"
-                        domain={[0, 100]}
-                        tickFormatter={(value) => `${value}%`}
-                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                      />
+                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} allowDecimals={false} />
                       <ChartTooltip content={<ChartTooltipContent />} />
                       <ChartLegend content={<ChartLegendContent />} />
-                      <Bar
-                        dataKey="valid"
-                        stackId="submissions"
-                        yAxisId="left"
-                        fill="url(#approvedGradient)"
-                        radius={[6, 6, 0, 0]}
-                      />
-                      <Bar
-                        dataKey="invalid"
-                        stackId="submissions"
-                        yAxisId="left"
-                        fill="url(#rejectedGradient)"
-                        radius={[6, 6, 0, 0]}
-                      />
-                      <Line
-                        yAxisId="right"
-                        type="monotone"
-                        dataKey="approvalRate"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        dot={false}
-                        isAnimationActive={false}
-                      />
+                      {errorColumns.map((errorType, index) => (
+                        <Bar
+                          key={errorType}
+                          dataKey={errorType}
+                          stackId="flags"
+                          fill={chartConfig[errorType]?.color ?? `hsl(var(--chart-${(index % 5) + 1}))`}
+                          radius={index === errorColumns.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+                        />
+                      ))}
                     </ComposedChart>
                   </ResponsiveContainer>
                 </ChartContainer>
@@ -346,16 +261,15 @@ export function UserProductivity({ data }: UserProductivityProps) {
                     <TableHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur">
                       <TableRow className="bg-muted/60">
                         <TableHead className="w-[26%] sticky top-0 z-10 bg-background">Interviewer ID</TableHead>
-                        <TableHead className="text-right sticky top-0 z-10 bg-background">Total</TableHead>
-                        <TableHead className="text-right sticky top-0 z-10 bg-background text-success">Approved</TableHead>
-                        <TableHead className="text-right sticky top-0 z-10 bg-background text-destructive">Not approved</TableHead>
-                        <TableHead className="text-right sticky top-0 z-10 bg-background">Approval %</TableHead>
+                        <TableHead className="text-right sticky top-0 z-10 bg-background">Total interviews</TableHead>
+                        <TableHead className="text-right sticky top-0 z-10 bg-background text-destructive">Flagged interviews</TableHead>
+                        <TableHead className="text-right sticky top-0 z-10 bg-background">Flag rate</TableHead>
                         {errorColumns.map((errorType) => (
                           <TableHead key={errorType} className="text-right sticky top-0 z-10 bg-background">
                             {formatErrorLabel(errorType)}
                           </TableHead>
                         ))}
-                        <TableHead className="text-right sticky top-0 z-10 bg-background">Total errors</TableHead>
+                        <TableHead className="text-right sticky top-0 z-10 bg-background">Total errors logged</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -363,14 +277,13 @@ export function UserProductivity({ data }: UserProductivityProps) {
                         <TableRow key={row.interviewerId} className="group transition-colors hover:bg-primary/5">
                           <TableCell className="font-semibold">{row.interviewerId}</TableCell>
                           <TableCell className="text-right">{row.totalSubmissions.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-success">
-                            {row.validSubmissions.toLocaleString()}
-                          </TableCell>
                           <TableCell className="text-right text-destructive">
                             {row.invalidSubmissions.toLocaleString()}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
-                            {row.approvalRate.toFixed(1)}%
+                            {row.totalSubmissions > 0
+                              ? `${((row.invalidSubmissions / row.totalSubmissions) * 100).toFixed(1)}%`
+                              : "0.0%"}
                           </TableCell>
                           {errorColumns.map((errorType) => (
                             <TableCell key={errorType} className="text-right">

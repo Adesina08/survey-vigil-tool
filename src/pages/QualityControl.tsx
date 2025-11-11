@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import { FilterControls } from "@/components/dashboard/FilterControls";
 import { SummaryCards } from "@/components/dashboard/SummaryCards";
 import { ProgressCharts } from "@/components/dashboard/ProgressCharts";
@@ -23,6 +25,183 @@ const QualityControl = ({
   onFilterChange,
   selectedLga,
 }: QualityControlProps) => {
+  const {
+    summary,
+    quotaProgress,
+    statusBreakdown,
+    productivity,
+    errorBreakdown,
+    achievementsByInterviewer,
+    achievementsByLGA,
+    filteredQuotaByLGA,
+    filteredQuotaByLGAAge,
+    filteredQuotaByLGAGender,
+  } = useMemo(() => {
+    const submissions = filteredMapSubmissions;
+    const relevantQuotaByLGA = selectedLga
+      ? dashboardData.quotaByLGA.filter((row) => row.lga === selectedLga)
+      : dashboardData.quotaByLGA;
+    const relevantQuotaByLGAAge = selectedLga
+      ? dashboardData.quotaByLGAAge.filter((row) => row.lga === selectedLga)
+      : dashboardData.quotaByLGAAge;
+    const relevantQuotaByLGAGender = selectedLga
+      ? dashboardData.quotaByLGAGender.filter((row) => row.lga === selectedLga)
+      : dashboardData.quotaByLGAGender;
+
+    const targetTotal = relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0);
+    const achievedFromQuota = relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0);
+
+    let approvedCount = 0;
+    let flaggedCount = 0;
+
+    const productivityMap = new Map<
+      string,
+      {
+        interviewerId: string;
+        interviewerName: string;
+        displayLabel: string;
+        totalSubmissions: number;
+        validSubmissions: number;
+        invalidSubmissions: number;
+        approvalRate: number;
+        errors: Record<string, number>;
+        totalErrors: number;
+      }
+    >();
+
+    const errorTotals = new Map<string, number>();
+    const achievementsByLGAMap = new Map<
+      string,
+      { state: string; lga: string; total: number; approved: number; notApproved: number }
+    >();
+
+    submissions.forEach((submission) => {
+      if (submission.status === "approved") {
+        approvedCount += 1;
+      } else {
+        flaggedCount += 1;
+      }
+
+      const interviewerId = submission.interviewerId;
+      const existing = productivityMap.get(interviewerId) ?? {
+        interviewerId,
+        interviewerName: submission.interviewerName,
+        displayLabel: submission.interviewerLabel,
+        totalSubmissions: 0,
+        validSubmissions: 0,
+        invalidSubmissions: 0,
+        approvalRate: 0,
+        errors: {},
+        totalErrors: 0,
+      };
+
+      existing.totalSubmissions += 1;
+      if (submission.status === "approved") {
+        existing.validSubmissions += 1;
+      } else {
+        existing.invalidSubmissions += 1;
+      }
+
+      submission.errorTypes.forEach((errorType) => {
+        existing.errors[errorType] = (existing.errors[errorType] ?? 0) + 1;
+        existing.totalErrors += 1;
+        errorTotals.set(errorType, (errorTotals.get(errorType) ?? 0) + 1);
+      });
+
+      productivityMap.set(interviewerId, existing);
+
+      const lgaKey = `${submission.state}|${submission.lga}`;
+      const lgaEntry = achievementsByLGAMap.get(lgaKey) ?? {
+        state: submission.state,
+        lga: submission.lga,
+        total: 0,
+        approved: 0,
+        notApproved: 0,
+      };
+      lgaEntry.total += 1;
+      if (submission.status === "approved") {
+        lgaEntry.approved += 1;
+      } else {
+        lgaEntry.notApproved += 1;
+      }
+      achievementsByLGAMap.set(lgaKey, lgaEntry);
+    });
+
+    const totalSubmissions = submissions.length;
+    const approvalRate = totalSubmissions > 0 ? (approvedCount / totalSubmissions) * 100 : 0;
+    const notApprovedRate = totalSubmissions > 0 ? (flaggedCount / totalSubmissions) * 100 : 0;
+    const quotaProgress = targetTotal > 0 ? (achievedFromQuota / targetTotal) * 100 : 0;
+
+    const productivity = Array.from(productivityMap.values()).map((row) => ({
+      ...row,
+      approvalRate: row.totalSubmissions > 0 ? (row.validSubmissions / row.totalSubmissions) * 100 : 0,
+    }));
+
+    const achievementsByInterviewer = productivity
+      .map((row) => ({
+        interviewerId: row.interviewerId,
+        interviewerName: row.interviewerName,
+        displayLabel: row.displayLabel,
+        total: row.totalSubmissions,
+        approved: row.validSubmissions,
+        notApproved: row.invalidSubmissions,
+        percentageApproved: Number(row.approvalRate.toFixed(1)),
+      }))
+      .sort((a, b) => b.approved - a.approved);
+
+    const achievementsByLGA = Array.from(achievementsByLGAMap.values())
+      .map((row) => ({
+        ...row,
+        percentageApproved: row.total > 0 ? Number(((row.approved / row.total) * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => a.lga.localeCompare(b.lga));
+
+    const errorTypeList = dashboardData.filters.errorTypes;
+    const totalErrors = Array.from(errorTotals.values()).reduce((sum, value) => sum + value, 0);
+    const errorBreakdown = (errorTypeList.length > 0 ? errorTypeList : Array.from(errorTotals.keys()))
+      .map((errorType) => {
+        const count = errorTotals.get(errorType) ?? 0;
+        const percentage = totalErrors > 0 ? (count / totalErrors) * 100 : 0;
+        return {
+          errorType,
+          count,
+          percentage: Number(percentage.toFixed(1)),
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      summary: {
+        overallTarget: targetTotal,
+        totalSubmissions,
+        approvedSubmissions: approvedCount,
+        approvalRate: Number(approvalRate.toFixed(1)),
+        notApprovedSubmissions: flaggedCount,
+        notApprovedRate: Number(notApprovedRate.toFixed(1)),
+        completionRate: Number(quotaProgress.toFixed(1)),
+      },
+      quotaProgress: Number(quotaProgress.toFixed(1)),
+      statusBreakdown: {
+        approved: approvedCount,
+        notApproved: flaggedCount,
+      },
+      productivity,
+      errorBreakdown,
+      achievementsByInterviewer,
+      achievementsByLGA,
+      filteredQuotaByLGA: relevantQuotaByLGA,
+      filteredQuotaByLGAAge: relevantQuotaByLGAAge,
+      filteredQuotaByLGAGender: relevantQuotaByLGAGender,
+    };
+  }, [
+    dashboardData.filters.errorTypes,
+    dashboardData.quotaByLGA,
+    dashboardData.quotaByLGAAge,
+    dashboardData.quotaByLGAGender,
+    filteredMapSubmissions,
+    selectedLga,
+  ]);
+
   return (
     <div className="space-y-6">
       <FilterControls
@@ -31,9 +210,9 @@ const QualityControl = ({
         selectedLga={selectedLga}
       />
 
-      <SummaryCards data={dashboardData.summary} />
+      <SummaryCards data={summary} />
 
-      <ProgressCharts quotaProgress={dashboardData.quotaProgress} statusBreakdown={dashboardData.statusBreakdown} />
+      <ProgressCharts quotaProgress={quotaProgress} statusBreakdown={statusBreakdown} />
 
       <InteractiveMap
         submissions={filteredMapSubmissions}
@@ -43,19 +222,19 @@ const QualityControl = ({
       />
 
       <QuotaTracker
-        byLGA={dashboardData.quotaByLGA}
-        byLGAAge={dashboardData.quotaByLGAAge}
-        byLGAGender={dashboardData.quotaByLGAGender}
+        byLGA={filteredQuotaByLGA}
+        byLGAAge={filteredQuotaByLGAAge}
+        byLGAGender={filteredQuotaByLGAGender}
       />
 
-      <UserProductivity data={dashboardData.userProductivity} />
+      <UserProductivity data={productivity} errorTypes={dashboardData.filters.errorTypes} />
 
-      <ErrorBreakdown data={dashboardData.errorBreakdown} />
+      <ErrorBreakdown data={errorBreakdown} />
 
       <AchievementsTables
         byState={dashboardData.achievements.byState}
-        byInterviewer={dashboardData.achievements.byInterviewer}
-        byLGA={dashboardData.achievements.byLGA}
+        byInterviewer={achievementsByInterviewer}
+        byLGA={achievementsByLGA}
       />
     </div>
   );
