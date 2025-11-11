@@ -53,6 +53,9 @@ const QualityControl = ({
 
     let approvedCount = 0;
     let flaggedCount = 0;
+    let treatmentPathCount = 0;
+    let controlPathCount = 0;
+    let unknownPathCount = 0;
 
     const productivityMap = new Map<
       string,
@@ -66,13 +69,25 @@ const QualityControl = ({
         approvalRate: number;
         errors: Record<string, number>;
         totalErrors: number;
+        treatmentPathCount: number;
+        controlPathCount: number;
+        unknownPathCount: number;
       }
     >();
 
     const errorTotals = new Map<string, number>();
     const achievementsByLGAMap = new Map<
       string,
-      { state: string; lga: string; total: number; approved: number; notApproved: number }
+      {
+        state: string;
+        lga: string;
+        total: number;
+        approved: number;
+        notApproved: number;
+        treatmentPathCount: number;
+        controlPathCount: number;
+        unknownPathCount: number;
+      }
     >();
 
     submissions.forEach((submission) => {
@@ -80,6 +95,18 @@ const QualityControl = ({
         approvedCount += 1;
       } else {
         flaggedCount += 1;
+      }
+
+      switch (submission.ogstepPath) {
+        case "treatment":
+          treatmentPathCount += 1;
+          break;
+        case "control":
+          controlPathCount += 1;
+          break;
+        default:
+          unknownPathCount += 1;
+          break;
       }
 
       const interviewerId = submission.interviewerId;
@@ -93,6 +120,9 @@ const QualityControl = ({
         approvalRate: 0,
         errors: {},
         totalErrors: 0,
+        treatmentPathCount: 0,
+        controlPathCount: 0,
+        unknownPathCount: 0,
       };
 
       existing.totalSubmissions += 1;
@@ -100,6 +130,18 @@ const QualityControl = ({
         existing.validSubmissions += 1;
       } else {
         existing.invalidSubmissions += 1;
+      }
+
+      switch (submission.ogstepPath) {
+        case "treatment":
+          existing.treatmentPathCount += 1;
+          break;
+        case "control":
+          existing.controlPathCount += 1;
+          break;
+        default:
+          existing.unknownPathCount += 1;
+          break;
       }
 
       submission.errorTypes.forEach((errorType) => {
@@ -117,12 +159,27 @@ const QualityControl = ({
         total: 0,
         approved: 0,
         notApproved: 0,
+        treatmentPathCount: 0,
+        controlPathCount: 0,
+        unknownPathCount: 0,
       };
       lgaEntry.total += 1;
       if (submission.status === "approved") {
         lgaEntry.approved += 1;
       } else {
         lgaEntry.notApproved += 1;
+      }
+
+      switch (submission.ogstepPath) {
+        case "treatment":
+          lgaEntry.treatmentPathCount += 1;
+          break;
+        case "control":
+          lgaEntry.controlPathCount += 1;
+          break;
+        default:
+          lgaEntry.unknownPathCount += 1;
+          break;
       }
       achievementsByLGAMap.set(lgaKey, lgaEntry);
     });
@@ -146,6 +203,9 @@ const QualityControl = ({
         approved: row.validSubmissions,
         notApproved: row.invalidSubmissions,
         percentageApproved: Number(row.approvalRate.toFixed(1)),
+        treatmentPathCount: row.treatmentPathCount,
+        controlPathCount: row.controlPathCount,
+        unknownPathCount: row.unknownPathCount,
       }))
       .sort((a, b) => b.approved - a.approved);
 
@@ -179,6 +239,9 @@ const QualityControl = ({
         notApprovedSubmissions: flaggedCount,
         notApprovedRate: Number(notApprovedRate.toFixed(1)),
         completionRate: Number(quotaProgress.toFixed(1)),
+        treatmentPathCount,
+        controlPathCount,
+        unknownPathCount,
       },
       quotaProgress: Number(quotaProgress.toFixed(1)),
       statusBreakdown: {

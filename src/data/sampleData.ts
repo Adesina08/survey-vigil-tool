@@ -51,6 +51,7 @@ export interface SheetSubmissionRow {
   "_A5. GPS Coordinates_longitude": number;
   Latitude?: number;
   Longitude?: number;
+  "B2. Did you participate in OGSTEP?"?: string;
 }
 
 export interface SheetStateTargetRow {

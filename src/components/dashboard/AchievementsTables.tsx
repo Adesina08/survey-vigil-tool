@@ -19,6 +19,9 @@ interface StateAchievement {
   approved: number;
   notApproved: number;
   percentageApproved: number;
+  treatmentPathCount: number;
+  controlPathCount: number;
+  unknownPathCount: number;
 }
 
 interface InterviewerAchievement {
@@ -29,6 +32,9 @@ interface InterviewerAchievement {
   approved: number;
   notApproved: number;
   percentageApproved: number;
+  treatmentPathCount: number;
+  controlPathCount: number;
+  unknownPathCount: number;
 }
 
 interface LGAAchievement {
@@ -38,6 +44,9 @@ interface LGAAchievement {
   approved: number;
   notApproved: number;
   percentageApproved: number;
+  treatmentPathCount: number;
+  controlPathCount: number;
+  unknownPathCount: number;
 }
 
 interface AchievementsTablesProps {
@@ -51,14 +60,35 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
     console.log(`Exporting ${type} achievements...`);
   };
 
-  const calculateTotals = <T extends { total: number; approved: number; notApproved: number }>(data: T[]) => {
+  const calculateTotals = <
+    T extends {
+      total: number;
+      approved: number;
+      notApproved: number;
+      treatmentPathCount?: number;
+      controlPathCount?: number;
+      unknownPathCount?: number;
+    }
+  >(
+    data: T[],
+  ) => {
     return data.reduce(
       (acc, row) => ({
         total: acc.total + row.total,
         approved: acc.approved + row.approved,
         notApproved: acc.notApproved + row.notApproved,
+        treatmentPathCount: acc.treatmentPathCount + (row.treatmentPathCount ?? 0),
+        controlPathCount: acc.controlPathCount + (row.controlPathCount ?? 0),
+        unknownPathCount: acc.unknownPathCount + (row.unknownPathCount ?? 0),
       }),
-      { total: 0, approved: 0, notApproved: 0 }
+      {
+        total: 0,
+        approved: 0,
+        notApproved: 0,
+        treatmentPathCount: 0,
+        controlPathCount: 0,
+        unknownPathCount: 0,
+      },
     );
   };
 
@@ -66,6 +96,21 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
   const lgaTotals = calculateTotals(byLGA);
 
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
+
+  const renderPathCell = (count: number, variant: "treatment" | "control") => {
+    const symbol = variant === "treatment" ? "🔵" : "🟢";
+    const label = variant === "treatment" ? "Treatment" : "Control";
+    return (
+      <div className="flex items-center justify-end gap-2">
+        <span aria-hidden="true" className="text-lg">
+          {symbol}
+        </span>
+        <span className="text-right font-medium" aria-label={`${label} path submissions`}>
+          {count.toLocaleString()}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">
@@ -91,7 +136,7 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                 </Button>
               </div>
               <ScrollArea className="h-80 rounded-xl border bg-background/80">
-                <div className="min-w-[720px] p-2">
+                <div className="min-w-[860px] p-2">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
@@ -99,6 +144,8 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Approved</TableHead>
                         <TableHead className="text-right">Not Approved</TableHead>
+                        <TableHead className="text-right">🔵 Treatment</TableHead>
+                        <TableHead className="text-right">🟢 Control</TableHead>
                         <TableHead className="text-right">% Approved</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -112,6 +159,12 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                           </TableCell>
                           <TableCell className="text-right text-destructive">
                             {row.notApproved.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row.treatmentPathCount, "treatment")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row.controlPathCount, "control")}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {formatPercentage(row.percentageApproved)}
@@ -131,6 +184,12 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                         <TableCell className="text-right font-bold text-destructive">
                           {interviewerTotals.notApproved.toLocaleString()}
                         </TableCell>
+                        <TableCell className="text-right">
+                          {renderPathCell(interviewerTotals.treatmentPathCount, "treatment")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {renderPathCell(interviewerTotals.controlPathCount, "control")}
+                        </TableCell>
                         <TableCell className="text-right font-bold">
                           {interviewerTotals.total > 0
                             ? formatPercentage((interviewerTotals.approved / interviewerTotals.total) * 100)
@@ -141,6 +200,11 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   </Table>
                 </div>
               </ScrollArea>
+              {interviewerTotals.unknownPathCount > 0 ? (
+                <p className="text-right text-xs text-muted-foreground">
+                  {interviewerTotals.unknownPathCount.toLocaleString()} submissions without an OGSTEP path response.
+                </p>
+              ) : null}
             </div>
           </TabsContent>
 
@@ -153,7 +217,7 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                 </Button>
               </div>
               <ScrollArea className="h-80 rounded-xl border bg-background/80">
-                <div className="min-w-[720px] p-2">
+                <div className="min-w-[860px] p-2">
                   <Table>
                     <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
@@ -161,6 +225,8 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Approved</TableHead>
                         <TableHead className="text-right">Not Approved</TableHead>
+                        <TableHead className="text-right">🔵 Treatment</TableHead>
+                        <TableHead className="text-right">🟢 Control</TableHead>
                         <TableHead className="text-right">% Approved</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -174,6 +240,12 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                           </TableCell>
                           <TableCell className="text-right text-destructive">
                             {row.notApproved.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row.treatmentPathCount, "treatment")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row.controlPathCount, "control")}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {formatPercentage(row.percentageApproved)}
@@ -193,6 +265,12 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                         <TableCell className="text-right font-bold text-destructive">
                           {lgaTotals.notApproved.toLocaleString()}
                         </TableCell>
+                        <TableCell className="text-right">
+                          {renderPathCell(lgaTotals.treatmentPathCount, "treatment")}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {renderPathCell(lgaTotals.controlPathCount, "control")}
+                        </TableCell>
                         <TableCell className="text-right font-bold">
                           {lgaTotals.total > 0
                             ? formatPercentage((lgaTotals.approved / lgaTotals.total) * 100)
@@ -203,6 +281,11 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   </Table>
                 </div>
               </ScrollArea>
+              {lgaTotals.unknownPathCount > 0 ? (
+                <p className="text-right text-xs text-muted-foreground">
+                  {lgaTotals.unknownPathCount.toLocaleString()} submissions without an OGSTEP path response.
+                </p>
+              ) : null}
             </div>
           </TabsContent>
         </Tabs>
