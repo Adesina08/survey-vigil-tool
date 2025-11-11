@@ -53,8 +53,10 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
-        <div className="max-h-[360px] overflow-auto">
-          <Table className="relative min-w-[520px]">
+        <Table
+          containerClassName="max-h-[360px] overflow-auto"
+          className="min-w-[520px]"
+        >
             <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
               <TableRow>
                 <TableHead className="sticky left-0 top-0 z-30 bg-background">Error Type</TableHead>
@@ -80,8 +82,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
-        </div>
+        </Table>
         <div className="mt-4 border-t pt-4">
           <div className="grid grid-cols-[1fr_auto] items-center text-sm font-semibold">
             <span>Total Errors</span>

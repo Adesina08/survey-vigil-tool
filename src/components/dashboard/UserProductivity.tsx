@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { CartesianGrid, ComposedChart, Bar, XAxis, YAxis } from "recharts";
+import { CartesianGrid, ComposedChart, Bar, XAxis, YAxis, Label } from "recharts";
 import { Crown, TrendingUp, Users } from "lucide-react";
 import {
   ChartContainer,
@@ -133,6 +133,7 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
 
   const topPerformers = rankedProductivity.slice(0, 10);
   const topPerformer = topPerformers[0];
+  const remainingTopPerformers = topPerformers.slice(1);
 
   const overallApprovalRate = totals.total > 0 ? (totals.valid / totals.total) * 100 : 0;
   const topApprovalRate = topPerformer ? topPerformer.approvalRate : 0;
@@ -195,12 +196,12 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Top 10 interviewers</p>
             <ScrollArea className="h-[360px] rounded-lg border bg-background/60 p-1">
               <div className="space-y-3 p-2">
-                {topPerformers.length === 0 ? (
+                {remainingTopPerformers.length === 0 ? (
                   <div className="rounded-lg border bg-background/80 p-4 text-sm text-muted-foreground">
-                    Not enough data to display rankings.
+                    Not enough data to display additional rankings.
                   </div>
                 ) : (
-                  topPerformers.map((performer, index) => (
+                  remainingTopPerformers.map((performer, index) => (
                     <div
                       key={performer.interviewerId}
                       className={cn(
@@ -212,9 +213,9 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="bg-primary/15 text-primary">
-                              #{index + 1}
+                              #{index + 2}
                             </Badge>
-                              <span className="font-semibold text-foreground">{performer.displayLabel || performer.interviewerId}</span>
+                            <span className="font-semibold text-foreground">{performer.displayLabel || performer.interviewerId}</span>
                           </div>
                           <p className="text-xs text-muted-foreground">
                             {performer.validSubmissions.toLocaleString()} approved of {performer.totalSubmissions.toLocaleString()} interviews
@@ -249,6 +250,9 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
             </TabsList>
 
             <TabsContent value="chart" className="mt-6">
+              <div className="mb-4 text-center text-sm font-semibold text-muted-foreground">
+                Submission status by interviewer
+              </div>
               <div className="rounded-2xl border bg-gradient-to-br from-background via-card to-muted/40 p-6 shadow-inner">
                 <ScrollArea className="h-[420px] w-full">
                   <div className="pr-4">
@@ -270,7 +274,15 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                           axisLine={false}
                           tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                           domain={[0, "dataMax"]}
-                        />
+                        >
+                          <Label
+                            value="Number of interviews"
+                            position="bottom"
+                            offset={16}
+                            fill="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                          />
+                        </XAxis>
                         <YAxis
                           type="category"
                           dataKey="label"
@@ -278,7 +290,16 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                           tickLine={false}
                           axisLine={false}
                           tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
-                        />
+                        >
+                          <Label
+                            value="Interviewer"
+                            angle={-90}
+                            position="insideLeft"
+                            offset={-12}
+                            fill="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                          />
+                        </YAxis>
                         <ChartTooltip
                           cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
                           content={
@@ -312,8 +333,10 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
             </TabsContent>
 
             <TabsContent value="table" className="mt-6">
-              <div className="max-h-[420px] overflow-auto rounded-2xl border bg-background/80">
-                <Table className="relative min-w-[960px]">
+              <Table
+                containerClassName="max-h-[420px] overflow-auto rounded-2xl border bg-background/80"
+                className="min-w-[960px]"
+              >
                   <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
                     <TableRow className="bg-muted/60">
                       <TableHead className="sticky left-0 top-0 z-30 w-[26%] bg-background">
@@ -362,7 +385,6 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
