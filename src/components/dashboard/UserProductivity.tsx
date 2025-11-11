@@ -26,6 +26,13 @@ import {
 import type { TooltipProps } from "recharts";
 import type { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Crown, TrendingUp, Users } from "lucide-react";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 import { formatErrorLabel } from "@/lib/utils";
 
 interface InterviewerData {
@@ -273,83 +280,63 @@ export function UserProductivity({ data }: UserProductivityProps) {
             </TabsList>
 
             <TabsContent value="chart" className="mt-6">
-              <div className="rounded-2xl border bg-gradient-to-br from-background via-card to-muted/40 p-4 shadow-inner">
-                <ResponsiveContainer width="100%" height={420}>
-                  <ComposedChart
-                    data={chartData}
-                    layout="vertical"
-                    margin={{ top: 32, right: 40, left: 160, bottom: 32 }}
-                    barCategoryGap="20%"
-                  >
-                    <defs>
-                      <linearGradient id="approvedGradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.15} />
-                        <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0.9} />
-                      </linearGradient>
-                      <linearGradient id="rejectedGradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.15} />
-                        <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.9} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--muted-foreground) / 0.2)" />
-                    <XAxis
-                      xAxisId="counts"
-                      type="number"
-                      allowDecimals={false}
-                      axisLine={false}
-                      tickLine={false}
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <XAxis
-                      xAxisId="rate"
-                      type="number"
-                      orientation="top"
-                      domain={[0, 100]}
-                      axisLine={false}
-                      tickLine={false}
-                      stroke="hsl(var(--muted-foreground))"
-                      tickFormatter={(value) => `${value}%`}
-                    />
-                    <YAxis
-                      dataKey="label"
-                      type="category"
-                      width={180}
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: "hsl(var(--foreground))", fontWeight: 500 }}
-                    />
-                    <Tooltip content={<SubmissionTooltip />} cursor={{ fill: "rgba(37, 99, 235, 0.08)" }} />
-                    <Legend verticalAlign="top" height={48} wrapperStyle={{ paddingBottom: 12 }} iconType="circle" />
-                    <Bar
-                      xAxisId="counts"
-                      dataKey="valid"
-                      name="Approved"
-                      stackId="submissions"
-                      fill="url(#approvedGradient)"
-                      radius={[12, 0, 0, 12]}
-                      maxBarSize={32}
-                    />
-                    <Bar
-                      xAxisId="counts"
-                      dataKey="invalid"
-                      name="Not approved"
-                      stackId="submissions"
-                      fill="url(#rejectedGradient)"
-                      radius={[0, 12, 12, 0]}
-                      maxBarSize={32}
-                    />
-                    <Line
-                      xAxisId="rate"
-                      type="monotone"
-                      dataKey="approvalRate"
-                      name="Approval rate"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={3}
-                      dot={{ r: 4, fill: "hsl(var(--primary))" }}
-                      activeDot={{ r: 6 }}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
+              <div className="rounded-2xl border bg-gradient-to-br from-background via-card to-muted/40 p-6 shadow-inner">
+                <ChartContainer
+                  config={{
+                    valid: {
+                      label: "Approved",
+                      color: "hsl(var(--success))",
+                    },
+                    invalid: {
+                      label: "Not Approved",
+                      color: "hsl(var(--destructive))",
+                    },
+                  }}
+                  className="h-[420px] w-full"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart
+                      data={chartData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                    >
+                      <defs>
+                        <linearGradient id="approvedGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.9} />
+                          <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0.4} />
+                        </linearGradient>
+                        <linearGradient id="rejectedGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.9} />
+                          <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.4} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
+                      />
+                      <YAxis
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar
+                        dataKey="valid"
+                        stackId="submissions"
+                        fill="url(#approvedGradient)"
+                        radius={[0, 0, 0, 0]}
+                      />
+                      <Bar
+                        dataKey="invalid"
+                        stackId="submissions"
+                        fill="url(#rejectedGradient)"
+                        radius={[8, 8, 0, 0]}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
               </div>
             </TabsContent>
 

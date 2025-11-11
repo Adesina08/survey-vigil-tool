@@ -194,7 +194,7 @@ const getLGA = (row: SheetSubmissionRow) => {
   const candidates = [
     row["A3. select the LGA"],
     row.LGA,
-    (row as Record<string, unknown>)["lga"],
+    (row as unknown as Record<string, unknown>)["lga"],
   ];
 
   for (const candidate of candidates) {
@@ -216,8 +216,8 @@ const getInterviewerName = (row: SheetSubmissionRow) => {
   const candidates = [
     row["Enumerator Name"],
     row["Interviewer Name"],
-    (row as Record<string, unknown>)["interviewer_name"],
-    (row as Record<string, unknown>)["enumerator_name"],
+    (row as unknown as Record<string, unknown>)["interviewer_name"],
+    (row as unknown as Record<string, unknown>)["enumerator_name"],
     row.interviewer,
     row.username,
   ];
