@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ResponsiveContainer, CartesianGrid, ComposedChart, Bar, XAxis, YAxis } from "recharts";
+import { CartesianGrid, ComposedChart, Bar, XAxis, YAxis } from "recharts";
 import { Crown, TrendingUp, Users } from "lucide-react";
 import {
   ChartContainer,
@@ -102,8 +102,8 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
     [errorColumns, rankedProductivity],
   );
 
-  const chartBaseWidth = 80;
-  const chartWidth = Math.max(chartData.length * chartBaseWidth, chartBaseWidth * 12);
+  const chartBaseHeight = 52;
+  const chartHeight = Math.max(chartData.length * chartBaseHeight + 120, chartBaseHeight * 6);
 
   const chartConfig = useMemo(() => {
     const palette = [
@@ -260,52 +260,60 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
 
             <TabsContent value="chart" className="mt-6">
               <div className="rounded-2xl border bg-gradient-to-br from-background via-card to-muted/40 p-6 shadow-inner">
-                <div className="h-[420px] w-full overflow-hidden">
-                  <div className="h-full w-full overflow-x-auto overflow-y-hidden">
-                    <div
-                      className="h-full"
-                      style={{ minWidth: `${chartWidth}px`, width: `${chartWidth}px` }}
+                <ScrollArea className="h-[420px] w-full">
+                  <div className="pr-4">
+                    <ChartContainer
+                      config={chartConfig}
+                      className="h-full w-full aspect-auto"
+                      style={{ height: chartHeight }}
                     >
-                      <ChartContainer config={chartConfig} className="h-full w-full aspect-auto">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" vertical={false} />
-                            <XAxis
-                              dataKey="label"
-                              interval={0}
-                              angle={-40}
-                              textAnchor="end"
-                              height={80}
-                              tickMargin={12}
-                              tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
-                            />
-                            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} allowDecimals={false} />
-                            <ChartTooltip
-                              cursor={{ fill: "hsl(var(--primary) / 0.08)" }}
-                              content={
-                                <ChartTooltipContent
-                                  labelFormatter={(value, payload) =>
-                                    (payload?.[0]?.payload?.fullLabel as string | undefined) ?? (value as string)
-                                  }
-                                />
+                      <ComposedChart
+                        data={chartData}
+                        layout="vertical"
+                        margin={{ top: 24, right: 32, bottom: 24, left: 24 }}
+                        barCategoryGap={12}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" horizontal={false} />
+                        <XAxis
+                          type="number"
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                          domain={[0, "dataMax"]}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="label"
+                          width={180}
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
+                        />
+                        <ChartTooltip
+                          cursor={{ fill: "hsl(var(--primary) / 0.06)" }}
+                          content={
+                            <ChartTooltipContent
+                              labelFormatter={(value, payload) =>
+                                (payload?.[0]?.payload?.fullLabel as string | undefined) ?? (value as string)
                               }
                             />
-                            <ChartLegend content={<ChartLegendContent />} />
-                            {errorColumns.map((errorType, index) => (
-                              <Bar
-                                key={errorType}
-                                dataKey={errorType}
-                                stackId="flags"
-                                fill={chartConfig[errorType]?.color ?? `hsl(var(--chart-${(index % 5) + 1}))`}
-                                radius={index === errorColumns.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
-                              />
-                            ))}
-                          </ComposedChart>
-                        </ResponsiveContainer>
-                      </ChartContainer>
-                    </div>
+                          }
+                        />
+                        <ChartLegend content={<ChartLegendContent />} />
+                        {errorColumns.map((errorType, index) => (
+                          <Bar
+                            key={errorType}
+                            dataKey={errorType}
+                            stackId="flags"
+                            fill={chartConfig[errorType]?.color ?? `hsl(var(--chart-${(index % 5) + 1}))`}
+                            radius={index === errorColumns.length - 1 ? [0, 6, 6, 0] : [0, 0, 0, 0]}
+                            maxBarSize={28}
+                          />
+                        ))}
+                      </ComposedChart>
+                    </ChartContainer>
                   </div>
-                </div>
+                </ScrollArea>
               </div>
             </TabsContent>
 
