@@ -20,7 +20,9 @@ interface MapSubmission {
   id: string;
   lat: number;
   lng: number;
-  interviewer: string;
+  interviewerId: string;
+  interviewerName: string;
+  interviewerLabel: string;
   lga: string;
   state: string;
   errorTypes: string[];
@@ -60,14 +62,14 @@ interface QuotaLGAGenderRow extends QuotaLGARow {
 }
 
 interface ProductivityRow {
-  interviewer: string;
+  interviewerId: string;
+  interviewerName: string;
+  displayLabel: string;
   totalSubmissions: number;
   validSubmissions: number;
   invalidSubmissions: number;
-  oddHour: number;
-  lowLOI: number;
-  outsideLGA: number;
-  duplicate: number;
+  approvalRate: number;
+  errors: Record<string, number>;
   totalErrors: number;
 }
 
@@ -89,7 +91,9 @@ interface AchievementByStateRow extends AchievementRow {
 }
 
 interface AchievementByInterviewerRow extends AchievementRow {
-  interviewer: string;
+  interviewerId: string;
+  interviewerName: string;
+  displayLabel: string;
 }
 
 interface AchievementByLGARow extends AchievementRow {
@@ -114,7 +118,11 @@ export interface DashboardData {
   };
   filters: {
     lgas: string[];
-    interviewers: string[];
+    interviewers: Array<{
+      id: string;
+      name: string;
+      label: string;
+    }>;
     errorTypes: string[];
   };
   lastUpdated: string;
@@ -200,24 +208,8 @@ const getLGA = (row: SheetSubmissionRow) => {
 };
 
 const getInterviewerId = (row: SheetSubmissionRow) => {
-  const candidates = [
-    row["A1. Enumerator ID"],
-    row["Interviewer ID"],
-    (row as Record<string, unknown>)["Enumerator ID"],
-    (row as Record<string, unknown>)["enumerator_id"],
-    row.username,
-    row.interviewer,
-    row._submitted_by,
-  ];
-
-  for (const candidate of candidates) {
-    const cleaned = sanitiseText(candidate);
-    if (cleaned) {
-      return cleaned;
-    }
-  }
-
-  return "Unknown";
+  const enumeratorId = sanitiseText(row["A1. Enumerator ID"]);
+  return enumeratorId ?? "Unknown";
 };
 
 const getInterviewerName = (row: SheetSubmissionRow) => {
@@ -311,15 +303,7 @@ export const buildDashboardData = ({
     errorTypes.map((type) => [type, 0])
   );
 
-  const interviewerErrors = new Map<
-    string,
-    {
-      oddHour: number;
-      lowLOI: number;
-      outsideLGA: number;
-      duplicate: number;
-    }
-  >();
+  const interviewerErrors = new Map<string, Record<string, number>>();
 
   const lgaSet = new Set<string>();
   const interviewerSet = new Set<string>();
@@ -334,7 +318,10 @@ export const buildDashboardData = ({
     const gender = row.Gender ?? "Unknown";
     const interviewerId = getInterviewerId(row);
     const interviewerName = getInterviewerName(row);
-    const interviewerLabel = `${interviewerId} · ${interviewerName}`;
+    const interviewerLabel =
+      interviewerName && interviewerName !== interviewerId
+        ? `${interviewerId} · ${interviewerName}`
+        : interviewerId;
     const lga = getLGA(row);
     const approvalStatus = getApprovalStatus(row);
     const errorFlags = row["Error Flags"] ?? [];
@@ -353,8 +340,8 @@ export const buildDashboardData = ({
     if (hasValidLGA) {
       lgaSet.add(lga!);
     }
-    if (interviewerLabel !== "Unknown · Unknown") {
-      interviewerSet.add(interviewerLabel);
+    if (interviewerId && interviewerId.toLowerCase() !== "unknown") {
+      interviewerSet.add(interviewerId);
     }
     errorFlags.forEach((flag) => errorTypeSet.add(flag));
 
@@ -369,12 +356,7 @@ export const buildDashboardData = ({
     incrementMap(totalsByStateGender, `${state}|${gender}`);
 
     interviewerNames.set(interviewerId, interviewerName);
-    const interviewerError = interviewerErrors.get(interviewerId) ?? {
-      oddHour: 0,
-      lowLOI: 0,
-      outsideLGA: 0,
-      duplicate: 0,
-    };
+    const interviewerError = interviewerErrors.get(interviewerId) ?? {};
 
     const isApproved =
       approvalStatus === "Approved" && (!requireGpsForApproval || hasValidCoordinates);
@@ -401,22 +383,7 @@ export const buildDashboardData = ({
 
     errorFlags.forEach((errorType) => {
       errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
-      switch (errorType) {
-        case "OddHour":
-          interviewerError.oddHour += 1;
-          break;
-        case "Low LOI":
-          interviewerError.lowLOI += 1;
-          break;
-        case "Outside LGA Boundary":
-          interviewerError.outsideLGA += 1;
-          break;
-        case "DuplicatePhone":
-          interviewerError.duplicate += 1;
-          break;
-        default:
-          break;
-      }
+      interviewerError[errorType] = getNumber(interviewerError[errorType]) + 1;
     });
 
     interviewerErrors.set(interviewerId, interviewerError);
@@ -434,7 +401,9 @@ export const buildDashboardData = ({
         id: submissionId,
         lat,
         lng,
-        interviewer: interviewerLabel,
+        interviewerId,
+        interviewerName,
+        interviewerLabel,
         lga: lga!,
         state,
         errorTypes: errorFlags,
@@ -553,33 +522,28 @@ export const buildDashboardData = ({
 
   const userProductivity: ProductivityRow[] = [...totalsByInterviewer.entries()]
     .map(([interviewerId, total]) => {
-      const name = interviewerNames.get(interviewerId) ?? interviewerId;
-      const errorStats = interviewerErrors.get(interviewerId) ?? {
-        oddHour: 0,
-        lowLOI: 0,
-        outsideLGA: 0,
-        duplicate: 0,
-      };
+      const name = interviewerNames.get(interviewerId) ?? "";
+      const label =
+        name && name !== interviewerId ? `${interviewerId} · ${name}` : interviewerId;
+      const errorStats = interviewerErrors.get(interviewerId) ?? {};
       const approvedCount = approvedByInterviewer.get(interviewerId) ?? 0;
       const invalidCount = notApprovedByInterviewer.get(interviewerId) ?? Math.max(total - approvedCount, 0);
+      const approvalRate = total > 0 ? (approvedCount / total) * 100 : 0;
+      const totalErrors = Object.values(errorStats).reduce((sum, value) => sum + value, 0);
 
       return {
-        interviewer: `${interviewerId} · ${name}`,
+        interviewerId,
+        interviewerName: name || interviewerId,
+        displayLabel: label,
         totalSubmissions: total,
         validSubmissions: approvedCount,
         invalidSubmissions: invalidCount,
-        oddHour: errorStats.oddHour,
-        lowLOI: errorStats.lowLOI,
-        outsideLGA: errorStats.outsideLGA,
-        duplicate: errorStats.duplicate,
-        totalErrors:
-          errorStats.oddHour +
-          errorStats.lowLOI +
-          errorStats.outsideLGA +
-          errorStats.duplicate,
+        approvalRate,
+        errors: errorStats,
+        totalErrors,
       };
     })
-    .filter((row) => !row.interviewer.toLowerCase().includes("unknown"));
+    .filter((row) => row.interviewerId.toLowerCase() !== "unknown");
 
   const rowErrorCounts = getErrorBreakdown(metricsRows);
   const finalErrorCounts = Object.keys(rowErrorCounts).length > 0 ? rowErrorCounts : errorCounts;
@@ -613,17 +577,20 @@ export const buildDashboardData = ({
     ([interviewerId, total]) => {
       const approved = approvedByInterviewer.get(interviewerId) ?? 0;
       const notApproved = notApprovedByInterviewer.get(interviewerId) ?? (total - approved);
-      const interviewerLabel = `${interviewerId} · ${interviewerNames.get(interviewerId) ?? interviewerId}`;
+      const name = interviewerNames.get(interviewerId) ?? "";
+      const label = name && name !== interviewerId ? `${interviewerId} · ${name}` : interviewerId;
 
       return {
-        interviewer: interviewerLabel,
+        interviewerId,
+        interviewerName: name || interviewerId,
+        displayLabel: label,
         total,
         approved,
         notApproved,
         percentageApproved: total > 0 ? (approved / total) * 100 : 0,
       };
     }
-  );
+  ).filter((row) => row.interviewerId.toLowerCase() !== "unknown");
 
   const achievementsByLGA: AchievementByLGARow[] = [...totalsByLGA.entries()].map(([key, total]) => {
     const [state, lga] = key.split("|");
@@ -711,8 +678,17 @@ export const buildDashboardData = ({
         .filter((value) => value && value.toLowerCase() !== "unknown")
         .sort(),
       interviewers: Array.from(interviewerSet)
-        .filter((value) => !value.toLowerCase().includes("unknown"))
-        .sort(),
+        .filter((value) => value && value.toLowerCase() !== "unknown")
+        .map((id) => {
+          const name = interviewerNames.get(id) ?? "";
+          const label = name && name !== id ? `${id} · ${name}` : id;
+          return {
+            id,
+            name: name || id,
+            label,
+          };
+        })
+        .sort((a, b) => a.id.localeCompare(b.id)),
       errorTypes: Array.from(errorTypeSet).sort(),
     },
     lastUpdated,
