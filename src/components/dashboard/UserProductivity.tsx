@@ -21,7 +21,7 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart";
-import { formatErrorLabel } from "@/lib/utils";
+import { cn, formatErrorLabel } from "@/lib/utils";
 
 interface InterviewerData {
   interviewerId: string;
@@ -110,7 +110,6 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
 
   const topPerformers = sortedByValid.slice(0, 10);
   const topPerformer = topPerformers[0];
-  const additionalTopPerformers = topPerformers.slice(1);
 
   const overallApprovalRate = totals.total > 0 ? (totals.valid / totals.total) * 100 : 0;
   const topApprovalRate = topPerformer ? topPerformer.approvalRate : 0;
@@ -173,21 +172,24 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Top 10 interviewers</p>
             <ScrollArea className="h-[360px] rounded-lg border bg-background/60 p-1">
               <div className="space-y-3 p-2">
-                {additionalTopPerformers.length === 0 ? (
+                {topPerformers.length === 0 ? (
                   <div className="rounded-lg border bg-background/80 p-4 text-sm text-muted-foreground">
                     Not enough data to display rankings.
                   </div>
                 ) : (
-                  additionalTopPerformers.map((performer, index) => (
+                  topPerformers.map((performer, index) => (
                     <div
                       key={performer.interviewerId}
-                      className="rounded-lg border bg-background/80 p-4 shadow-sm transition-all hover:border-primary/60 hover:shadow-md"
+                      className={cn(
+                        "rounded-lg border bg-background/80 p-4 shadow-sm transition-all hover:border-primary/60 hover:shadow-md",
+                        index === 0 && "border-primary/60 bg-primary/5",
+                      )}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="bg-primary/15 text-primary">
-                              #{index + 2}
+                              #{index + 1}
                             </Badge>
                             <span className="font-semibold text-foreground">{performer.interviewerId}</span>
                           </div>
@@ -273,7 +275,7 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {data.map((row) => (
+                      {sortedByValid.map((row) => (
                         <TableRow key={row.interviewerId} className="group transition-colors hover:bg-primary/5">
                           <TableCell className="font-semibold">{row.interviewerId}</TableCell>
                           <TableCell className="text-right">{row.totalSubmissions.toLocaleString()}</TableCell>
