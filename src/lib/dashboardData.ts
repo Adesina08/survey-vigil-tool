@@ -7,12 +7,12 @@ import {
   type SheetStateTargetRow,
   type SheetStateAgeTargetRow,
   type SheetStateGenderTargetRow,
-  type ErrorType,
 } from "@/data/sampleData";
 import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks";
 import { normaliseHeaderKey } from "./googleSheets";
 import { getSubmissionMetrics, type Row as MetricRow } from "@/utils/metrics";
-import { extractErrorCodes, getErrorBreakdown } from "@/utils/errors";
+import { getErrorBreakdown, extractQualityIndicatorCounts } from "@/utils/errors";
+import { determineApprovalStatus } from "@/utils/approval";
 
 type OgstepPath = "treatment" | "control" | "unknown";
 
@@ -98,14 +98,16 @@ function buildUserProductivity(submissions: SheetSubmissionRow[]): ProductivityR
   const byUser = new Map<string, ProductivityRow>();
 
   const getKey = (row: SheetSubmissionRow) => {
-    const id = (row["A1. Enumerator ID"] || row["Interviewer ID"] || "").toString().trim();
-    const name = (row["Enumerator Name"] || row["Interviewer Name"] || "").toString().trim();
-    return `${id}|${name}`;
-  };
-
-  const hasFlags = (row: Record<string, unknown>): boolean => {
-    const codes = extractErrorCodes(row);
-    return codes.length > 0;
+    const rawId =
+      (row["A1. Enumerator ID"] ||
+        row["Interviewer ID"] ||
+        row.username ||
+        row.interviewer ||
+        "")
+        .toString()
+        .trim();
+    const id = rawId.length > 0 ? rawId : "Unknown";
+    return `${id}|${id}`;
   };
 
   submissions.forEach((row) => {
@@ -127,12 +129,12 @@ function buildUserProductivity(submissions: SheetSubmissionRow[]): ProductivityR
 
     existing.total += 1;
 
-    const isApproved = String(row["Approval Status"] || "").trim().toLowerCase() === "approved";
-    if (isApproved) {
+    const approvalStatus = determineApprovalStatus(
+      row as unknown as Record<string, unknown>,
+    );
+    if (approvalStatus === "Approved") {
       existing.approved += 1;
-    }
-
-    if (hasFlags(row)) {
+    } else {
       existing.flagged += 1;
     }
 
@@ -140,9 +142,10 @@ function buildUserProductivity(submissions: SheetSubmissionRow[]): ProductivityR
   });
 
   return Array.from(byUser.values()).sort((a, b) => {
-    if (b.total !== a.total) return b.total - a.total;
     if (b.approved !== a.approved) return b.approved - a.approved;
-    return b.flagged - a.flagged;
+    if (a.flagged !== b.flagged) return a.flagged - b.flagged;
+    if (b.total !== a.total) return b.total - a.total;
+    return a.enumeratorId.localeCompare(b.enumeratorId);
   });
 }
 
@@ -424,6 +427,11 @@ const getInterviewerId = (row: SheetSubmissionRow) => {
 };
 
 const getInterviewerName = (row: SheetSubmissionRow) => {
+  const enumeratorId = sanitiseText(row["A1. Enumerator ID"]);
+  if (enumeratorId) {
+    return enumeratorId;
+  }
+
   const candidates = [
     row["Enumerator Name"],
     row["Interviewer Name"],
@@ -443,10 +451,8 @@ const getInterviewerName = (row: SheetSubmissionRow) => {
   return getInterviewerId(row);
 };
 
-const getApprovalStatus = (row: SheetSubmissionRow) => {
-  const status = row["Approval Status"] ?? row["Outcome Status"] ?? "Valid";
-  return status === "Approved" || status === "Valid" ? "Approved" : "Not Approved";
-};
+const getApprovalStatus = (row: SheetSubmissionRow) =>
+  determineApprovalStatus(row as unknown as Record<string, unknown>);
 
 interface DashboardDataInput {
   submissions: SheetSubmissionRow[];
@@ -466,7 +472,7 @@ export const buildDashboardData = ({
   const metricsRows: MetricRow[] = Array.isArray(analysisRows)
     ? (analysisRows as MetricRow[])
     : (submissions as unknown as MetricRow[]);
-  const requireGpsForApproval = true;
+  const requireGpsForApproval = false;
   const metrics = getSubmissionMetrics(metricsRows, requireGpsForApproval);
 
   const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(submissions);
@@ -504,20 +510,7 @@ export const buildDashboardData = ({
   const ogstepByInterviewer = new Map<string, PathCounts>();
   const ogstepByLGA = new Map<string, PathCounts>();
 
-  const errorTypes: ErrorType[] = [
-    "OddHour",
-    "Low LOI",
-    "High LOI",
-    "Outside LGA Boundary",
-    "DuplicatePhone",
-    "Interwoven",
-    "ShortGap",
-    "ClusteredInterview",
-    "Terminated",
-  ];
-  const errorCounts: Record<string, number> = Object.fromEntries(
-    errorTypes.map((type) => [type, 0])
-  );
+  const errorCounts: Record<string, number> = {};
 
   const interviewerErrors = new Map<string, Record<string, number>>();
 
@@ -540,7 +533,23 @@ export const buildDashboardData = ({
         : interviewerId;
     const lga = getLGA(row);
     const approvalStatus = getApprovalStatus(row);
-    const errorFlags = row["Error Flags"] ?? [];
+    const qualityIndicatorCounts = extractQualityIndicatorCounts(
+      row as unknown as Record<string, unknown>,
+    );
+    const qualityIndicatorKeys = Object.keys(qualityIndicatorCounts);
+
+    const manualErrorFlags = Array.isArray(row["Error Flags"])
+      ? (row["Error Flags"] as unknown[])
+      : [];
+    const errorFlags = Array.from(
+      new Set(
+        qualityIndicatorKeys.concat(
+          manualErrorFlags
+            .map((flag) => (typeof flag === "string" ? flag : String(flag ?? "")))
+            .filter((flag) => flag.length > 0),
+        ),
+      ),
+    );
     const { response: ogstepResponse, path: ogstepPath } = extractOgstepDetails(row);
 
     const lat = getCoordinate(row, "lat");
@@ -582,8 +591,7 @@ export const buildDashboardData = ({
     interviewerNames.set(interviewerId, interviewerName);
     const interviewerError = interviewerErrors.get(interviewerId) ?? {};
 
-    const isApproved =
-      approvalStatus === "Approved" && (!requireGpsForApproval || hasValidCoordinates);
+    const isApproved = approvalStatus === "Approved";
 
     if (isApproved) {
       incrementMap(approvedByState, state);
@@ -605,14 +613,20 @@ export const buildDashboardData = ({
       }
     }
 
-    errorFlags.forEach((errorType) => {
-      errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
-      interviewerError[errorType] = getNumber(interviewerError[errorType]) + 1;
+    Object.entries(qualityIndicatorCounts).forEach(([errorType, value]) => {
+      errorCounts[errorType] = getNumber(errorCounts[errorType]) + value;
+      interviewerError[errorType] = getNumber(interviewerError[errorType]) + value;
     });
 
-    interviewerErrors.set(interviewerId, interviewerError);
+    manualErrorFlags
+      .map((flag) => (typeof flag === "string" ? flag : String(flag ?? "")))
+      .filter((flag) => flag.length > 0)
+      .forEach((errorType) => {
+        errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
+        interviewerError[errorType] = getNumber(interviewerError[errorType]) + 1;
+      });
 
-    const metadata = row.qualityMetadata;
+    interviewerErrors.set(interviewerId, interviewerError);
 
     if (hasValidCoordinates && hasValidLGA) {
       const rowIndex = getSubmissionIndex(row);
@@ -643,7 +657,7 @@ export const buildDashboardData = ({
         state,
         errorTypes: errorFlags,
         timestamp: timestampLabel,
-        status: (metadata?.isValid ?? isApproved) ? "approved" : "not_approved",
+        status: approvalStatus === "Approved" ? "approved" : "not_approved",
         sortKey,
         ogstepPath,
         ogstepResponse: ogstepResponse,
@@ -779,7 +793,11 @@ export const buildDashboardData = ({
   const userProductivity = buildUserProductivity(submissions);
 
   const rowErrorCounts = getErrorBreakdown(metricsRows);
-  const finalErrorCounts = Object.keys(rowErrorCounts).length > 0 ? rowErrorCounts : errorCounts;
+  const finalErrorCounts: Record<string, number> = { ...errorCounts };
+
+  Object.entries(rowErrorCounts).forEach(([code, count]) => {
+    finalErrorCounts[code] = (finalErrorCounts[code] ?? 0) + count;
+  });
 
   Object.keys(finalErrorCounts).forEach((code) => errorTypeSet.add(code));
 

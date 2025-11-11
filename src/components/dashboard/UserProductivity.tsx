@@ -61,14 +61,14 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
     });
 
     const compare = (a: InterviewerData, b: InterviewerData) => {
-      if (b.totalSubmissions !== a.totalSubmissions) {
-        return b.totalSubmissions - a.totalSubmissions;
-      }
-      if (b.approvalRate !== a.approvalRate) {
-        return b.approvalRate - a.approvalRate;
-      }
       if (b.validSubmissions !== a.validSubmissions) {
         return b.validSubmissions - a.validSubmissions;
+      }
+      if (a.invalidSubmissions !== b.invalidSubmissions) {
+        return a.invalidSubmissions - b.invalidSubmissions;
+      }
+      if (b.totalSubmissions !== a.totalSubmissions) {
+        return b.totalSubmissions - a.totalSubmissions;
       }
       return a.interviewerId.localeCompare(b.interviewerId);
     };
@@ -94,38 +94,28 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
         id: item.interviewerId,
         label: item.displayLabel || item.interviewerId,
         fullLabel: item.displayLabel || item.interviewerId,
-        ...errorColumns.reduce<Record<string, number>>((acc, errorType) => {
-          acc[errorType] = item.errors[errorType] ?? 0;
-          return acc;
-        }, {}),
+        approved: item.validSubmissions,
+        notApproved: item.invalidSubmissions,
       })),
-    [errorColumns, rankedProductivity],
+    [rankedProductivity],
   );
 
   const chartBaseHeight = 52;
   const chartHeight = Math.max(chartData.length * chartBaseHeight + 120, chartBaseHeight * 6);
 
-  const chartConfig = useMemo(() => {
-    const palette = [
-      "hsl(var(--chart-1, var(--primary)))",
-      "hsl(var(--chart-2, #9333ea))",
-      "hsl(var(--chart-3, #f97316))",
-      "hsl(var(--chart-4, #0ea5e9))",
-      "hsl(var(--chart-5, #22c55e))",
-      "hsl(var(--chart-6, #eab308))",
-      "hsl(var(--chart-7, #ec4899))",
-      "hsl(var(--chart-8, #14b8a6))",
-      "hsl(var(--chart-9, #6366f1))",
-    ];
-
-    return errorColumns.reduce<Record<string, { label: string; color: string }>>((acc, errorType, index) => {
-      acc[errorType] = {
-        label: formatErrorLabel(errorType),
-        color: palette[index % palette.length],
-      };
-      return acc;
-    }, {});
-  }, [errorColumns]);
+  const chartConfig = useMemo(
+    () => ({
+      approved: {
+        label: "Approved",
+        color: "hsl(var(--success))",
+      },
+      notApproved: {
+        label: "Not Approved",
+        color: "hsl(var(--destructive))",
+      },
+    }),
+    [],
+  );
 
   const totals = useMemo(
     () =>
@@ -300,16 +290,20 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                           }
                         />
                         <ChartLegend content={<ChartLegendContent />} />
-                        {errorColumns.map((errorType, index) => (
-                          <Bar
-                            key={errorType}
-                            dataKey={errorType}
-                            stackId="flags"
-                            fill={chartConfig[errorType]?.color ?? `hsl(var(--chart-${(index % 5) + 1}))`}
-                            radius={index === errorColumns.length - 1 ? [0, 6, 6, 0] : [0, 0, 0, 0]}
-                            maxBarSize={28}
-                          />
-                        ))}
+                        <Bar
+                          dataKey="approved"
+                          stackId="status"
+                          fill={chartConfig.approved.color}
+                          radius={[0, 0, 0, 0]}
+                          maxBarSize={32}
+                        />
+                        <Bar
+                          dataKey="notApproved"
+                          stackId="status"
+                          fill={chartConfig.notApproved.color}
+                          radius={[0, 6, 6, 0]}
+                          maxBarSize={32}
+                        />
                       </ComposedChart>
                     </ChartContainer>
                   </div>
@@ -318,50 +312,57 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
             </TabsContent>
 
             <TabsContent value="table" className="mt-6">
-              <ScrollArea className="h-[420px] rounded-2xl border bg-background/80">
-                <div className="min-w-[840px] p-2">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur">
-                      <TableRow className="bg-muted/60">
-                        <TableHead className="w-[26%] sticky top-0 z-10 bg-background">Interviewer ID</TableHead>
-                        <TableHead className="text-right sticky top-0 z-10 bg-background">Total interviews</TableHead>
-                        <TableHead className="text-right sticky top-0 z-10 bg-background text-destructive">Flagged interviews</TableHead>
-                        <TableHead className="text-right sticky top-0 z-10 bg-background">Flag rate</TableHead>
-                        {errorColumns.map((errorType) => (
-                          <TableHead key={errorType} className="text-right sticky top-0 z-10 bg-background">
-                            {formatErrorLabel(errorType)}
-                          </TableHead>
-                        ))}
-                        <TableHead className="text-right sticky top-0 z-10 bg-background">Total errors logged</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rankedProductivity.map((row) => (
-                        <TableRow key={row.interviewerId} className="group transition-colors hover:bg-primary/5">
-                          <TableCell className="font-semibold">{row.displayLabel || row.interviewerId}</TableCell>
-                          <TableCell className="text-right">{row.totalSubmissions.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-destructive">
-                            {row.invalidSubmissions.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {row.totalSubmissions > 0
-                              ? `${((row.invalidSubmissions / row.totalSubmissions) * 100).toFixed(1)}%`
-                              : "0.0%"}
-                          </TableCell>
-                          {errorColumns.map((errorType) => (
-                            <TableCell key={errorType} className="text-right">
-                              {(row.errors[errorType] ?? 0).toLocaleString()}
-                            </TableCell>
-                          ))}
-                          <TableCell className="text-right font-semibold text-destructive">
-                            {row.totalErrors.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
+              <div className="max-h-[420px] overflow-auto rounded-2xl border bg-background/80">
+                <Table className="relative min-w-[960px]">
+                  <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
+                    <TableRow className="bg-muted/60">
+                      <TableHead className="sticky left-0 top-0 z-30 w-[26%] bg-background">
+                        Interviewer ID
+                      </TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">
+                        Total interviews
+                      </TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right text-success">
+                        Approved interviews
+                      </TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right text-destructive">
+                        Flagged interviews
+                      </TableHead>
+                      {errorColumns.map((errorType) => (
+                        <TableHead
+                          key={errorType}
+                          className="top-0 z-20 bg-background text-right"
+                        >
+                          {formatErrorLabel(errorType)}
+                        </TableHead>
                       ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </ScrollArea>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rankedProductivity.map((row) => (
+                      <TableRow key={row.interviewerId} className="group transition-colors hover:bg-primary/5">
+                        <TableCell className="sticky left-0 z-10 bg-background font-semibold">
+                          {row.displayLabel || row.interviewerId}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {row.totalSubmissions.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right text-success">
+                          {row.validSubmissions.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right text-destructive">
+                          {row.invalidSubmissions.toLocaleString()}
+                        </TableCell>
+                        {errorColumns.map((errorType) => (
+                          <TableCell key={errorType} className="text-right">
+                            {(row.errors[errorType] ?? 0).toLocaleString()}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>

@@ -53,25 +53,27 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+        <div className="max-h-[360px] overflow-auto">
+          <Table className="relative min-w-[520px]">
+            <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
               <TableRow>
-                <TableHead>Error Type</TableHead>
+                <TableHead className="sticky left-0 top-0 z-30 bg-background">Error Type</TableHead>
                 <TableHead
-                  className="cursor-pointer text-right hover:text-primary"
+                  className="top-0 z-20 bg-background text-right hover:text-primary cursor-pointer"
                   onClick={() => handleSort("count")}
                 >
                   Count {sortConfig.key === "count" && (sortConfig.direction === "desc" ? "↓" : "↑")}
                 </TableHead>
-                <TableHead className="text-right">Percentage</TableHead>
+                <TableHead className="top-0 z-20 bg-background text-right">Percentage</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedData.map((row) => (
                 <TableRow key={row.errorType}>
-                  <TableCell className="font-medium">{formatErrorLabel(row.errorType)}</TableCell>
-                  <TableCell className="text-right text-destructive font-semibold">
+                  <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                    {formatErrorLabel(row.errorType)}
+                  </TableCell>
+                  <TableCell className="text-right font-semibold text-destructive">
                     {row.count.toLocaleString()}
                   </TableCell>
                   <TableCell className="text-right">{row.percentage.toFixed(1)}%</TableCell>

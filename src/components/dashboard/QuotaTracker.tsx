@@ -153,21 +153,23 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
           </TabsList>
 
           <TabsContent value="lga">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+            <div className="max-h-80 overflow-auto rounded-xl border bg-background/80">
+              <Table className="relative min-w-[720px]">
+                <TableHeader className="sticky top-0 z-20 bg-background">
                   <TableRow>
-                    <TableHead>State</TableHead>
-                    <TableHead>LGA</TableHead>
-                    <TableHead className="text-right">Target</TableHead>
-                    <TableHead className="text-right">Achieved</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead className="sticky left-0 top-0 z-30 bg-background">State</TableHead>
+                    <TableHead className="top-0 z-20 bg-background">LGA</TableHead>
+                    <TableHead className="top-0 z-20 bg-background text-right">Target</TableHead>
+                    <TableHead className="top-0 z-20 bg-background text-right">Achieved</TableHead>
+                    <TableHead className="top-0 z-20 bg-background text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {byLGA.map((row) => (
                     <TableRow key={`${row.state}-${row.lga}`}>
-                      <TableCell className="font-medium">{row.state}</TableCell>
+                      <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                        {row.state}
+                      </TableCell>
                       <TableCell className="font-medium">{row.lga}</TableCell>
                       <TableCell className="text-right">{row.target.toLocaleString()}</TableCell>
                       <TableCell className="text-right text-success">
@@ -182,22 +184,24 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
           </TabsContent>
 
           <TabsContent value="age">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+            <div className="max-h-80 overflow-auto rounded-xl border bg-background/80">
+              <Table className="relative min-w-[820px]">
+                <TableHeader className="sticky top-0 z-20 bg-background">
                   <TableRow>
-                    <TableHead>State</TableHead>
-                    <TableHead>LGA</TableHead>
-                    <TableHead>Age Group</TableHead>
-                    <TableHead className="text-right">Target</TableHead>
-                    <TableHead className="text-right">Achieved</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead className="sticky left-0 top-0 z-30 bg-background">State</TableHead>
+                    <TableHead className="top-0 z-20 bg-background">LGA</TableHead>
+                    <TableHead className="top-0 z-20 bg-background">Age Group</TableHead>
+                    <TableHead className="top-0 z-20 bg-background text-right">Target</TableHead>
+                    <TableHead className="top-0 z-20 bg-background text-right">Achieved</TableHead>
+                    <TableHead className="top-0 z-20 bg-background text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {byLGAAge.map((row, idx) => (
                     <TableRow key={`${row.state}-${row.lga}-${row.ageGroup}-${idx}`}>
-                      <TableCell className="font-medium">{row.state}</TableCell>
+                      <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                        {row.state}
+                      </TableCell>
                       <TableCell className="font-medium">{row.lga}</TableCell>
                       <TableCell>{row.ageGroup}</TableCell>
                       <TableCell className="text-right">{row.target.toLocaleString()}</TableCell>
@@ -213,22 +217,24 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
           </TabsContent>
 
           <TabsContent value="gender">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
+            <div className="max-h-80 overflow-auto rounded-xl border bg-background/80">
+              <Table className="relative min-w-[820px]">
+                <TableHeader className="sticky top-0 z-20 bg-background">
                   <TableRow>
-                    <TableHead>State</TableHead>
-                    <TableHead>LGA</TableHead>
-                    <TableHead>Gender</TableHead>
-                    <TableHead className="text-right">Target</TableHead>
-                    <TableHead className="text-right">Achieved</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead className="sticky left-0 top-0 z-30 bg-background">State</TableHead>
+                    <TableHead className="top-0 z-20 bg-background">LGA</TableHead>
+                    <TableHead className="top-0 z-20 bg-background">Gender</TableHead>
+                    <TableHead className="top-0 z-20 bg-background text-right">Target</TableHead>
+                    <TableHead className="top-0 z-20 bg-background text-right">Achieved</TableHead>
+                    <TableHead className="top-0 z-20 bg-background text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {byLGAGender.map((row, idx) => (
                     <TableRow key={`${row.state}-${row.lga}-${row.gender}-${idx}`}>
-                      <TableCell className="font-medium">{row.state}</TableCell>
+                      <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                        {row.state}
+                      </TableCell>
                       <TableCell className="font-medium">{row.lga}</TableCell>
                       <TableCell>{row.gender}</TableCell>
                       <TableCell className="text-right">{row.target.toLocaleString()}</TableCell>

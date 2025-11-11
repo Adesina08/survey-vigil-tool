@@ -120,6 +120,8 @@ const Index = () => {
         lastUpdated={dashboardData?.lastUpdated ?? ""}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing || isFetching}
+        exportRows={dashboardData.analysisRows}
+        exportFilenamePrefix="ogstep-dashboard"
       />
 
       <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-6 sm:px-6">
