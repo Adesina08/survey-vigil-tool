@@ -1,45 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
+import { AlertCircle, Loader2 } from "lucide-react";
+
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { ExportBar } from "@/components/dashboard/ExportBar";
 import { Button } from "@/components/ui/button";
 import { useDashboardData } from "@/hooks/useDashboardData";
-import { AlertCircle, Loader2 } from "lucide-react";
-import TabsQCAnalysis from "@/components/TabsQCAnalysis";
 import QualityControl from "./QualityControl";
-
-function filterByLga<T>(rows: T[], lga: string | null): T[] {
-  if (!lga || lga === "all" || lga === "All LGAs") {
-    return rows;
-  }
-
-  return rows.filter((row) => {
-    if (!row || typeof row !== "object") {
-      return false;
-    }
-
-    const record = row as Record<string, unknown>;
-    const candidate =
-      record["lga"] ??
-      record["a3_select_the_lga"] ??
-      record["A3. select the LGA"] ??
-      record["LGA"];
-
-    return candidate === lga;
-  });
-}
+import type { SurveyRow } from "@/utils/qcMetrics";
 
 const Index = () => {
   const [statusMessage, setStatusMessage] = useState("Loading…");
-  const {
-    data: dashboardData,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useDashboardData({ onStatusChange: setStatusMessage });
+  const { data: dashboardData, isLoading, isFetching, isError, error, refetch } = useDashboardData({
+    onStatusChange: setStatusMessage,
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedLga, setSelectedLga] = useState<string | null>(null);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -50,35 +23,6 @@ const Index = () => {
       setIsRefreshing(false);
     }
   };
-
-  const handleFilterChange = (filterType: string, value: string) => {
-    if (filterType === "lga") {
-      const normalized = !value || value === "all" || value === "All LGAs" ? null : value;
-      setSelectedLga(normalized);
-      console.log(`Filter changed: ${filterType} = ${normalized ?? "All LGAs"}`);
-      return;
-    }
-
-    console.log(`Filter changed: ${filterType} = ${value}`);
-  };
-
-  const filteredMapSubmissions = useMemo(() => {
-    if (!dashboardData) {
-      return [];
-    }
-
-    return filterByLga(dashboardData.mapSubmissions, selectedLga);
-  }, [dashboardData, selectedLga]);
-
-  useEffect(() => {
-    if (!selectedLga || !dashboardData) {
-      return;
-    }
-
-    if (!dashboardData.filters.lgas.includes(selectedLga)) {
-      setSelectedLga(null);
-    }
-  }, [dashboardData, selectedLga]);
 
   if (isLoading && !dashboardData) {
     return (
@@ -94,7 +38,7 @@ const Index = () => {
   const errorMessage =
     error?.message ?? "An unexpected error occurred while connecting to the dashboard service.";
 
-  if (isError || !dashboardData?.summary) {
+  if (isError || !dashboardData?.analysisRows) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4 sm:px-6">
         <div className="w-full max-w-md rounded-lg border bg-card p-6 text-center">
@@ -102,9 +46,7 @@ const Index = () => {
             <AlertCircle className="h-8 w-8 text-destructive" />
           </div>
           <h2 className="text-lg font-semibold">Unable to load dashboard data</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {errorMessage}
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>
           <Button className="mt-4" onClick={() => refetch()}>
             Retry
           </Button>
@@ -112,6 +54,8 @@ const Index = () => {
       </div>
     );
   }
+
+  const rows = (dashboardData.analysisRows ?? []) as SurveyRow[];
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -123,19 +67,8 @@ const Index = () => {
       />
 
       <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-6 sm:px-6">
-        <TabsQCAnalysis
-          qualityControl={
-            <QualityControl
-              dashboardData={dashboardData}
-              filteredMapSubmissions={filteredMapSubmissions}
-              onFilterChange={handleFilterChange}
-              selectedLga={selectedLga}
-            />
-          }
-        />
+        <QualityControl rows={rows} isLoading={isLoading || isFetching} />
       </main>
-
-      <ExportBar rows={dashboardData.analysisRows} filenamePrefix="ogstep-dashboard" />
 
       <footer className="border-t bg-background py-4">
         <div className="mx-auto w-full max-w-7xl px-4 text-center text-sm text-muted-foreground sm:px-6">
@@ -147,3 +80,4 @@ const Index = () => {
 };
 
 export default Index;
+
