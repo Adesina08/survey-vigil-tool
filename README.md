@@ -64,14 +64,20 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/e281e3e3-daa2-46dd-b066-99dee0aa1b39) and click on Share -> Publish.
 
-## Configuring the Google Sheets data source
+## Configuring the Apps Script data source
 
-Set a single environment variable that points to the published GViz URL for your Google Sheet:
+Set the Google Apps Script Web App URL that returns JSON as the single data source for the dashboard:
 
-- **Local development (Vite)**: add `VITE_GOOGLE_SHEETS_URL=...` to your `.env` file.
-- **Netlify / serverless functions**: set `GOOGLE_SHEETS_URL=...` (the functions also fall back to `VITE_GOOGLE_SHEETS_URL`).
+- **Local development (Vite)**: add `VITE_APPS_SCRIPT_URL=...` to your `.env` file.
+- **Netlify / serverless functions**: set `APPS_SCRIPT_URL=...` (the server also falls back to `VITE_APPS_SCRIPT_URL`).
 
-Use the exact GViz endpoint (for example `https://docs.google.com/spreadsheets/d/<id>/gviz/tq?sheet=Sheet1`) and ensure the sheet is public or published so the API endpoints can read it.
+Example entry for your environment file:
+
+```
+APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycby1wbXX8cW4Z17E4ype83OebSYFYSzP5-Q-XEKhONXzhuADaCLKeiWwg6H7BMzMRm4g/exec
+```
+
+Deploy the Apps Script as a Web App with "Anyone with the link" access so the backend can retrieve the JSON payload.
 
 ## Can I connect a custom domain to my Lovable project?
 

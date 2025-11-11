@@ -9,32 +9,6 @@ import type {
   SheetSubmissionRow,
 } from "@/data/sampleData";
 
-const GVIZ_PREFIX = "google.visualization.Query.setResponse(";
-const GVIZ_SUFFIX = ");";
-const GVIZ_SECURITY_PREFIX = ")]}'";
-
-interface GVizColumn {
-  id: string;
-  label: string;
-}
-
-interface GVizCell {
-  v?: unknown;
-  f?: string;
-}
-
-interface GVizRow {
-  c: GVizCell[];
-}
-
-interface GVizResponse {
-  status: string;
-  table: {
-    cols: GVizColumn[];
-    rows: GVizRow[];
-  };
-}
-
 type NormalisedRow = Map<string, unknown>;
 
 export const normaliseHeaderKey = (key: string): string => {
@@ -66,6 +40,53 @@ export const normaliseHeaderKey = (key: string): string => {
   return normalised || trimmed;
 };
 
+export const HEADER_ALIASES: Record<string, string> = {
+  state: "State",
+  statename: "State",
+  lga: "A3. select the LGA",
+  ward: "Ward",
+  gender: "A7. Sex",
+  sex: "A7. Sex",
+  age: "A8. Age",
+  agegroup: "Age Group",
+  age_group: "Age Group",
+  enumeratorid: "A1. Enumerator ID",
+  interviewerid: "A1. Enumerator ID",
+  enumeratorname: "Enumerator Name",
+  interviewername: "Enumerator Name",
+  submissionid: "Submission ID",
+  submissiondate: "Submission Date",
+  submissiontime: "Submission Time",
+  starttime: "start",
+  endtime: "end",
+  lat: "_A5. GPS Coordinates_latitude",
+  latitude: "_A5. GPS Coordinates_latitude",
+  lon: "_A5. GPS Coordinates_longitude",
+  lng: "_A5. GPS Coordinates_longitude",
+  longitude: "_A5. GPS Coordinates_longitude",
+  gpscoordinates: "A5. GPS Coordinates",
+  consent: "A6. Consent to participate",
+  imei: "imei",
+  subscriberid: "subscriberid",
+  simserial: "simserial",
+  interview_duration: "Interview Length (mins)",
+  interviewduration: "Interview Length (mins)",
+  "interview duration": "Interview Length (mins)",
+  state_target: "State Target",
+  statetarget: "State Target",
+  age_target: "Age Group Target",
+  agetarget: "Age Group Target",
+  "age group target": "Age Group Target",
+  gender_target: "Gender Target",
+  gendertarget: "Gender Target",
+};
+
+const aliasHeaderKey = (key: string): string => {
+  const normalised = normaliseHeaderKey(key);
+  const canonical = HEADER_ALIASES[normalised] ?? key;
+  return normaliseHeaderKey(canonical);
+};
+
 const createNormalisedRow = (row: Record<string, unknown>): NormalisedRow => {
   const map: NormalisedRow = new Map();
 
@@ -74,7 +95,7 @@ const createNormalisedRow = (row: Record<string, unknown>): NormalisedRow => {
       return;
     }
 
-    const key = normaliseHeaderKey(rawKey);
+    const key = aliasHeaderKey(rawKey);
 
     if (!map.has(key)) {
       map.set(key, value);
@@ -94,226 +115,6 @@ const getFromRow = (row: NormalisedRow, ...candidates: string[]): unknown => {
 
   return undefined;
 };
-
-const stripGVizSecurityPrefix = (rawText: string): string => {
-  if (rawText.startsWith(GVIZ_SECURITY_PREFIX)) {
-    return rawText.slice(GVIZ_SECURITY_PREFIX.length);
-  }
-
-  return rawText;
-};
-
-const parseGVizResponse = (rawText: string): Record<string, unknown>[] => {
-  const trimmed = stripGVizSecurityPrefix(rawText.trim());
-
-  if (!trimmed.startsWith(GVIZ_PREFIX) || !trimmed.endsWith(GVIZ_SUFFIX)) {
-    throw new Error("Unexpected Google Sheets response format");
-  }
-
-  const jsonText = trimmed.slice(GVIZ_PREFIX.length, -GVIZ_SUFFIX.length);
-  const parsed = JSON.parse(jsonText) as GVizResponse;
-
-  if (parsed.status !== "ok") {
-    throw new Error("Google Sheets request failed");
-  }
-
-  const headers = parsed.table.cols.map((column, index) => {
-    const baseLabel = column.label?.trim() ?? column.id?.trim();
-    return baseLabel && baseLabel.length > 0 ? baseLabel : `Column ${index + 1}`;
-  });
-
-  return parsed.table.rows.map((row) => {
-    const record: Record<string, unknown> = {};
-
-    row.c.forEach((cell, index) => {
-      const header = headers[index] ?? `Column ${index + 1}`;
-      record[header] = parseGVizCellValue(cell);
-    });
-
-    return record;
-  });
-};
-
-const parseGVizCellValue = (cell?: GVizCell): unknown => {
-  if (!cell || cell.v === null || cell.v === undefined) {
-    return null;
-  }
-
-  const rawValue = cell.v;
-
-  if (typeof rawValue === "string") {
-    if (rawValue.startsWith("Date(") && rawValue.endsWith(")")) {
-      const isoDate = convertGVizDate(rawValue);
-      return isoDate ?? cell.f ?? null;
-    }
-    return rawValue;
-  }
-
-  if (typeof rawValue === "number" || typeof rawValue === "boolean") {
-    return rawValue;
-  }
-
-  if (cell.f) {
-    return cell.f;
-  }
-
-  return rawValue;
-};
-
-const convertGVizDate = (value: string): string | null => {
-  const match = value.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/);
-  if (!match) {
-    return null;
-  }
-
-  const parts = match.slice(1).map((part) => Number.parseInt(part ?? "0", 10));
-  const [year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0] = parts;
-
-  const date = new Date(Date.UTC(year, month, day, hour, minute, second));
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-};
-
-const parseCsvLine = (line: string): string[] => {
-  const result: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index];
-
-    if (inQuotes) {
-      if (char === "\"") {
-        const nextChar = line[index + 1];
-        if (nextChar === "\"") {
-          current += "\"";
-          index += 1;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += char;
-      }
-    } else if (char === "\"") {
-      inQuotes = true;
-    } else if (char === ",") {
-      result.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-
-  result.push(current);
-  return result;
-};
-
-const parseCsvResponse = (rawText: string): Record<string, unknown>[] => {
-  const lines = rawText
-    .split(/\r?\n/)
-    .map((line) => line.trimEnd())
-    .filter((line) => line.length > 0);
-
-  if (lines.length === 0) {
-    return [];
-  }
-
-  const headers = parseCsvLine(lines[0]);
-
-  return lines.slice(1).map((line) => {
-    const values = parseCsvLine(line);
-    const record: Record<string, unknown> = {};
-
-    headers.forEach((header, index) => {
-      const value = values[index] ?? "";
-      record[header] = value;
-    });
-
-    return record;
-  });
-};
-
-const buildCsvFallbackUrl = (input: string): string => {
-  const lower = input.toLowerCase();
-  if (lower.includes("out:csv")) {
-    return input;
-  }
-
-  if (lower.includes("out:json")) {
-    return input.replace(/out:json/gi, "out:csv");
-  }
-
-  try {
-    const url = new URL(input);
-    const tqx = url.searchParams.get("tqx");
-
-    if (tqx) {
-      const parts = tqx
-        .split(";")
-        .map((part) => part.trim())
-        .filter((part) => part.length > 0);
-
-      let replaced = false;
-      const updatedParts = parts.map((part) => {
-        const lowerPart = part.toLowerCase();
-        if (lowerPart.startsWith("out:")) {
-          replaced = true;
-          return "out:csv";
-        }
-        return part;
-      });
-
-      if (!replaced) {
-        updatedParts.push("out:csv");
-      }
-
-      url.searchParams.set("tqx", updatedParts.join(";"));
-    } else {
-      url.searchParams.set("tqx", "out:csv");
-    }
-
-    return url.toString();
-  } catch (error) {
-    console.warn("Failed to parse Google Sheets URL for CSV fallback", error);
-    const separator = input.includes("?") ? "&" : "?";
-    return `${input}${separator}tqx=out:csv`;
-  }
-};
-
-export async function fetchGoogleSheetFromUrl(
-  fullUrl: string
-): Promise<Record<string, unknown>[]> {
-  const trimmedUrl = fullUrl.trim();
-  if (!trimmedUrl) {
-    throw new Error("Google Sheets URL is empty");
-  }
-
-  const response = await fetch(trimmedUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Google Sheet: ${response.status} ${response.statusText}`);
-  }
-
-  const rawText = await response.text();
-
-  try {
-    return parseGVizResponse(rawText);
-  } catch (error) {
-    console.warn("Failed to parse GViz response, attempting CSV fallback", error);
-  }
-
-  const csvUrl = buildCsvFallbackUrl(trimmedUrl);
-  const csvResponse = await fetch(csvUrl);
-  if (!csvResponse.ok) {
-    throw new Error(`Failed to fetch Google Sheet CSV: ${csvResponse.status} ${csvResponse.statusText}`);
-  }
-
-  const csvText = await csvResponse.text();
-  const rows = parseCsvResponse(csvText);
-  if (rows.length === 0) {
-    throw new Error("Google Sheet CSV returned no rows");
-  }
-
-  return rows;
-}
 
 const toStringValue = (value: unknown): string => {
   if (typeof value === "string") {

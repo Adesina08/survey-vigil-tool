@@ -29,8 +29,8 @@ const formatEnvValue = (value: string | undefined) => {
 export const handler = async () => {
   return jsonResponse(200, {
     env: {
-      GOOGLE_SHEETS_URL: formatEnvValue(process.env.GOOGLE_SHEETS_URL),
-      VITE_GOOGLE_SHEETS_URL: formatEnvValue(process.env.VITE_GOOGLE_SHEETS_URL),
+      APPS_SCRIPT_URL: formatEnvValue(process.env.APPS_SCRIPT_URL),
+      VITE_APPS_SCRIPT_URL: formatEnvValue(process.env.VITE_APPS_SCRIPT_URL),
     },
     timestamp: new Date().toISOString(),
   });
