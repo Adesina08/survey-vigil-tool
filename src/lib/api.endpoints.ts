@@ -31,5 +31,3 @@ const withBase = (path: string): string => {
 };
 
 export const DASHBOARD_ENDPOINT = withBase("/api/dashboard");
-export const ANALYSIS_SCHEMA_ENDPOINT = withBase("/api/analysis/schema");
-export const ANALYSIS_TABLE_ENDPOINT = withBase("/api/analysis/table");

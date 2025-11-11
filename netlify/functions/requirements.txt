@@ -1,4 +1,0 @@
-pandas
-numpy
-great_tables
-scipy

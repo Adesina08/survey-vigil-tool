@@ -4,7 +4,6 @@ import { ExportBar } from "@/components/dashboard/ExportBar";
 import { Button } from "@/components/ui/button";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { AlertCircle, Loader2 } from "lucide-react";
-import TabsQCAnalysis from "@/components/TabsQCAnalysis";
 import QualityControl from "./QualityControl";
 
 function filterByLga<T>(rows: T[], lga: string | null): T[] {
@@ -123,15 +122,11 @@ const Index = () => {
       />
 
       <main className="mx-auto max-w-7xl flex-1 space-y-6 px-6 py-6">
-        <TabsQCAnalysis
-          qualityControl={
-            <QualityControl
-              dashboardData={dashboardData}
-              filteredMapSubmissions={filteredMapSubmissions}
-              onFilterChange={handleFilterChange}
-              selectedLga={selectedLga}
-            />
-          }
+        <QualityControl
+          dashboardData={dashboardData}
+          filteredMapSubmissions={filteredMapSubmissions}
+          onFilterChange={handleFilterChange}
+          selectedLga={selectedLga}
         />
       </main>
 
