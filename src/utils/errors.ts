@@ -72,6 +72,25 @@ const readNestedField = (row: Record<string, unknown>, path: [string, string]) =
 export const extractErrorCodes = (row: Record<string, unknown>): string[] => {
   const perRow = new Set<string>();
 
+  // Dynamically harvest flag-like columns: QC_FLAG_* and QC_WARN_*
+  Object.entries(row).forEach(([key, val]) => {
+    if (typeof key === "string" && /^QC_(FLAG|WARN)_/i.test(key)) {
+      const num =
+        typeof val === "number"
+          ? val
+          : typeof val === "string"
+          ? Number(val)
+          : 0;
+      if (Number.isFinite(num) && num > 0) {
+        const token = key
+          .replace(/^QC_/, "")
+          .replace(/_{2,}/g, "_")
+          .replace(/_+$/, "");
+        perRow.add(token);
+      }
+    }
+  });
+
   const candidates: unknown[] = [];
 
   ERROR_FIELD_CANDIDATES.forEach((field) => {

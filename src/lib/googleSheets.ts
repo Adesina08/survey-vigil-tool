@@ -45,6 +45,18 @@ export const HEADER_ALIASES: Record<string, string> = {
   statename: "State",
   lga: "A3. select the LGA",
   ward: "Ward",
+  // --- OGSTEP JSON compatibility ---
+  "a3b. select the ward": "Ward",
+  "a3b select the ward": "Ward",
+  "interviewer number": "Interviewer ID",
+  "respondent name": "Respondent Name",
+  approval: "Approval Status",
+  "qc status": "Outcome Status",
+  phonenumber: "Respondent phone number",
+  deviceid: "deviceid",
+  imei: "imei",
+  subscriberid: "subscriberid",
+  simserial: "simserial",
   gender: "A7. Sex",
   sex: "A7. Sex",
   age: "A8. Age",
@@ -516,6 +528,13 @@ export const mapSheetRowsToSubmissions = (
         )
       );
 
+      const directApproval = toStringValue(
+        getFromRow(normalisedRow, "Approval Status", "Approval")
+      );
+      const qcStatusRaw = toStringValue(
+        getFromRow(normalisedRow, "Outcome Status", "QC Status")
+      );
+
       const submission: SheetSubmissionRow = {
         "Submission ID": submissionId,
         "Submission Date": submissionDateString,
@@ -550,6 +569,25 @@ export const mapSheetRowsToSubmissions = (
 
       if (ogstepParticipation) {
         submission["B2. Did you participate in OGSTEP?"] = ogstepParticipation;
+      }
+
+      if (directApproval) {
+        const normalised = directApproval.trim().toLowerCase();
+        submission["Approval Status"] =
+          normalised === "approved" || normalised === "1" || normalised === "yes"
+            ? "Approved"
+            : "Not Approved";
+      }
+
+      if (qcStatusRaw) {
+        const normalised = /^(pass|valid)$/i.test(qcStatusRaw)
+          ? "Valid"
+          : /^(fail|invalid)$/i.test(qcStatusRaw)
+          ? "Invalid"
+          : null;
+        if (normalised) {
+          submission["Outcome Status"] = normalised;
+        }
       }
 
       if (resolvedLatitude !== undefined) {
