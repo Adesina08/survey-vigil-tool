@@ -131,15 +131,20 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
   };
 
   return (
-    <Card className="fade-in">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">
+      <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
         <CardTitle>Quota Tracker</CardTitle>
-        <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="gap-2 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+          onClick={handleExport}
+        >
           <Download className="h-4 w-4" />
           Export Quota Data
         </Button>
       </CardHeader>
-      <CardContent>
+      <CardContent className="bg-card/60 p-6">
         <Tabs defaultValue="lga" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="lga">By LGA</TabsTrigger>

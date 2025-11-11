@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -36,8 +38,9 @@ export function UserProductivity({ data }: UserProductivityProps) {
     invalid: item.invalidSubmissions,
   }));
 
-  const topPerformers = sortedByValid.slice(0, 3);
+  const topPerformers = sortedByValid.slice(0, 10);
   const topPerformer = topPerformers[0];
+  const additionalTopPerformers = topPerformers.slice(1);
 
   const totals = data.reduce(
     (acc, interviewer) => {
@@ -110,97 +113,138 @@ export function UserProductivity({ data }: UserProductivityProps) {
             </div>
           </div>
           <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Top 3 interviewers</p>
-            <div className="space-y-3">
-              {topPerformers.map((performer, index) => {
-                const approval =
-                  performer.totalSubmissions > 0
-                    ? (performer.validSubmissions / performer.totalSubmissions) * 100
-                    : 0;
-                return (
-                  <div
-                    key={performer.interviewer}
-                    className="rounded-lg border bg-background/80 p-4 shadow-sm transition-all hover:border-primary/60 hover:shadow-md"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="bg-primary/15 text-primary">
-                            #{index + 1}
-                          </Badge>
-                          <span className="font-semibold text-foreground">{performer.interviewer}</span>
-                        </div>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {performer.validSubmissions.toLocaleString()} valid of {performer.totalSubmissions.toLocaleString()} interviews
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm font-semibold text-success">
-                        <TrendingUp className="h-4 w-4" />
-                        {approval.toFixed(1)}%
-                      </div>
-                    </div>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Top 10 interviewers</p>
+            <ScrollArea className="h-[360px] rounded-lg border bg-background/60 p-1">
+              <div className="space-y-3 p-2">
+                {additionalTopPerformers.length === 0 ? (
+                  <div className="rounded-lg border bg-background/80 p-4 text-sm text-muted-foreground">
+                    Not enough data to display rankings.
                   </div>
-                );
-              })}
-            </div>
+                ) : (
+                  additionalTopPerformers.map((performer, index) => {
+                    const approval =
+                      performer.totalSubmissions > 0
+                        ? (performer.validSubmissions / performer.totalSubmissions) * 100
+                        : 0;
+                    return (
+                      <div
+                        key={performer.interviewer}
+                        className="rounded-lg border bg-background/80 p-4 shadow-sm transition-all hover:border-primary/60 hover:shadow-md"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="bg-primary/15 text-primary">
+                                #{index + 2}
+                              </Badge>
+                              <span className="font-semibold text-foreground">{performer.interviewer}</span>
+                            </div>
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {performer.validSubmissions.toLocaleString()} valid of {performer.totalSubmissions.toLocaleString()} interviews
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-semibold text-success">
+                            <TrendingUp className="h-4 w-4" />
+                            {approval.toFixed(1)}%
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
-            <Users className="h-5 w-5 text-primary" />
+      <Card className="overflow-hidden border-none shadow-lg shadow-primary/15">
+        <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+            <Users className="h-5 w-5" />
             Submission quality overview
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="rounded-xl border bg-muted/40 p-4">
-            <ResponsiveContainer width="100%" height={400}>
-              <BarChart
-                data={chartData}
-                layout="vertical"
-                margin={{ top: 24, right: 32, left: 140, bottom: 16 }}
-                barCategoryGap="18%"
-              >
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis type="number" allowDecimals={false} axisLine={false} tickLine={false} />
-                <YAxis dataKey="name" type="category" width={160} axisLine={false} tickLine={false} />
-                <Tooltip
-                  cursor={{ fill: "rgba(37, 99, 235, 0.08)" }}
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "12px",
-                    boxShadow: "0 12px 24px rgba(15, 23, 42, 0.12)",
-                  }}
-                />
-                <Legend verticalAlign="top" height={36} wrapperStyle={{ paddingBottom: 16 }} />
-                <Bar
-                  dataKey="valid"
-                  name="Valid submissions"
-                  stackId="submissions"
-                  fill="hsl(var(--success))"
-                  radius={[12, 0, 0, 12]}
-                  maxBarSize={28}
-                />
-                <Bar
-                  dataKey="invalid"
-                  name="Invalid submissions"
-                  stackId="submissions"
-                  fill="hsl(var(--destructive))"
-                  radius={[0, 12, 12, 0]}
-                  maxBarSize={28}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        <CardContent className="space-y-6 bg-card/60 p-6">
+          <Tabs defaultValue="chart" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="chart">Chart</TabsTrigger>
+              <TabsTrigger value="table">Table</TabsTrigger>
+            </TabsList>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-[28%]">Interviewer</TableHead>
+            <TabsContent value="chart" className="mt-6">
+              <div className="rounded-2xl border bg-gradient-to-br from-background via-card to-muted/40 p-4 shadow-inner">
+                <ResponsiveContainer width="100%" height={420}>
+                  <BarChart
+                    data={chartData}
+                    layout="vertical"
+                    margin={{ top: 24, right: 32, left: 140, bottom: 24 }}
+                    barCategoryGap="16%"
+                  >
+                    <defs>
+                      <linearGradient id="validGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.1} />
+                        <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0.9} />
+                      </linearGradient>
+                      <linearGradient id="invalidGradient" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity={0.1} />
+                        <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity={0.9} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="4 4" stroke="hsl(var(--muted-foreground) / 0.2)" />
+                    <XAxis type="number" allowDecimals={false} axisLine={false} tickLine={false} stroke="hsl(var(--muted-foreground))" />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={160}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "hsl(var(--foreground))", fontWeight: 500 }}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(37, 99, 235, 0.08)" }}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--popover))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "16px",
+                        boxShadow: "0 18px 32px rgba(15, 23, 42, 0.16)",
+                      }}
+                      labelStyle={{ fontWeight: 600, color: "hsl(var(--foreground))" }}
+                    />
+                    <Legend
+                      verticalAlign="top"
+                      height={48}
+                      wrapperStyle={{ paddingBottom: 12 }}
+                      iconType="circle"
+                    />
+                    <Bar
+                      dataKey="valid"
+                      name="Valid submissions"
+                      stackId="submissions"
+                      fill="url(#validGradient)"
+                      radius={[12, 0, 0, 12]}
+                      maxBarSize={30}
+                    />
+                    <Bar
+                      dataKey="invalid"
+                      name="Invalid submissions"
+                      stackId="submissions"
+                      fill="url(#invalidGradient)"
+                      radius={[0, 12, 12, 0]}
+                      maxBarSize={30}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="table" className="mt-6">
+              <ScrollArea className="h-[420px] rounded-2xl border bg-background/80">
+                <div className="min-w-[720px] p-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="w-[28%]">Interviewer</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right text-success">Valid</TableHead>
                   <TableHead className="text-right text-destructive">Invalid</TableHead>
@@ -209,10 +253,10 @@ export function UserProductivity({ data }: UserProductivityProps) {
                   <TableHead className="text-right">Outside LGA</TableHead>
                   <TableHead className="text-right">Duplicate</TableHead>
                   <TableHead className="text-right">Total Errors</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((row) => {
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.map((row) => {
                   const approval = row.totalSubmissions > 0
                     ? (row.validSubmissions / row.totalSubmissions) * 100
                     : 0;
@@ -239,10 +283,13 @@ export function UserProductivity({ data }: UserProductivityProps) {
                       </TableCell>
                     </TableRow>
                   );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download, Award } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface StateAchievement {
   state: string;
@@ -65,14 +66,14 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
   return (
-    <Card className="fade-in">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">
+      <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
         <CardTitle className="flex items-center gap-2">
-          <Award className="h-5 w-5 text-primary" />
+          <Award className="h-5 w-5" />
           Achievements
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="bg-card/60 p-6">
         <Tabs defaultValue="interviewer" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="interviewer">By Interviewer</TabsTrigger>
@@ -87,13 +88,14 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   Export Interviewer Data
                 </Button>
               </div>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Interviewer</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Approved</TableHead>
+              <ScrollArea className="h-80 rounded-xl border bg-background/80">
+                <div className="min-w-[720px] p-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Interviewer</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Approved</TableHead>
                       <TableHead className="text-right">Not Approved</TableHead>
                       <TableHead className="text-right">% Approved</TableHead>
                     </TableRow>
@@ -115,27 +117,28 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                       </TableRow>
                     ))}
                   </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell className="font-bold">Total</TableCell>
-                      <TableCell className="text-right font-bold">
-                        {interviewerTotals.total.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-success">
-                        {interviewerTotals.approved.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-destructive">
-                        {interviewerTotals.notApproved.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        {interviewerTotals.total > 0
-                          ? formatPercentage((interviewerTotals.approved / interviewerTotals.total) * 100)
-                          : "0.0%"}
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </div>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-bold">Total</TableCell>
+                        <TableCell className="text-right font-bold">
+                          {interviewerTotals.total.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-success">
+                          {interviewerTotals.approved.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-destructive">
+                          {interviewerTotals.notApproved.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-bold">
+                          {interviewerTotals.total > 0
+                            ? formatPercentage((interviewerTotals.approved / interviewerTotals.total) * 100)
+                            : "0.0%"}
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </div>
+              </ScrollArea>
             </div>
           </TabsContent>
 
@@ -147,13 +150,14 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   Export LGA Data
                 </Button>
               </div>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>LGA</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Approved</TableHead>
+              <ScrollArea className="h-80 rounded-xl border bg-background/80">
+                <div className="min-w-[720px] p-2">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>LGA</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Approved</TableHead>
                       <TableHead className="text-right">Not Approved</TableHead>
                       <TableHead className="text-right">% Approved</TableHead>
                     </TableRow>
@@ -175,27 +179,28 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                       </TableRow>
                     ))}
                   </TableBody>
-                  <TableFooter>
-                    <TableRow>
-                      <TableCell className="font-bold">Total</TableCell>
-                      <TableCell className="text-right font-bold">
-                        {lgaTotals.total.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-success">
-                        {lgaTotals.approved.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-destructive">
-                        {lgaTotals.notApproved.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        {lgaTotals.total > 0
-                          ? formatPercentage((lgaTotals.approved / lgaTotals.total) * 100)
-                          : "0.0%"}
-                      </TableCell>
-                    </TableRow>
-                  </TableFooter>
-                </Table>
-              </div>
+                    <TableFooter>
+                      <TableRow>
+                        <TableCell className="font-bold">Total</TableCell>
+                        <TableCell className="text-right font-bold">
+                          {lgaTotals.total.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-success">
+                          {lgaTotals.approved.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-destructive">
+                          {lgaTotals.notApproved.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-bold">
+                          {lgaTotals.total > 0
+                            ? formatPercentage((lgaTotals.approved / lgaTotals.total) * 100)
+                            : "0.0%"}
+                        </TableCell>
+                      </TableRow>
+                    </TableFooter>
+                  </Table>
+                </div>
+              </ScrollArea>
             </div>
           </TabsContent>
         </Tabs>
