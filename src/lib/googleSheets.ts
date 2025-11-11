@@ -319,6 +319,7 @@ const interpretApprovalStatus = (value: unknown): ApprovalStatus | null => {
 const deriveApprovalStatus = (row: NormalisedRow): ApprovalStatus => {
   const candidateHeaders = [
     "Approval Status",
+    "Approval",
     "Outcome Status",
     "A6. Consent to participate",
     "Consent",
@@ -471,16 +472,7 @@ export const mapSheetRowsToSubmissions = (
       const respondentPhone =
         toStringValue(getFromRow(normalisedRow, "Respondent phone number")) || undefined;
 
-      const approvalRaw = toStringValue(
-        getFromRow(normalisedRow, "A6. Consent to participate")
-      ).toLowerCase();
-      const approvalStatus: ApprovalStatus =
-        approvalRaw.includes("not") ||
-        approvalRaw === "no" ||
-        approvalRaw === "0" ||
-        approvalRaw === "false"
-          ? "Not Approved"
-          : "Approved";
+      const approvalStatus = deriveApprovalStatus(normalisedRow);
 
       const interviewLength = (() => {
         const explicit = toNumberValue(
@@ -528,9 +520,6 @@ export const mapSheetRowsToSubmissions = (
         )
       );
 
-      const directApproval = toStringValue(
-        getFromRow(normalisedRow, "Approval Status", "Approval")
-      );
       const qcStatusRaw = toStringValue(
         getFromRow(normalisedRow, "Outcome Status", "QC Status")
       );
@@ -571,24 +560,23 @@ export const mapSheetRowsToSubmissions = (
         submission["B2. Did you participate in OGSTEP?"] = ogstepParticipation;
       }
 
-      if (directApproval) {
-        const normalised = directApproval.trim().toLowerCase();
-        submission["Approval Status"] =
-          normalised === "approved" || normalised === "1" || normalised === "yes"
-            ? "Approved"
-            : "Not Approved";
-      }
-
+      let outcomeStatus: SheetSubmissionRow["Outcome Status"];
       if (qcStatusRaw) {
         const normalised = /^(pass|valid)$/i.test(qcStatusRaw)
           ? "Valid"
           : /^(fail|invalid)$/i.test(qcStatusRaw)
-          ? "Invalid"
-          : null;
+            ? "Invalid"
+            : null;
         if (normalised) {
-          submission["Outcome Status"] = normalised;
+          outcomeStatus = normalised;
         }
       }
+
+      if (!outcomeStatus) {
+        outcomeStatus = approvalStatus === "Approved" ? "Valid" : "Invalid";
+      }
+
+      submission["Outcome Status"] = outcomeStatus;
 
       if (resolvedLatitude !== undefined) {
         submission.Latitude = resolvedLatitude;

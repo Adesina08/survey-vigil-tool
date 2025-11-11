@@ -48,15 +48,6 @@ const QualityControl = ({
       ? dashboardData.quotaByLGAGender.filter((row) => row.lga === selectedLga)
       : dashboardData.quotaByLGAGender;
 
-    const targetTotal = relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0);
-    const achievedFromQuota = relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0);
-
-    let approvedCount = 0;
-    let flaggedCount = 0;
-    let treatmentPathCount = 0;
-    let controlPathCount = 0;
-    let unknownPathCount = 0;
-
     const productivityMap = new Map<
       string,
       {
@@ -91,24 +82,6 @@ const QualityControl = ({
     >();
 
     submissions.forEach((submission) => {
-      if (submission.status === "approved") {
-        approvedCount += 1;
-      } else {
-        flaggedCount += 1;
-      }
-
-      switch (submission.ogstepPath) {
-        case "treatment":
-          treatmentPathCount += 1;
-          break;
-        case "control":
-          controlPathCount += 1;
-          break;
-        default:
-          unknownPathCount += 1;
-          break;
-      }
-
       const interviewerId = submission.interviewerId;
       const existing = productivityMap.get(interviewerId) ?? {
         interviewerId,
@@ -184,11 +157,6 @@ const QualityControl = ({
       achievementsByLGAMap.set(lgaKey, lgaEntry);
     });
 
-    const totalSubmissions = submissions.length;
-    const approvalRate = totalSubmissions > 0 ? (approvedCount / totalSubmissions) * 100 : 0;
-    const notApprovedRate = totalSubmissions > 0 ? (flaggedCount / totalSubmissions) * 100 : 0;
-    const quotaProgress = targetTotal > 0 ? (achievedFromQuota / targetTotal) * 100 : 0;
-
     const productivity = Array.from(productivityMap.values()).map((row) => ({
       ...row,
       approvalRate: row.totalSubmissions > 0 ? (row.validSubmissions / row.totalSubmissions) * 100 : 0,
@@ -232,22 +200,19 @@ const QualityControl = ({
 
     return {
       summary: {
-        overallTarget: targetTotal,
-        totalSubmissions,
-        approvedSubmissions: approvedCount,
-        approvalRate: Number(approvalRate.toFixed(1)),
-        notApprovedSubmissions: flaggedCount,
-        notApprovedRate: Number(notApprovedRate.toFixed(1)),
-        completionRate: Number(quotaProgress.toFixed(1)),
-        treatmentPathCount,
-        controlPathCount,
-        unknownPathCount,
+        overallTarget: dashboardData.summary.overallTarget,
+        totalSubmissions: dashboardData.summary.totalSubmissions,
+        approvedSubmissions: dashboardData.summary.approvedSubmissions,
+        approvalRate: dashboardData.summary.approvalRate,
+        notApprovedSubmissions: dashboardData.summary.notApprovedSubmissions,
+        notApprovedRate: dashboardData.summary.notApprovedRate,
+        completionRate: dashboardData.quotaProgress,
+        treatmentPathCount: dashboardData.summary.treatmentPathCount,
+        controlPathCount: dashboardData.summary.controlPathCount,
+        unknownPathCount: dashboardData.summary.unknownPathCount,
       },
-      quotaProgress: Number(quotaProgress.toFixed(1)),
-      statusBreakdown: {
-        approved: approvedCount,
-        notApproved: flaggedCount,
-      },
+      quotaProgress: dashboardData.quotaProgress,
+      statusBreakdown: dashboardData.statusBreakdown,
       productivity,
       errorBreakdown,
       achievementsByInterviewer,
@@ -261,6 +226,9 @@ const QualityControl = ({
     dashboardData.quotaByLGA,
     dashboardData.quotaByLGAAge,
     dashboardData.quotaByLGAGender,
+    dashboardData.summary,
+    dashboardData.statusBreakdown,
+    dashboardData.quotaProgress,
     filteredMapSubmissions,
     selectedLga,
   ]);
