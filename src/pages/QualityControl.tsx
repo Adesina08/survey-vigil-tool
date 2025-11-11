@@ -5,6 +5,7 @@ import { SummaryCards } from "@/components/dashboard/SummaryCards";
 import { ProgressCharts } from "@/components/dashboard/ProgressCharts";
 import { InteractiveMap } from "@/components/dashboard/InteractiveMap";
 import { QuotaTracker } from "@/components/dashboard/QuotaTracker";
+import { QuotaTargetTracker } from "@/components/dashboard/QuotaTargetTracker";
 import { UserProductivity } from "@/components/dashboard/UserProductivity";
 import { ErrorBreakdown } from "@/components/dashboard/ErrorBreakdown";
 import { AchievementsTables } from "@/components/dashboard/AchievementsTables";
@@ -442,6 +443,10 @@ const QualityControl = ({
         interviewers={dashboardData.filters.interviewers}
         errorTypes={dashboardData.filters.errorTypes}
         lgas={dashboardData.filters.lgas}
+      />
+
+      <QuotaTargetTracker
+        records={selectedLga ? filteredAnalysisRows : dashboardData.analysisRows}
       />
 
       <QuotaTracker
