@@ -12,7 +12,7 @@ import {
 import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks";
 import { normaliseHeaderKey } from "./googleSheets";
 import { getSubmissionMetrics, type Row as MetricRow } from "@/utils/metrics";
-import { getErrorBreakdown } from "@/utils/errors";
+import { extractErrorCodes, getErrorBreakdown } from "@/utils/errors";
 
 type OgstepPath = "treatment" | "control" | "unknown";
 
@@ -74,7 +74,7 @@ interface QuotaLGAGenderRow extends QuotaLGARow {
   gender: string;
 }
 
-interface ProductivityRow {
+interface DetailedProductivityRow {
   interviewerId: string;
   interviewerName: string;
   displayLabel: string;
@@ -84,6 +84,66 @@ interface ProductivityRow {
   approvalRate: number;
   errors: Record<string, number>;
   totalErrors: number;
+}
+
+type ProductivityRow = {
+  enumeratorId: string;
+  enumeratorName: string;
+  total: number;
+  approved: number;
+  flagged: number;
+};
+
+function buildUserProductivity(submissions: SheetSubmissionRow[]): ProductivityRow[] {
+  const byUser = new Map<string, ProductivityRow>();
+
+  const getKey = (row: SheetSubmissionRow) => {
+    const id = (row["A1. Enumerator ID"] || row["Interviewer ID"] || "").toString().trim();
+    const name = (row["Enumerator Name"] || row["Interviewer Name"] || "").toString().trim();
+    return `${id}|${name}`;
+  };
+
+  const hasFlags = (row: Record<string, unknown>): boolean => {
+    const codes = extractErrorCodes(row);
+    return codes.length > 0;
+  };
+
+  submissions.forEach((row) => {
+    const key = getKey(row);
+    if (!key || key === "|") {
+      return;
+    }
+
+    const [enumeratorId, enumeratorName] = key.split("|");
+    const existing =
+      byUser.get(key) ??
+      {
+        enumeratorId,
+        enumeratorName,
+        total: 0,
+        approved: 0,
+        flagged: 0,
+      };
+
+    existing.total += 1;
+
+    const isApproved = String(row["Approval Status"] || "").trim().toLowerCase() === "approved";
+    if (isApproved) {
+      existing.approved += 1;
+    }
+
+    if (hasFlags(row)) {
+      existing.flagged += 1;
+    }
+
+    byUser.set(key, existing);
+  });
+
+  return Array.from(byUser.values()).sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total;
+    if (b.approved !== a.approved) return b.approved - a.approved;
+    return b.flagged - a.flagged;
+  });
 }
 
 interface ErrorBreakdownRow {
@@ -126,6 +186,7 @@ export interface DashboardData {
   quotaByLGAGender: QuotaLGAGenderRow[];
   mapSubmissions: MapSubmission[];
   userProductivity: ProductivityRow[];
+  userProductivityDetailed: DetailedProductivityRow[];
   errorBreakdown: ErrorBreakdownRow[];
   achievements: {
     byState: AchievementByStateRow[];
@@ -690,7 +751,7 @@ export const buildDashboardData = ({
       return a.gender.localeCompare(b.gender);
     });
 
-  const userProductivity: ProductivityRow[] = [...totalsByInterviewer.entries()]
+  const userProductivityDetailed: DetailedProductivityRow[] = [...totalsByInterviewer.entries()]
     .map(([interviewerId, total]) => {
       const name = interviewerNames.get(interviewerId) ?? "";
       const label =
@@ -714,6 +775,8 @@ export const buildDashboardData = ({
       };
     })
     .filter((row) => row.interviewerId.toLowerCase() !== "unknown");
+
+  const userProductivity = buildUserProductivity(submissions);
 
   const rowErrorCounts = getErrorBreakdown(metricsRows);
   const finalErrorCounts = Object.keys(rowErrorCounts).length > 0 ? rowErrorCounts : errorCounts;
@@ -854,6 +917,7 @@ export const buildDashboardData = ({
     quotaByLGAGender,
     mapSubmissions: sortedMapSubmissions,
     userProductivity,
+    userProductivityDetailed,
     errorBreakdown,
     achievements: {
       byState: achievementsByState,
