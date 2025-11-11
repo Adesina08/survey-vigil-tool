@@ -22,7 +22,9 @@ interface StateAchievement {
 }
 
 interface InterviewerAchievement {
-  interviewer: string;
+  interviewerId: string;
+  interviewerName: string;
+  displayLabel: string;
   total: number;
   approved: number;
   notApproved: number;
@@ -49,7 +51,7 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
     console.log(`Exporting ${type} achievements...`);
   };
 
-  const calculateTotals = (data: any[]) => {
+  const calculateTotals = <T extends { total: number; approved: number; notApproved: number }>(data: T[]) => {
     return data.reduce(
       (acc, row) => ({
         total: acc.total + row.total,
@@ -93,17 +95,25 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Interviewer</TableHead>
+                        <TableHead>Interviewer ID</TableHead>
+                        <TableHead>Name</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Approved</TableHead>
-                      <TableHead className="text-right">Not Approved</TableHead>
-                      <TableHead className="text-right">% Approved</TableHead>
+                        <TableHead className="text-right">Not Approved</TableHead>
+                        <TableHead className="text-right">% Approved</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {byInterviewer.map((row) => (
-                      <TableRow key={row.interviewer}>
-                        <TableCell className="font-medium">{row.interviewer}</TableCell>
+                      <TableRow key={row.interviewerId}>
+                        <TableCell className="font-semibold">{row.interviewerId}</TableCell>
+                        <TableCell>
+                          {row.interviewerName && row.interviewerName !== row.interviewerId ? (
+                            <span>{row.interviewerName}</span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
                         <TableCell className="text-right text-success">
                           {row.approved.toLocaleString()}
@@ -119,7 +129,9 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   </TableBody>
                     <TableFooter>
                       <TableRow>
-                        <TableCell className="font-bold">Total</TableCell>
+                        <TableCell className="font-bold" colSpan={2}>
+                          Total
+                        </TableCell>
                         <TableCell className="text-right font-bold">
                           {interviewerTotals.total.toLocaleString()}
                         </TableCell>

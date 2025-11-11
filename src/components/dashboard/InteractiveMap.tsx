@@ -29,7 +29,9 @@ interface Submission {
   id: string;
   lat: number;
   lng: number;
-  interviewer: string;
+  interviewerId: string;
+  interviewerName: string;
+  interviewerLabel: string;
   lga: string;
   state: string;
   errorTypes: string[];
@@ -37,9 +39,15 @@ interface Submission {
   status: "approved" | "not_approved";
 }
 
+interface InterviewerOption {
+  id: string;
+  name: string;
+  label: string;
+}
+
 interface InteractiveMapProps {
   submissions: Submission[];
-  interviewers: string[];
+  interviewers: InterviewerOption[];
   errorTypes: string[];
   lgas: string[];
 }
@@ -81,9 +89,17 @@ const createPopupContent = (submission: Submission) => {
 
   return `
       <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
-        <div style="font-weight:700;color:#2563eb;">Submission #${submission.id}</div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <div style="font-weight:700;color:#2563eb;">${submission.interviewerLabel}</div>
+          <div style="font-size:12px;color:#64748b;">Submission #${submission.id}</div>
+        </div>
         <div style="display:flex;flex-direction:column;gap:4px;">
-          <div><span style="font-weight:600;">Interviewer:</span> ${submission.interviewer}</div>
+          <div><span style="font-weight:600;">Interviewer ID:</span> ${submission.interviewerId}</div>
+          <div><span style="font-weight:600;">Name:</span> ${
+            submission.interviewerName && submission.interviewerName !== submission.interviewerId
+              ? submission.interviewerName
+              : "N/A"
+          }</div>
           <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
           <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
           ${errorsSection}
@@ -150,12 +166,22 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
     }
   }, [lgas, selectedLga]);
 
+  useEffect(() => {
+    if (selectedInterviewer === "all") {
+      return;
+    }
+
+    if (!interviewers.some((option) => option.id === selectedInterviewer)) {
+      setSelectedInterviewer("all");
+    }
+  }, [interviewers, selectedInterviewer]);
+
   const filteredSubmissions = useMemo(() => {
     return submissions.filter((submission) => {
       const matchesError =
         selectedErrorType === "all" || submission.errorTypes.includes(selectedErrorType);
       const matchesInterviewer =
-        selectedInterviewer === "all" || submission.interviewer === selectedInterviewer;
+        selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer;
       const matchesLga = selectedLga === "all" || submission.lga === selectedLga;
       return matchesError && matchesInterviewer && matchesLga;
     });
@@ -370,8 +396,13 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
               <SelectContent>
                 <SelectItem value="all">All Interviewers</SelectItem>
                 {interviewers.map((interviewer) => (
-                  <SelectItem key={interviewer} value={interviewer}>
-                    {interviewer}
+                  <SelectItem key={interviewer.id} value={interviewer.id}>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium">{interviewer.id}</span>
+                      {interviewer.name && interviewer.name !== interviewer.id ? (
+                        <span className="text-xs text-muted-foreground">{interviewer.name}</span>
+                      ) : null}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
