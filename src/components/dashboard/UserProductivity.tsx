@@ -41,13 +41,43 @@ interface UserProductivityProps {
 }
 
 export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
-  const sortedByValid = useMemo(
-    () => [...data].sort((a, b) => b.validSubmissions - a.validSubmissions),
-    [data],
-  );
+  const rankedProductivity = useMemo(() => {
+    const normalised = data.map((entry) => {
+      const total = Math.max(entry.totalSubmissions ?? 0, 0);
+      const valid = Math.max(entry.validSubmissions ?? 0, 0);
+      const invalidFromSource = Math.max(entry.invalidSubmissions ?? 0, 0);
+      const computedInvalid = Math.max(total - valid, 0);
+      const invalid = Math.max(invalidFromSource, computedInvalid);
+      const computedTotal = Math.max(total, valid + invalid);
+      const approvalRate = computedTotal > 0 ? (valid / computedTotal) * 100 : 0;
+
+      return {
+        ...entry,
+        totalSubmissions: computedTotal,
+        validSubmissions: valid,
+        invalidSubmissions: invalid,
+        approvalRate,
+      };
+    });
+
+    const compare = (a: InterviewerData, b: InterviewerData) => {
+      if (b.totalSubmissions !== a.totalSubmissions) {
+        return b.totalSubmissions - a.totalSubmissions;
+      }
+      if (b.approvalRate !== a.approvalRate) {
+        return b.approvalRate - a.approvalRate;
+      }
+      if (b.validSubmissions !== a.validSubmissions) {
+        return b.validSubmissions - a.validSubmissions;
+      }
+      return a.interviewerId.localeCompare(b.interviewerId);
+    };
+
+    return normalised.sort(compare);
+  }, [data]);
 
   const errorColumns = useMemo(() => {
-    const unique = new Set<string>(errorTypes);
+    const unique = new Set<string>(errorTypes ?? []);
     data.forEach((row) => {
       Object.keys(row.errors).forEach((errorType) => {
         unique.add(errorType);
@@ -60,17 +90,20 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
 
   const chartData = useMemo(
     () =>
-      sortedByValid.map((item) => ({
+      rankedProductivity.map((item) => ({
         id: item.interviewerId,
-        label: item.interviewerId,
-        fullLabel: item.interviewerId,
+        label: item.displayLabel || item.interviewerId,
+        fullLabel: item.displayLabel || item.interviewerId,
         ...errorColumns.reduce<Record<string, number>>((acc, errorType) => {
           acc[errorType] = item.errors[errorType] ?? 0;
           return acc;
         }, {}),
       })),
-    [errorColumns, sortedByValid],
+    [errorColumns, rankedProductivity],
   );
+
+  const chartBaseWidth = 80;
+  const chartWidth = Math.max(chartData.length * chartBaseWidth, chartBaseWidth * 12);
 
   const chartConfig = useMemo(() => {
     const palette = [
@@ -96,7 +129,7 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
 
   const totals = useMemo(
     () =>
-      data.reduce(
+      rankedProductivity.reduce(
         (acc, interviewer) => {
           acc.total += interviewer.totalSubmissions;
           acc.valid += interviewer.validSubmissions;
@@ -105,10 +138,10 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
         },
         { total: 0, valid: 0, invalid: 0 },
       ),
-    [data],
+    [rankedProductivity],
   );
 
-  const topPerformers = sortedByValid.slice(0, 10);
+  const topPerformers = rankedProductivity.slice(0, 10);
   const topPerformer = topPerformers[0];
 
   const overallApprovalRate = totals.total > 0 ? (totals.valid / totals.total) * 100 : 0;
@@ -135,7 +168,7 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                   {topPerformer ? (
                     <>
                       <Crown className="h-5 w-5 text-yellow-400" />
-                      <span>{topPerformer.interviewerId}</span>
+                      <span>{topPerformer.displayLabel || topPerformer.interviewerId}</span>
                     </>
                   ) : (
                     <span>No data available</span>
@@ -191,7 +224,7 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                             <Badge variant="secondary" className="bg-primary/15 text-primary">
                               #{index + 1}
                             </Badge>
-                            <span className="font-semibold text-foreground">{performer.interviewerId}</span>
+                              <span className="font-semibold text-foreground">{performer.displayLabel || performer.interviewerId}</span>
                           </div>
                           <p className="text-xs text-muted-foreground">
                             {performer.validSubmissions.toLocaleString()} approved of {performer.totalSubmissions.toLocaleString()} interviews
@@ -227,32 +260,52 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
 
             <TabsContent value="chart" className="mt-6">
               <div className="rounded-2xl border bg-gradient-to-br from-background via-card to-muted/40 p-6 shadow-inner">
-                <ChartContainer config={chartConfig} className="h-[420px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" vertical={false} />
-                      <XAxis
-                        dataKey="label"
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
-                      />
-                      <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} allowDecimals={false} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <ChartLegend content={<ChartLegendContent />} />
-                      {errorColumns.map((errorType, index) => (
-                        <Bar
-                          key={errorType}
-                          dataKey={errorType}
-                          stackId="flags"
-                          fill={chartConfig[errorType]?.color ?? `hsl(var(--chart-${(index % 5) + 1}))`}
-                          radius={index === errorColumns.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
-                        />
-                      ))}
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+                <div className="h-[420px] w-full overflow-hidden">
+                  <div className="h-full w-full overflow-x-auto overflow-y-hidden">
+                    <div
+                      className="h-full"
+                      style={{ minWidth: `${chartWidth}px`, width: `${chartWidth}px` }}
+                    >
+                      <ChartContainer config={chartConfig} className="h-full w-full aspect-auto">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" vertical={false} />
+                            <XAxis
+                              dataKey="label"
+                              interval={0}
+                              angle={-40}
+                              textAnchor="end"
+                              height={80}
+                              tickMargin={12}
+                              tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
+                            />
+                            <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} allowDecimals={false} />
+                            <ChartTooltip
+                              cursor={{ fill: "hsl(var(--primary) / 0.08)" }}
+                              content={
+                                <ChartTooltipContent
+                                  labelFormatter={(value, payload) =>
+                                    (payload?.[0]?.payload?.fullLabel as string | undefined) ?? (value as string)
+                                  }
+                                />
+                              }
+                            />
+                            <ChartLegend content={<ChartLegendContent />} />
+                            {errorColumns.map((errorType, index) => (
+                              <Bar
+                                key={errorType}
+                                dataKey={errorType}
+                                stackId="flags"
+                                fill={chartConfig[errorType]?.color ?? `hsl(var(--chart-${(index % 5) + 1}))`}
+                                radius={index === errorColumns.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+                              />
+                            ))}
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </ChartContainer>
+                    </div>
+                  </div>
+                </div>
               </div>
             </TabsContent>
 
@@ -275,9 +328,9 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sortedByValid.map((row) => (
+                      {rankedProductivity.map((row) => (
                         <TableRow key={row.interviewerId} className="group transition-colors hover:bg-primary/5">
-                          <TableCell className="font-semibold">{row.interviewerId}</TableCell>
+                          <TableCell className="font-semibold">{row.displayLabel || row.interviewerId}</TableCell>
                           <TableCell className="text-right">{row.totalSubmissions.toLocaleString()}</TableCell>
                           <TableCell className="text-right text-destructive">
                             {row.invalidSubmissions.toLocaleString()}

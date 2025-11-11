@@ -11,6 +11,30 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ statusMessage, lastUpdated, onRefresh, isRefreshing }: DashboardHeaderProps) {
+  const versionLabel = typeof APP_VERSION_LABEL === "string" ? APP_VERSION_LABEL.trim() : "";
+  const shouldShowVersion = versionLabel.length > 0;
+
+  const shouldShowLastUpdated = (() => {
+    if (!lastUpdated) {
+      return false;
+    }
+
+    const parsed = new Date(lastUpdated);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.getFullYear() > 1970 || parsed.getTime() > 0;
+    }
+
+    if (/1970/.test(lastUpdated)) {
+      return false;
+    }
+
+    if (/invalid/i.test(lastUpdated)) {
+      return false;
+    }
+
+    return true;
+  })();
+
   return (
     <header className="border-b bg-card px-6 py-4">
       <div className="mx-auto max-w-7xl">
@@ -43,12 +67,12 @@ export function DashboardHeader({ statusMessage, lastUpdated, onRefresh, isRefre
             <div className="text-right text-sm">
               <div className="text-muted-foreground">Status</div>
               <div className="font-medium break-words text-foreground">{statusMessage}</div>
-              {lastUpdated ? (
+              {shouldShowLastUpdated ? (
                 <div className="text-xs text-muted-foreground">Latest submission: {lastUpdated}</div>
               ) : null}
-              <div className="text-xs text-muted-foreground">
-                {APP_VERSION_LABEL ? `Version ${APP_VERSION_LABEL}` : "Version not set"}
-              </div>
+              {shouldShowVersion ? (
+                <div className="text-xs text-muted-foreground">Version {versionLabel}</div>
+              ) : null}
             </div>
             <Button
               onClick={onRefresh}

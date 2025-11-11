@@ -1,16 +1,55 @@
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, CheckCircle, XCircle, Flag } from "lucide-react";
+import { createDashboardCsvExporter, type DashboardExportRow } from "@/lib/exportDashboard";
 
-export function ExportBar() {
-  const handleExport = (type: string) => {
-    console.log(`Exporting ${type} data...`);
+interface ExportBarProps {
+  rows: DashboardExportRow[];
+  filenamePrefix?: string;
+}
+
+export function ExportBar({ rows, filenamePrefix = "ogstep-dashboard" }: ExportBarProps) {
+  const hasRows = Array.isArray(rows) && rows.length > 0;
+
+  const exporter = useMemo(
+    () => createDashboardCsvExporter({ rows: Array.isArray(rows) ? rows : [], filenamePrefix }),
+    [rows, filenamePrefix],
+  );
+
+  const handleExport = (type: "all" | "approved" | "notApproved" | "flags") => {
+    if (!hasRows) {
+      console.warn("No dashboard data available to export.");
+      return;
+    }
+
+    switch (type) {
+      case "approved":
+        exporter.exportApproved();
+        break;
+      case "notApproved":
+        exporter.exportNotApproved();
+        break;
+      case "flags":
+        exporter.exportErrorFlags();
+        break;
+      case "all":
+      default:
+        exporter.exportAll();
+        break;
+    }
   };
 
   return (
     <div className="sticky bottom-0 z-10 border-t bg-card px-6 py-4">
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap justify-center gap-2 text-center">
-          <Button onClick={() => handleExport("all")} variant="default" size="sm" className="gap-2">
+          <Button
+            onClick={() => handleExport("all")}
+            variant="default"
+            size="sm"
+            className="gap-2"
+            disabled={!hasRows}
+          >
             <Download className="h-4 w-4" />
             Export All Data
           </Button>
@@ -19,6 +58,7 @@ export function ExportBar() {
             variant="outline"
             size="sm"
             className="gap-2 border-success text-success hover:bg-success/10"
+            disabled={!hasRows}
           >
             <CheckCircle className="h-4 w-4" />
             Export Approved Data
@@ -28,6 +68,7 @@ export function ExportBar() {
             variant="outline"
             size="sm"
             className="gap-2 border-destructive text-destructive hover:bg-destructive/10"
+            disabled={!hasRows}
           >
             <XCircle className="h-4 w-4" />
             Export Not Approved Data
@@ -37,6 +78,7 @@ export function ExportBar() {
             variant="outline"
             size="sm"
             className="gap-2 border-warning text-warning hover:bg-warning/10"
+            disabled={!hasRows}
           >
             <Flag className="h-4 w-4" />
             Export Error Flags
