@@ -29,26 +29,23 @@ function filterByLga<T>(rows: T[], lga: string | null): T[] {
 }
 
 const Index = () => {
-  const { data: dashboardData, isLoading, isFetching, isError, error, refetch } = useDashboardData();
+  const [statusMessage, setStatusMessage] = useState("Loading…");
+  const {
+    data: dashboardData,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useDashboardData({ onStatusChange: setStatusMessage });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefreshed, setLastRefreshed] = useState<string>("");
   const [selectedLga, setSelectedLga] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (dashboardData?.lastUpdated) {
-      setLastRefreshed(dashboardData.lastUpdated);
-    } else if (!dashboardData) {
-      setLastRefreshed("");
-    }
-  }, [dashboardData]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
+    setStatusMessage("Refreshing…");
     try {
-      const result = await refetch();
-      if (result.data) {
-        setLastRefreshed(result.data.lastUpdated);
-      }
+      await refetch();
     } finally {
       setIsRefreshing(false);
     }
@@ -119,7 +116,8 @@ const Index = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <DashboardHeader
-        lastRefreshed={lastRefreshed}
+        statusMessage={statusMessage}
+        lastUpdated={dashboardData?.lastUpdated ?? ""}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing || isFetching}
       />
