@@ -13,6 +13,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { formatErrorLabel } from "@/lib/utils";
+import { SectionHeader } from "./SectionHeader";
 
 const defaultIconPrototype = L.Icon.Default.prototype as unknown as {
   _getIconUrl?: unknown;
@@ -217,10 +218,10 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
         boundaryLayerRef.current?.remove();
         boundaryLayerRef.current = L.geoJSON(geoJson, {
           style: () => ({
-            color: "#1d4ed8",
-            weight: 1.5,
-            fillOpacity: 0.12,
-            fillColor: "#93c5fd",
+            color: "#999",
+            weight: 1,
+            fillOpacity: 0.2,
+            fillColor: "#f3f4f6",
           }),
         }).addTo(mapRef.current!);
 
@@ -275,7 +276,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
     const addLabel = (name: string, center: L.LatLngExpression) => {
       const icon = L.divIcon({
         className: "lga-label",
-        html: `<div style="background: rgba(37, 99, 235, 0.92); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 4px rgba(15, 23, 42, 0.25);">${name}</div>`,
+        html: `<div>${name}</div>`,
         iconSize: [0, 0],
       });
 
@@ -327,79 +328,82 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
   }, [filteredSubmissions.length]);
 
   return (
-    <Card className="fade-in">
-      <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2 self-start">
-          <MapPin className="h-5 w-5 text-primary" />
-          <CardTitle className="text-left">Submissions on Map</CardTitle>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 overflow-x-auto pb-1">
-          <Select value={selectedLga} onValueChange={setSelectedLga}>
-            <SelectTrigger className="min-w-[180px]">
-              <SelectValue placeholder="All LGAs" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All LGAs</SelectItem>
-              {lgas.map((lga) => (
-                <SelectItem key={lga} value={lga}>
-                  {lga}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
-            <SelectTrigger className="min-w-[180px]">
-              <SelectValue placeholder="All Error Types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Error Types</SelectItem>
-              {errorTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {formatErrorLabel(type)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
-            <SelectTrigger className="min-w-[200px]">
-              <SelectValue placeholder="All Interviewers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Interviewers</SelectItem>
-              {interviewers.map((interviewer) => (
-                <SelectItem key={interviewer} value={interviewer}>
-                  {interviewer}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[500px] w-full overflow-hidden rounded-lg border">
-          <div ref={mapContainerRef} className="h-full w-full" />
-        </div>
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm text-muted-foreground">
-            Showing {filteredSubmissions.length.toLocaleString()} submissions
+    <section className="space-y-4">
+      <SectionHeader title="OGUN LGA MAP" subtitle="Submissions by LGA" />
+      <Card className="fade-in">
+        <CardHeader className="flex flex-col gap-4 border-b bg-muted/30 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-2 self-start">
+            <MapPin className="h-5 w-5 text-primary" />
+            <CardTitle className="text-left text-base font-semibold">Live Submission Map</CardTitle>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowLabels((value) => !value)}
-              className="gap-2"
-            >
-              <Tag className="h-4 w-4" />
-              {showLabels ? "Hide" : "Show"} LGA Labels
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleExportMap} className="gap-2">
-              <Download className="h-4 w-4" />
-              Export Map
-            </Button>
+          <div className="flex flex-wrap items-end gap-3">
+            <Select value={selectedLga} onValueChange={setSelectedLga}>
+              <SelectTrigger className="min-w-[180px]">
+                <SelectValue placeholder="All LGAs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All LGAs</SelectItem>
+                {lgas.map((lga) => (
+                  <SelectItem key={lga} value={lga}>
+                    {lga}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
+              <SelectTrigger className="min-w-[180px]">
+                <SelectValue placeholder="All Error Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Error Types</SelectItem>
+                {errorTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {formatErrorLabel(type)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
+              <SelectTrigger className="min-w-[200px]">
+                <SelectValue placeholder="All Interviewers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Interviewers</SelectItem>
+                {interviewers.map((interviewer) => (
+                  <SelectItem key={interviewer} value={interviewer}>
+                    {interviewer}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[500px] w-full overflow-hidden rounded-lg border">
+            <div ref={mapContainerRef} className="h-full w-full" />
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-sm text-muted-foreground">
+              Showing {filteredSubmissions.length.toLocaleString()} submissions
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLabels((value) => !value)}
+                className="gap-2"
+              >
+                <Tag className="h-4 w-4" />
+                {showLabels ? "Hide" : "Show"} LGA Labels
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportMap} className="gap-2">
+                <Download className="h-4 w-4" />
+                Export Map
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
   );
 }

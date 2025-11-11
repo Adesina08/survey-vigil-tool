@@ -16,9 +16,9 @@ export function FilterControls({ lgas, onFilterChange, selectedLga }: FilterCont
   const currentValue = selectedLga && selectedLga !== "all" ? selectedLga : "all";
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:max-w-xs">
+    <div className="flex flex-wrap items-end gap-3">
       <Select value={currentValue} onValueChange={(value) => onFilterChange("lga", value)}>
-        <SelectTrigger>
+        <SelectTrigger className="min-w-[180px]">
           <SelectValue placeholder="All LGAs" />
         </SelectTrigger>
         <SelectContent>
