@@ -135,7 +135,7 @@ const Index = () => {
         />
       </main>
 
-      <ExportBar />
+      <ExportBar rows={dashboardData.analysisRows} filenamePrefix="ogstep-dashboard" />
 
       <footer className="border-t bg-background py-4">
         <div className="mx-auto max-w-7xl px-6 text-center text-sm text-muted-foreground">

@@ -120,9 +120,6 @@ export function SummaryCards({ data }: SummaryCardsProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{card.value}</div>
-            {card.helper ? (
-              <p className="mt-2 text-xs text-muted-foreground">{card.helper}</p>
-            ) : null}
           </CardContent>
         </Card>
       ))}

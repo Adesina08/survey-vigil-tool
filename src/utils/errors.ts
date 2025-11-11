@@ -1,50 +1,99 @@
-const splitIssues = (value: string): string[] =>
-  value
-    .split(/[;|,\n]/)
-    .map((chunk) => chunk.trim())
-    .filter((chunk) => chunk.length > 0);
+const DELIMITER_REGEX = /[;|,\n]/;
 
-const normaliseErrorCode = (value: string): string | null => {
-  const trimmed = value.trim();
+const ERROR_FIELD_CANDIDATES = [
+  "Quality Flags",
+  "quality_flags",
+  "Flagged Issues",
+  "flagged_issues",
+  "Flags",
+  "flags",
+  "Issues",
+  "issues",
+  "Quality Issues",
+  "quality_issues",
+  "QC Flags",
+  "qc_flags",
+  "Error Flags",
+  "error_flags",
+  "Error",
+  "error",
+];
+
+const NESTED_PATHS: Array<[string, string]> = [
+  ["qualityMetadata", "flags"],
+  ["qualityMetadata", "issues"],
+  ["metadata", "flags"],
+  ["metadata", "issues"],
+];
+
+const toArray = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(DELIMITER_REGEX)
+      .map((chunk) => chunk.trim())
+      .filter((chunk) => chunk.length > 0);
+  }
+
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  return [value];
+};
+
+const normaliseErrorCode = (value: unknown): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const trimmed = String(value).trim();
   if (!trimmed) {
     return null;
   }
-  const [code] = trimmed.split(":");
-  return code.trim() || null;
+
+  const [leading] = trimmed.split(/[:-]/);
+  const token = (leading ?? "").trim();
+  return token || trimmed;
 };
 
-const extractErrorCodes = (row: Record<string, unknown>): string[] => {
-  const codes = new Set<string>();
-  const errorFlags = row["Error Flags"];
-
-  if (Array.isArray(errorFlags)) {
-    errorFlags
-      .map((entry) => normaliseErrorCode(String(entry)))
-      .forEach((code) => {
-        if (code) {
-          codes.add(code);
-        }
-      });
-  } else if (typeof errorFlags === "string" && errorFlags.trim().length > 0) {
-    splitIssues(errorFlags).forEach((chunk) => {
-      const code = normaliseErrorCode(chunk);
-      if (code) {
-        codes.add(code);
-      }
-    });
+const readNestedField = (row: Record<string, unknown>, path: [string, string]) => {
+  const [parentKey, childKey] = path;
+  const parent = row[parentKey];
+  if (!parent || typeof parent !== "object") {
+    return undefined;
   }
+  return (parent as Record<string, unknown>)[childKey];
+};
 
-  const qcIssues = row["QC Issues"];
-  if (typeof qcIssues === "string" && qcIssues.trim().length > 0) {
-    splitIssues(qcIssues).forEach((chunk) => {
-      const code = normaliseErrorCode(chunk);
-      if (code) {
-        codes.add(code);
-      }
-    });
-  }
+export const extractErrorCodes = (row: Record<string, unknown>): string[] => {
+  const perRow = new Set<string>();
 
-  return Array.from(codes);
+  const candidates: unknown[] = [];
+
+  ERROR_FIELD_CANDIDATES.forEach((field) => {
+    if (field in row) {
+      candidates.push(row[field]);
+    }
+  });
+
+  NESTED_PATHS.forEach((path) => {
+    const nested = readNestedField(row, path);
+    if (nested !== undefined) {
+      candidates.push(nested);
+    }
+  });
+
+  candidates
+    .flatMap((value) => toArray(value))
+    .map((value) => normaliseErrorCode(value))
+    .filter((value): value is string => Boolean(value))
+    .forEach((code) => perRow.add(code));
+
+  return Array.from(perRow);
 };
 
 export function getErrorBreakdown(rows: Record<string, unknown>[]) {

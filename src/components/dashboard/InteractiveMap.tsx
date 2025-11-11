@@ -264,7 +264,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
         }
 
         if (!response || !response.ok) {
-          response = await fetch("/ogun-lga.geojson").catch(() => null as any);
+          response = await fetch("/ogun-lga.geojson").catch(() => null);
         }
 
         if (!response || !response.ok) return;
@@ -315,6 +315,41 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
       marker.addTo(layer);
     });
   }, [filteredSubmissions]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    const map = mapRef.current;
+    const points = filteredSubmissions
+      .map((submission) => {
+        const { lat, lng } = submission;
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          return null;
+        }
+        return L.latLng(lat, lng);
+      })
+      .filter((value): value is ReturnType<typeof L.latLng> => value !== null);
+
+    if (points.length === 0) {
+      const boundaryBounds = boundaryLayerRef.current?.getBounds();
+      if (boundaryBounds && boundaryBounds.isValid()) {
+        map.fitBounds(boundaryBounds, { padding: [32, 32] });
+      } else {
+        map.setView([7.15, 3.35], 8, { animate: true });
+      }
+      return;
+    }
+
+    if (points.length === 1) {
+      map.setView(points[0], 13, { animate: true });
+      return;
+    }
+
+    const bounds = L.latLngBounds(points);
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [32, 32] });
+    }
+  }, [filteredSubmissions, selectedLga, selectedErrorType, selectedInterviewer]);
 
   useEffect(() => {
     if (!mapRef.current) return;
