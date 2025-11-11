@@ -21,22 +21,15 @@ interface SummaryCardsProps {
 export function SummaryCards({ data }: SummaryCardsProps) {
   const formatNumber = (value: number) => value.toLocaleString();
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
-  const pathTotal = Math.max(
-    data.treatmentPathCount + data.controlPathCount + data.unknownPathCount,
-    0,
-  );
+  const knownPathTotal = Math.max(data.treatmentPathCount + data.controlPathCount, 0);
 
   const formatPathHelper = (count: number) => {
-    if (pathTotal === 0) {
-      return "No submissions recorded";
+    if (knownPathTotal === 0) {
+      return "No submissions with recorded OGSTEP path.";
     }
 
-    const percentage = (count / pathTotal) * 100;
-    const unknownNote =
-      data.unknownPathCount > 0
-        ? ` · ${data.unknownPathCount.toLocaleString()} unknown`
-        : "";
-    return `${percentage.toFixed(1)}% of submissions${unknownNote}`;
+    const percentage = (count / knownPathTotal) * 100;
+    return `${percentage.toFixed(1)}% of submissions with OGSTEP path`;
   };
 
   const cards = [
@@ -72,14 +65,14 @@ export function SummaryCards({ data }: SummaryCardsProps) {
       helper: `Flag rate: ${formatPercentage(data.notApprovedRate)}`,
     },
     {
-      title: "🔵 Treatment path",
+      title: "Treatment path",
       value: formatNumber(data.treatmentPathCount),
       icon: Circle,
       variant: "treatment" as const,
       helper: formatPathHelper(data.treatmentPathCount),
     },
     {
-      title: "🟢 Control path",
+      title: "Control path",
       value: formatNumber(data.controlPathCount),
       icon: Circle,
       variant: "control" as const,
