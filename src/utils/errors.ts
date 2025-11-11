@@ -143,6 +143,12 @@ export const extractQualityIndicatorCounts = (
   const counts: Record<string, number> = {};
 
   Object.entries(row).forEach(([key, value]) => {
+    const trimmedKey = key.trim();
+
+    if (/^QC\s*FLAG\s*COUNT$/i.test(trimmedKey)) {
+      return;
+    }
+
     if (!/^QC_(FLAG|WARN)_/i.test(key)) {
       return;
     }

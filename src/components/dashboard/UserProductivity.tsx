@@ -117,7 +117,7 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
     [],
   );
 
-  const totals = useMemo(
+  const overallTotals = useMemo(
     () =>
       rankedProductivity.reduce(
         (acc, interviewer) => {
@@ -135,8 +135,16 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
   const topPerformer = topPerformers[0];
   const remainingTopPerformers = topPerformers.slice(1);
 
-  const overallApprovalRate = totals.total > 0 ? (totals.valid / totals.total) * 100 : 0;
+  const overallApprovalRate =
+    overallTotals.total > 0 ? (overallTotals.valid / overallTotals.total) * 100 : 0;
   const topApprovalRate = topPerformer ? topPerformer.approvalRate : 0;
+  const topPerformerTotals = topPerformer
+    ? {
+        total: topPerformer.totalSubmissions,
+        valid: topPerformer.validSubmissions,
+        invalid: topPerformer.invalidSubmissions,
+      }
+    : { total: 0, valid: 0, invalid: 0 };
 
   return (
     <div className="space-y-6 fade-in">
@@ -173,15 +181,21 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-lg bg-muted/40 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total interviews</p>
-                <p className="mt-2 text-2xl font-semibold text-foreground">{totals.total.toLocaleString()}</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">
+                  {topPerformerTotals.total.toLocaleString()}
+                </p>
               </div>
               <div className="rounded-lg bg-muted/40 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Approved</p>
-                <p className="mt-2 text-2xl font-semibold text-success">{totals.valid.toLocaleString()}</p>
+                <p className="mt-2 text-2xl font-semibold text-success">
+                  {topPerformerTotals.valid.toLocaleString()}
+                </p>
               </div>
               <div className="rounded-lg bg-muted/40 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Flagged</p>
-                <p className="mt-2 text-2xl font-semibold text-destructive">{totals.invalid.toLocaleString()}</p>
+                <p className="mt-2 text-2xl font-semibold text-destructive">
+                  {topPerformerTotals.invalid.toLocaleString()}
+                </p>
               </div>
             </div>
             <div className="space-y-3">
@@ -264,7 +278,7 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
                       <ComposedChart
                         data={chartData}
                         layout="vertical"
-                        margin={{ top: 24, right: 32, bottom: 24, left: 24 }}
+                        margin={{ top: 48, right: 32, bottom: 24, left: 24 }}
                         barCategoryGap={12}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" horizontal={false} />
