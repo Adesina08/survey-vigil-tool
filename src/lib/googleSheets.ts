@@ -221,6 +221,25 @@ const normaliseGender = (value: unknown): Gender => {
   return "Unknown";
 };
 
+const normaliseOgstepParticipation = (value: unknown): string | undefined => {
+  const text = normaliseChoiceText(value);
+  if (!text) {
+    return undefined;
+  }
+
+  const lower = text.toLowerCase();
+
+  if (lower.startsWith("y") || lower === "1" || lower === "yes" || lower === "true") {
+    return "Yes";
+  }
+
+  if (lower.startsWith("n") || lower === "0" || lower === "no" || lower === "false") {
+    return "No";
+  }
+
+  return text;
+};
+
 const interpretApprovalStatus = (value: unknown): ApprovalStatus | null => {
   const text = normaliseChoiceText(value);
   if (!text) {
@@ -489,6 +508,14 @@ export const mapSheetRowsToSubmissions = (
         getFromRow(normalisedRow, "Error Flags", "Errors", "Error Flag")
       );
 
+      const ogstepParticipation = normaliseOgstepParticipation(
+        getFromRow(
+          normalisedRow,
+          "B2. Did you participate in OGSTEP?",
+          "Did you participate in OGSTEP?"
+        )
+      );
+
       const submission: SheetSubmissionRow = {
         "Submission ID": submissionId,
         "Submission Date": submissionDateString,
@@ -520,6 +547,10 @@ export const mapSheetRowsToSubmissions = (
         "_A5. GPS Coordinates_latitude": resolvedLatitude ?? 0,
         "_A5. GPS Coordinates_longitude": resolvedLongitude ?? 0,
       };
+
+      if (ogstepParticipation) {
+        submission["B2. Did you participate in OGSTEP?"] = ogstepParticipation;
+      }
 
       if (resolvedLatitude !== undefined) {
         submission.Latitude = resolvedLatitude;

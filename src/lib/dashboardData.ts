@@ -14,6 +14,8 @@ import { normaliseHeaderKey } from "./googleSheets";
 import { getSubmissionMetrics, type Row as MetricRow } from "@/utils/metrics";
 import { getErrorBreakdown } from "@/utils/errors";
 
+type OgstepPath = "treatment" | "control" | "unknown";
+
 export type AnalysisRow = Record<string, unknown>;
 
 interface MapSubmission {
@@ -28,6 +30,8 @@ interface MapSubmission {
   errorTypes: string[];
   timestamp: string;
   status: "approved" | "not_approved";
+  ogstepPath: OgstepPath;
+  ogstepResponse: string | null;
 }
 
 interface SummaryData {
@@ -38,11 +42,20 @@ interface SummaryData {
   notApprovedSubmissions: number;
   notApprovedRate: number;
   latestSubmissionTime?: string | null;
+  treatmentPathCount: number;
+  controlPathCount: number;
+  unknownPathCount: number;
 }
 
 interface StatusBreakdown {
   approved: number;
   notApproved: number;
+}
+
+interface PathCounts {
+  treatment: number;
+  control: number;
+  unknown: number;
 }
 
 interface QuotaLGARow {
@@ -84,6 +97,9 @@ interface AchievementRow {
   approved: number;
   notApproved: number;
   percentageApproved: number;
+  treatmentPathCount: number;
+  controlPathCount: number;
+  unknownPathCount: number;
 }
 
 interface AchievementByStateRow extends AchievementRow {
@@ -217,6 +233,56 @@ const parseSubmissionTimestamp = (row: SheetSubmissionRow): Date | null => {
 
 const incrementMap = (map: Map<string, number>, key: string, amount = 1) => {
   map.set(key, (map.get(key) ?? 0) + amount);
+};
+
+const createEmptyPathCounts = (): PathCounts => ({ treatment: 0, control: 0, unknown: 0 });
+
+const determineOgstepPath = (response?: string | null): OgstepPath => {
+  if (!response) {
+    return "unknown";
+  }
+
+  const lower = response.trim().toLowerCase();
+  if (!lower) {
+    return "unknown";
+  }
+
+  if (lower.startsWith("y") || lower === "1" || lower === "yes" || lower === "true") {
+    return "treatment";
+  }
+
+  if (lower.startsWith("n") || lower === "0" || lower === "no" || lower === "false") {
+    return "control";
+  }
+
+  return "unknown";
+};
+
+const extractOgstepDetails = (row: SheetSubmissionRow): { response: string | null; path: OgstepPath } => {
+  const raw = row["B2. Did you participate in OGSTEP?"];
+  if (raw === undefined || raw === null) {
+    return { response: null, path: "unknown" };
+  }
+
+  const response = String(raw).trim();
+  const normalised = response.length > 0 ? response : null;
+  return { response: normalised, path: determineOgstepPath(normalised) };
+};
+
+const incrementPathCount = (counts: PathCounts, path: OgstepPath) => {
+  if (path === "treatment") {
+    counts.treatment += 1;
+  } else if (path === "control") {
+    counts.control += 1;
+  } else {
+    counts.unknown += 1;
+  }
+};
+
+const incrementPathCountsMap = (map: Map<string, PathCounts>, key: string, path: OgstepPath) => {
+  const counts = map.get(key) ?? createEmptyPathCounts();
+  incrementPathCount(counts, path);
+  map.set(key, counts);
 };
 
 const getNumber = (value: number | undefined | null) => (value ?? 0);
@@ -372,6 +438,11 @@ export const buildDashboardData = ({
 
   const interviewerNames = new Map<string, string>();
 
+  const ogstepTotals: PathCounts = createEmptyPathCounts();
+  const ogstepByState = new Map<string, PathCounts>();
+  const ogstepByInterviewer = new Map<string, PathCounts>();
+  const ogstepByLGA = new Map<string, PathCounts>();
+
   const errorTypes: ErrorType[] = [
     "OddHour",
     "Low LOI",
@@ -409,12 +480,20 @@ export const buildDashboardData = ({
     const lga = getLGA(row);
     const approvalStatus = getApprovalStatus(row);
     const errorFlags = row["Error Flags"] ?? [];
+    const { response: ogstepResponse, path: ogstepPath } = extractOgstepDetails(row);
 
     const lat = getCoordinate(row, "lat");
     const lng = getCoordinate(row, "lng");
 
     const hasValidCoordinates = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
     const hasValidLGA = typeof lga === "string" && lga.length > 0;
+
+    incrementPathCount(ogstepTotals, ogstepPath);
+    incrementPathCountsMap(ogstepByState, state, ogstepPath);
+    incrementPathCountsMap(ogstepByInterviewer, interviewerId, ogstepPath);
+    if (hasValidLGA) {
+      incrementPathCountsMap(ogstepByLGA, `${state}|${lga}`, ogstepPath);
+    }
 
     const submissionTimestamp = parseSubmissionTimestamp(row);
     if (submissionTimestamp && (!latestTimestamp || submissionTimestamp > latestTimestamp)) {
@@ -505,6 +584,8 @@ export const buildDashboardData = ({
         timestamp: timestampLabel,
         status: (metadata?.isValid ?? isApproved) ? "approved" : "not_approved",
         sortKey,
+        ogstepPath,
+        ogstepResponse: ogstepResponse,
       });
     }
   });
@@ -652,6 +733,7 @@ export const buildDashboardData = ({
     const approved = approvedByState.get(state) ?? 0;
     const notApproved = notApprovedByState.get(state) ?? (total - approved);
     const computedTotal = approved + notApproved;
+    const pathCounts = ogstepByState.get(state) ?? createEmptyPathCounts();
 
     return {
       state,
@@ -659,6 +741,9 @@ export const buildDashboardData = ({
       approved,
       notApproved,
       percentageApproved: computedTotal > 0 ? (approved / computedTotal) * 100 : 0,
+      treatmentPathCount: pathCounts.treatment,
+      controlPathCount: pathCounts.control,
+      unknownPathCount: pathCounts.unknown,
     };
   });
 
@@ -668,6 +753,7 @@ export const buildDashboardData = ({
       const notApproved = notApprovedByInterviewer.get(interviewerId) ?? (total - approved);
       const name = interviewerNames.get(interviewerId) ?? "";
       const label = name && name !== interviewerId ? `${interviewerId} · ${name}` : interviewerId;
+      const pathCounts = ogstepByInterviewer.get(interviewerId) ?? createEmptyPathCounts();
 
       return {
         interviewerId,
@@ -677,6 +763,9 @@ export const buildDashboardData = ({
         approved,
         notApproved,
         percentageApproved: total > 0 ? (approved / total) * 100 : 0,
+        treatmentPathCount: pathCounts.treatment,
+        controlPathCount: pathCounts.control,
+        unknownPathCount: pathCounts.unknown,
       };
     }
   ).filter((row) => row.interviewerId.toLowerCase() !== "unknown");
@@ -686,6 +775,7 @@ export const buildDashboardData = ({
     const approved = approvedByLGA.get(key) ?? 0;
     const notApproved = notApprovedByLGA.get(key) ?? (total - approved);
     const computedTotal = approved + notApproved;
+    const pathCounts = ogstepByLGA.get(key) ?? createEmptyPathCounts();
 
     return {
       lga,
@@ -694,6 +784,9 @@ export const buildDashboardData = ({
       approved,
       notApproved,
       percentageApproved: computedTotal > 0 ? (approved / computedTotal) * 100 : 0,
+      treatmentPathCount: pathCounts.treatment,
+      controlPathCount: pathCounts.control,
+      unknownPathCount: pathCounts.unknown,
     };
   });
 
@@ -704,6 +797,9 @@ export const buildDashboardData = ({
     approvalRate: Number(approvalRate.toFixed(1)),
     notApprovedSubmissions: totalNotApproved,
     notApprovedRate: Number(notApprovedRate.toFixed(1)),
+    treatmentPathCount: ogstepTotals.treatment,
+    controlPathCount: ogstepTotals.control,
+    unknownPathCount: ogstepTotals.unknown,
   };
 
   const statusBreakdown: StatusBreakdown = {

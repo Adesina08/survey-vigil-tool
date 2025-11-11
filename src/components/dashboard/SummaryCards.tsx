@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, CheckCircle, Target, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, Circle, Target, XCircle } from "lucide-react";
 
 interface SummaryData {
   overallTarget: number;
@@ -9,6 +9,9 @@ interface SummaryData {
   notApprovedSubmissions: number;
   notApprovedRate: number;
   completionRate: number;
+  treatmentPathCount: number;
+  controlPathCount: number;
+  unknownPathCount: number;
 }
 
 interface SummaryCardsProps {
@@ -18,6 +21,23 @@ interface SummaryCardsProps {
 export function SummaryCards({ data }: SummaryCardsProps) {
   const formatNumber = (value: number) => value.toLocaleString();
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
+  const pathTotal = Math.max(
+    data.treatmentPathCount + data.controlPathCount + data.unknownPathCount,
+    0,
+  );
+
+  const formatPathHelper = (count: number) => {
+    if (pathTotal === 0) {
+      return "No submissions recorded";
+    }
+
+    const percentage = (count / pathTotal) * 100;
+    const unknownNote =
+      data.unknownPathCount > 0
+        ? ` · ${data.unknownPathCount.toLocaleString()} unknown`
+        : "";
+    return `${percentage.toFixed(1)}% of submissions${unknownNote}`;
+  };
 
   const cards = [
     {
@@ -51,6 +71,20 @@ export function SummaryCards({ data }: SummaryCardsProps) {
       variant: "destructive" as const,
       helper: `Flag rate: ${formatPercentage(data.notApprovedRate)}`,
     },
+    {
+      title: "🔵 Treatment path",
+      value: formatNumber(data.treatmentPathCount),
+      icon: Circle,
+      variant: "treatment" as const,
+      helper: formatPathHelper(data.treatmentPathCount),
+    },
+    {
+      title: "🟢 Control path",
+      value: formatNumber(data.controlPathCount),
+      icon: Circle,
+      variant: "control" as const,
+      helper: formatPathHelper(data.controlPathCount),
+    },
   ];
 
   const getCardStyles = (variant: string) => {
@@ -59,6 +93,10 @@ export function SummaryCards({ data }: SummaryCardsProps) {
         return "border-success/20 bg-success/5";
       case "destructive":
         return "border-destructive/20 bg-destructive/5";
+      case "treatment":
+        return "border-blue-500/20 bg-blue-500/5";
+      case "control":
+        return "border-green-500/20 bg-green-500/5";
       default:
         return "";
     }
@@ -70,6 +108,10 @@ export function SummaryCards({ data }: SummaryCardsProps) {
         return "text-success";
       case "destructive":
         return "text-destructive";
+      case "treatment":
+        return "text-blue-500";
+      case "control":
+        return "text-green-500";
       default:
         return "text-primary";
     }

@@ -37,6 +37,8 @@ interface Submission {
   errorTypes: string[];
   timestamp: string;
   status: "approved" | "not_approved";
+  ogstepPath: "treatment" | "control" | "unknown";
+  ogstepResponse: string | null;
 }
 
 interface InterviewerOption {
@@ -56,18 +58,33 @@ type Html2CanvasFn = (element: HTMLElement, options?: Record<string, unknown>) =
 
 type Html2CanvasWindow = typeof window & { html2canvas?: Html2CanvasFn };
 
-const getMarkerColor = (status: Submission["status"]) => {
-  switch (status) {
-    case "approved":
-      return "#16a34a";
-    case "not_approved":
+const getPathMetadata = (submission: Submission) => {
+  switch (submission.ogstepPath) {
+    case "treatment":
+      return {
+        color: "#2563eb",
+        label: "Treatment path",
+        icon: "🔵",
+      } as const;
+    case "control":
+      return {
+        color: "#22c55e",
+        label: "Control path",
+        icon: "🟢",
+      } as const;
     default:
-      return "#dc2626";
+      return {
+        color: "#6b7280",
+        label: "Path unavailable",
+        icon: "⚪",
+      } as const;
   }
 };
 
-const createCustomIcon = (status: Submission["status"]) => {
-  const color = getMarkerColor(status);
+const getMarkerColor = (submission: Submission) => getPathMetadata(submission).color;
+
+const createCustomIcon = (submission: Submission) => {
+  const color = getMarkerColor(submission);
   return L.divIcon({
     className: "custom-marker",
     html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
@@ -79,6 +96,8 @@ const createCustomIcon = (status: Submission["status"]) => {
 const createPopupHtml = (submission: Submission): string => {
   const statusLabel = submission.status === "approved" ? "Approved" : "Not Approved";
   const statusColor = submission.status === "approved" ? "#16a34a" : "#dc2626";
+  const pathMetadata = getPathMetadata(submission);
+  const ogstepResponse = submission.ogstepResponse ?? "Not provided";
   const errorsSection =
     submission.errorTypes.length
       ? `<div style="margin-top:8px;">
@@ -99,6 +118,8 @@ const createPopupHtml = (submission: Submission): string => {
         <div><span style="font-weight:600;">Interviewer ID:</span> ${submission.interviewerId}</div>
         <!-- Name removed -->
         <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
+        <div><span style="font-weight:600;">OGSTEP Path:</span> <span style="font-weight:700; display:inline-flex; align-items:center; gap:4px;">${pathMetadata.icon} ${pathMetadata.label}</span></div>
+        <div style="font-size:12px;color:#64748b;">Response: ${ogstepResponse}</div>
         <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
         ${errorsSection}
         <div style="font-size:12px;color:#64748b;">${submission.timestamp}</div>
@@ -184,6 +205,11 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
       return matchesError && matchesInterviewer && matchesLga;
     });
   }, [submissions, selectedErrorType, selectedInterviewer, selectedLga]);
+
+  const hasUnknownPath = useMemo(
+    () => filteredSubmissions.some((submission) => submission.ogstepPath === "unknown"),
+    [filteredSubmissions],
+  );
 
   const handleExportMap = async () => {
     if (!mapContainerRef.current) return;
@@ -287,7 +313,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
 
     filteredSubmissions.forEach((submission) => {
       const marker = L.marker([submission.lat, submission.lng], {
-        icon: createCustomIcon(submission.status),
+        icon: createCustomIcon(submission),
       });
 
       marker.bindPopup(createPopupHtml(submission));
@@ -427,6 +453,28 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
                 Export Map
               </Button>
             </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="text-lg">
+                🔵
+              </span>
+              <span>Treatment path (B2 = Yes)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span aria-hidden="true" className="text-lg">
+                🟢
+              </span>
+              <span>Control path (B2 = No)</span>
+            </div>
+            {hasUnknownPath ? (
+              <div className="flex items-center gap-2">
+                <span aria-hidden="true" className="text-lg">
+                  ⚪
+                </span>
+                <span>Path not captured</span>
+              </div>
+            ) : null}
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-muted-foreground">
