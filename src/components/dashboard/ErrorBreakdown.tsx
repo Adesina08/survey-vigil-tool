@@ -81,9 +81,9 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
           </Table>
         </div>
         <div className="mt-4 border-t pt-4">
-          <div className="flex justify-between text-sm font-semibold">
+          <div className="grid grid-cols-[1fr_auto] items-center text-sm font-semibold">
             <span>Total Errors</span>
-            <span className="text-destructive">{totalErrors.toLocaleString()}</span>
+            <span className="text-right text-destructive">{totalErrors.toLocaleString()}</span>
           </div>
         </div>
       </CardContent>

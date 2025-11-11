@@ -46,7 +46,9 @@ export function DashboardHeader({ statusMessage, lastUpdated, onRefresh, isRefre
               {lastUpdated ? (
                 <div className="text-xs text-muted-foreground">Latest submission: {lastUpdated}</div>
               ) : null}
-              <div className="text-xs text-muted-foreground">{APP_VERSION_LABEL}</div>
+              <div className="text-xs text-muted-foreground">
+                {APP_VERSION_LABEL ? `Version ${APP_VERSION_LABEL}` : "Version not set"}
+              </div>
             </div>
             <Button
               onClick={onRefresh}

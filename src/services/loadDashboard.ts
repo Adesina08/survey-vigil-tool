@@ -240,7 +240,9 @@ export async function loadDashboardDataWithCache(
 
   try {
     const dashboard = await loadDashboardData();
-    updateStatus(`Last refreshed: ${dashboard.lastUpdated}`);
+    const refreshedAt = new Date();
+    const formattedRefresh = refreshedAt.toLocaleString();
+    updateStatus(`Last refreshed: ${formattedRefresh}`);
     return dashboard;
   } catch (error) {
     if (cached) {
