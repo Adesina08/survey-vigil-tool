@@ -64,19 +64,16 @@ const getPathMetadata = (submission: Submission) => {
       return {
         color: "#2563eb",
         label: "Treatment path",
-        icon: "🔵",
       } as const;
     case "control":
       return {
         color: "#22c55e",
         label: "Control path",
-        icon: "🟢",
       } as const;
     default:
       return {
         color: "#6b7280",
         label: "Path unavailable",
-        icon: "⚪",
       } as const;
   }
 };
@@ -118,7 +115,7 @@ const createPopupHtml = (submission: Submission): string => {
         <div><span style="font-weight:600;">Interviewer ID:</span> ${submission.interviewerId}</div>
         <!-- Name removed -->
         <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
-        <div><span style="font-weight:600;">OGSTEP Path:</span> <span style="font-weight:700; display:inline-flex; align-items:center; gap:4px;">${pathMetadata.icon} ${pathMetadata.label}</span></div>
+        <div><span style="font-weight:600;">OGSTEP Path:</span> <span style="font-weight:700;">${pathMetadata.label}</span></div>
         <div style="font-size:12px;color:#64748b;">Response: ${ogstepResponse}</div>
         <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
         ${errorsSection}
@@ -196,20 +193,17 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
   }, [interviewers, selectedInterviewer]);
 
   const filteredSubmissions = useMemo(() => {
-    return submissions.filter((submission) => {
-      const matchesError =
-        selectedErrorType === "all" || submission.errorTypes.includes(selectedErrorType);
-      const matchesInterviewer =
-        selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer;
-      const matchesLga = selectedLga === "all" || submission.lga === selectedLga;
-      return matchesError && matchesInterviewer && matchesLga;
-    });
+    return submissions
+      .filter((submission) => submission.ogstepPath !== "unknown")
+      .filter((submission) => {
+        const matchesError =
+          selectedErrorType === "all" || submission.errorTypes.includes(selectedErrorType);
+        const matchesInterviewer =
+          selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer;
+        const matchesLga = selectedLga === "all" || submission.lga === selectedLga;
+        return matchesError && matchesInterviewer && matchesLga;
+      });
   }, [submissions, selectedErrorType, selectedInterviewer, selectedLga]);
-
-  const hasUnknownPath = useMemo(
-    () => filteredSubmissions.some((submission) => submission.ogstepPath === "unknown"),
-    [filteredSubmissions],
-  );
 
   const handleExportMap = async () => {
     if (!mapContainerRef.current) return;
@@ -280,12 +274,13 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
         boundaryLayerRef.current?.remove();
         boundaryLayerRef.current = L.geoJSON(geoJson, {
           style: () => ({
-            color: "#999",
-            weight: 1,
-            fillOpacity: 0.2,
-            fillColor: "#f3f4f6",
+            color: "#1f2937",
+            weight: 1.5,
+            fillOpacity: 0,
           }),
         }).addTo(mapRef.current!);
+
+        boundaryLayerRef.current.bringToBack();
 
         setGeoJsonFeatures(geoJson.features ?? []);
 
@@ -456,25 +451,11 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <span aria-hidden="true" className="text-lg">
-                🔵
-              </span>
               <span>Treatment path (B2 = Yes)</span>
             </div>
             <div className="flex items-center gap-2">
-              <span aria-hidden="true" className="text-lg">
-                🟢
-              </span>
               <span>Control path (B2 = No)</span>
             </div>
-            {hasUnknownPath ? (
-              <div className="flex items-center gap-2">
-                <span aria-hidden="true" className="text-lg">
-                  ⚪
-                </span>
-                <span>Path not captured</span>
-              </div>
-            ) : null}
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-muted-foreground">

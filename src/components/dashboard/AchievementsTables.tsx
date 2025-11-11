@@ -98,13 +98,9 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
   const renderPathCell = (count: number, variant: "treatment" | "control") => {
-    const symbol = variant === "treatment" ? "🔵" : "🟢";
     const label = variant === "treatment" ? "Treatment" : "Control";
     return (
       <div className="flex items-center justify-end gap-2">
-        <span aria-hidden="true" className="text-lg">
-          {symbol}
-        </span>
         <span className="text-right font-medium" aria-label={`${label} path submissions`}>
           {count.toLocaleString()}
         </span>
@@ -144,8 +140,8 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Approved</TableHead>
                         <TableHead className="text-right">Not Approved</TableHead>
-                        <TableHead className="text-right">🔵 Treatment</TableHead>
-                        <TableHead className="text-right">🟢 Control</TableHead>
+                        <TableHead className="text-right">Treatment</TableHead>
+                        <TableHead className="text-right">Control</TableHead>
                         <TableHead className="text-right">% Approved</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -200,11 +196,6 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   </Table>
                 </div>
               </ScrollArea>
-              {interviewerTotals.unknownPathCount > 0 ? (
-                <p className="text-right text-xs text-muted-foreground">
-                  {interviewerTotals.unknownPathCount.toLocaleString()} submissions without an OGSTEP path response.
-                </p>
-              ) : null}
             </div>
           </TabsContent>
 
@@ -225,8 +216,8 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Approved</TableHead>
                         <TableHead className="text-right">Not Approved</TableHead>
-                        <TableHead className="text-right">🔵 Treatment</TableHead>
-                        <TableHead className="text-right">🟢 Control</TableHead>
+                        <TableHead className="text-right">Treatment</TableHead>
+                        <TableHead className="text-right">Control</TableHead>
                         <TableHead className="text-right">% Approved</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -281,11 +272,6 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   </Table>
                 </div>
               </ScrollArea>
-              {lgaTotals.unknownPathCount > 0 ? (
-                <p className="text-right text-xs text-muted-foreground">
-                  {lgaTotals.unknownPathCount.toLocaleString()} submissions without an OGSTEP path response.
-                </p>
-              ) : null}
             </div>
           </TabsContent>
         </Tabs>
