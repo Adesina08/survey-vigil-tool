@@ -58,6 +58,39 @@ const isProbablyJson = (contentType: string, raw: string) => {
   return trimmed.startsWith("{") || trimmed.startsWith("[");
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const toRecordArray = (value: unknown): Record<string, unknown>[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(isRecord);
+};
+
+const normaliseAppsScriptPayload = (value: unknown): AppsScriptPayload => {
+  if (Array.isArray(value)) {
+    return toRecordArray(value);
+  }
+
+  if (!isRecord(value)) {
+    throw new Error("Apps Script payload missing rows array.");
+  }
+
+  const rowsSource = (value["rows"] ?? value["data"] ?? []) as unknown;
+  if (!Array.isArray(rowsSource)) {
+    throw new Error("Apps Script payload missing rows array.");
+  }
+
+  return {
+    rows: toRecordArray(rowsSource),
+    stateTargets: toRecordArray(value["stateTargets"]),
+    stateAgeTargets: toRecordArray(value["stateAgeTargets"]),
+    stateGenderTargets: toRecordArray(value["stateGenderTargets"]),
+  };
+};
+
 const fetchAndParse = async (url: string): Promise<AppsScriptPayload> => {
   const response = await fetch(url, { method: "GET" });
   const contentType = response.headers.get("content-type") ?? "";
@@ -72,7 +105,8 @@ const fetchAndParse = async (url: string): Promise<AppsScriptPayload> => {
   }
 
   try {
-    return JSON.parse(raw) as AppsScriptPayload;
+    const parsed = JSON.parse(raw) as unknown;
+    return normaliseAppsScriptPayload(parsed);
   } catch (error) {
     throw new Error(`Failed to parse Apps Script response: ${error instanceof Error ? error.message : String(error)}`);
   }
