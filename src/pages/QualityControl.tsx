@@ -9,6 +9,94 @@ import { UserProductivity } from "@/components/dashboard/UserProductivity";
 import { ErrorBreakdown } from "@/components/dashboard/ErrorBreakdown";
 import { AchievementsTables } from "@/components/dashboard/AchievementsTables";
 import type { DashboardData } from "@/lib/dashboardData";
+import { determineApprovalStatus } from "@/utils/approval";
+import { extractErrorCodes, extractQualityIndicatorCounts } from "@/utils/errors";
+
+type NormalisedRow = Record<string, unknown>;
+
+type OgstepPath = "treatment" | "control" | "unknown";
+
+const getFirstTextValue = (row: NormalisedRow, keys: string[]): string | null => {
+  for (const key of keys) {
+    if (!(key in row)) {
+      continue;
+    }
+    const value = row[key];
+    if (value === null || value === undefined) {
+      continue;
+    }
+    const text = String(value).trim();
+    if (text) {
+      return text;
+    }
+  }
+  return null;
+};
+
+const getInterviewerIdFromRow = (row: NormalisedRow): string =>
+  getFirstTextValue(row, [
+    "a1_enumerator_id",
+    "interviewer_id",
+    "enumerator_id",
+    "username",
+    "interviewer",
+    "enumeratorid",
+    "interviewerid",
+  ]) ?? "Unknown";
+
+const getInterviewerNameFromRow = (row: NormalisedRow, fallbackId: string): string =>
+  getFirstTextValue(row, [
+    "interviewer_name",
+    "enumerator_name",
+    "username",
+    "interviewer",
+  ]) ?? fallbackId;
+
+const getLgaFromRow = (row: NormalisedRow): string | null =>
+  getFirstTextValue(row, [
+    "lga",
+    "a3_select_the_lga",
+    "lga_name",
+    "lga_of_interview",
+    "local_government",
+  ]);
+
+const getStateFromRow = (row: NormalisedRow): string =>
+  getFirstTextValue(row, ["state", "state_name", "a2_state"]) ?? "Unknown State";
+
+const normaliseOgstepResponse = (value: string | null): OgstepPath => {
+  if (!value) {
+    return "unknown";
+  }
+
+  const lower = value.trim().toLowerCase();
+  if (!lower) {
+    return "unknown";
+  }
+
+  if (lower.startsWith("y") || lower === "1" || lower === "yes" || lower === "true") {
+    return "treatment";
+  }
+
+  if (lower.startsWith("n") || lower === "0" || lower === "no" || lower === "false") {
+    return "control";
+  }
+
+  return "unknown";
+};
+
+const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
+  const response =
+    getFirstTextValue(row, [
+      "b2_did_you_participate_in_ogstep",
+      "did_you_participate_in_ogstep",
+      "ogstep",
+      "ogstep_participation",
+      "ogstep_response",
+    ]) ?? null;
+
+  return normaliseOgstepResponse(response);
+};
 
 type MapSubmission = DashboardData["mapSubmissions"][number];
 
@@ -25,6 +113,18 @@ const QualityControl = ({
   onFilterChange,
   selectedLga,
 }: QualityControlProps) => {
+  const filteredAnalysisRows = useMemo(() => {
+    const rows = dashboardData.analysisRows ?? [];
+    if (!selectedLga) {
+      return rows;
+    }
+
+    return rows.filter((row) => {
+      const lga = getLgaFromRow(row as NormalisedRow);
+      return lga === selectedLga;
+    });
+  }, [dashboardData.analysisRows, selectedLga]);
+
   const {
     summary,
     quotaProgress,
@@ -36,8 +136,8 @@ const QualityControl = ({
     filteredQuotaByLGA,
     filteredQuotaByLGAAge,
     filteredQuotaByLGAGender,
+    errorTypes,
   } = useMemo(() => {
-    const submissions = filteredMapSubmissions;
     const relevantQuotaByLGA = selectedLga
       ? dashboardData.quotaByLGA.filter((row) => row.lga === selectedLga)
       : dashboardData.quotaByLGA;
@@ -48,6 +148,12 @@ const QualityControl = ({
       ? dashboardData.quotaByLGAGender.filter((row) => row.lga === selectedLga)
       : dashboardData.quotaByLGAGender;
 
+    const rows = filteredAnalysisRows as NormalisedRow[];
+    let totalSubmissions = 0;
+    let approvedCount = 0;
+    let notApprovedCount = 0;
+
+    const pathTotals: Record<OgstepPath, number> = { treatment: 0, control: 0, unknown: 0 };
     const productivityMap = new Map<
       string,
       {
@@ -66,7 +172,6 @@ const QualityControl = ({
       }
     >();
 
-    const errorTotals = new Map<string, number>();
     const achievementsByLGAMap = new Map<
       string,
       {
@@ -81,12 +186,21 @@ const QualityControl = ({
       }
     >();
 
-    submissions.forEach((submission) => {
-      const interviewerId = submission.interviewerId;
+    const errorTotals = new Map<string, number>();
+
+    rows.forEach((row) => {
+      totalSubmissions += 1;
+      const interviewerId = getInterviewerIdFromRow(row);
+      const interviewerName = getInterviewerNameFromRow(row, interviewerId);
+      const displayLabel =
+        interviewerName && interviewerName !== interviewerId
+          ? `${interviewerId} · ${interviewerName}`
+          : interviewerId;
+
       const existing = productivityMap.get(interviewerId) ?? {
         interviewerId,
-        interviewerName: submission.interviewerName,
-        displayLabel: submission.interviewerLabel,
+        interviewerName,
+        displayLabel,
         totalSubmissions: 0,
         validSubmissions: 0,
         invalidSubmissions: 0,
@@ -98,69 +212,84 @@ const QualityControl = ({
         unknownPathCount: 0,
       };
 
-      existing.totalSubmissions += 1;
-      if (submission.status === "approved") {
+      const approvalStatus = determineApprovalStatus(row);
+      const isApproved = approvalStatus === "Approved";
+      if (isApproved) {
         existing.validSubmissions += 1;
+        approvedCount += 1;
       } else {
         existing.invalidSubmissions += 1;
+        notApprovedCount += 1;
       }
+      existing.totalSubmissions += 1;
 
-      switch (submission.ogstepPath) {
-        case "treatment":
-          existing.treatmentPathCount += 1;
-          break;
-        case "control":
-          existing.controlPathCount += 1;
-          break;
-        default:
-          existing.unknownPathCount += 1;
-          break;
+      const ogstepPath = getOgstepPathFromRow(row);
+      if (ogstepPath === "treatment") {
+        existing.treatmentPathCount += 1;
+      } else if (ogstepPath === "control") {
+        existing.controlPathCount += 1;
+      } else {
+        existing.unknownPathCount += 1;
       }
+      pathTotals[ogstepPath] += 1;
 
-      submission.errorTypes.forEach((errorType) => {
-        existing.errors[errorType] = (existing.errors[errorType] ?? 0) + 1;
-        existing.totalErrors += 1;
-        errorTotals.set(errorType, (errorTotals.get(errorType) ?? 0) + 1);
+      const qualityCounts = extractQualityIndicatorCounts(row);
+      Object.entries(qualityCounts).forEach(([code, value]) => {
+        if (!value || !Number.isFinite(value)) {
+          return;
+        }
+        existing.errors[code] = (existing.errors[code] ?? 0) + value;
+        existing.totalErrors += value;
+        errorTotals.set(code, (errorTotals.get(code) ?? 0) + value);
       });
+
+      extractErrorCodes(row)
+        .filter((code) => !/^QC_(FLAG|WARN)_/i.test(code))
+        .forEach((code) => {
+          existing.errors[code] = (existing.errors[code] ?? 0) + 1;
+          existing.totalErrors += 1;
+          errorTotals.set(code, (errorTotals.get(code) ?? 0) + 1);
+        });
 
       productivityMap.set(interviewerId, existing);
 
-      const lgaKey = `${submission.state}|${submission.lga}`;
-      const lgaEntry = achievementsByLGAMap.get(lgaKey) ?? {
-        state: submission.state,
-        lga: submission.lga,
-        total: 0,
-        approved: 0,
-        notApproved: 0,
-        treatmentPathCount: 0,
-        controlPathCount: 0,
-        unknownPathCount: 0,
-      };
-      lgaEntry.total += 1;
-      if (submission.status === "approved") {
-        lgaEntry.approved += 1;
-      } else {
-        lgaEntry.notApproved += 1;
-      }
-
-      switch (submission.ogstepPath) {
-        case "treatment":
+      const lga = getLgaFromRow(row);
+      if (lga) {
+        const state = getStateFromRow(row);
+        const key = `${state}|${lga}`;
+        const lgaEntry = achievementsByLGAMap.get(key) ?? {
+          state,
+          lga,
+          total: 0,
+          approved: 0,
+          notApproved: 0,
+          treatmentPathCount: 0,
+          controlPathCount: 0,
+          unknownPathCount: 0,
+        };
+        lgaEntry.total += 1;
+        if (isApproved) {
+          lgaEntry.approved += 1;
+        } else {
+          lgaEntry.notApproved += 1;
+        }
+        if (ogstepPath === "treatment") {
           lgaEntry.treatmentPathCount += 1;
-          break;
-        case "control":
+        } else if (ogstepPath === "control") {
           lgaEntry.controlPathCount += 1;
-          break;
-        default:
+        } else {
           lgaEntry.unknownPathCount += 1;
-          break;
+        }
+        achievementsByLGAMap.set(key, lgaEntry);
       }
-      achievementsByLGAMap.set(lgaKey, lgaEntry);
     });
 
-    const productivity = Array.from(productivityMap.values()).map((row) => ({
-      ...row,
-      approvalRate: row.totalSubmissions > 0 ? (row.validSubmissions / row.totalSubmissions) * 100 : 0,
-    }));
+    const productivity = Array.from(productivityMap.values())
+      .map((row) => ({
+        ...row,
+        approvalRate: row.totalSubmissions > 0 ? (row.validSubmissions / row.totalSubmissions) * 100 : 0,
+      }))
+      .filter((row) => row.interviewerId.trim().length > 0 && row.interviewerId.toLowerCase() !== "unknown");
 
     const achievementsByInterviewer = productivity
       .map((row) => ({
@@ -184,35 +313,41 @@ const QualityControl = ({
       }))
       .sort((a, b) => a.lga.localeCompare(b.lga));
 
-    const errorTypeList = dashboardData.filters.errorTypes;
+    const totalTarget = selectedLga
+      ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
+      : dashboardData.summary.overallTarget;
+    const approvedAgainstTarget = selectedLga
+      ? relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0)
+      : approvedCount;
+
+    const quotaProgress = totalTarget > 0 ? Number(((approvedAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
+
+    const summary = {
+      overallTarget: totalTarget,
+      totalSubmissions,
+      approvedSubmissions: approvedCount,
+      approvalRate: totalSubmissions > 0 ? Number(((approvedCount / totalSubmissions) * 100).toFixed(1)) : 0,
+      notApprovedSubmissions: notApprovedCount,
+      notApprovedRate: totalSubmissions > 0 ? Number(((notApprovedCount / totalSubmissions) * 100).toFixed(1)) : 0,
+      completionRate: quotaProgress,
+      treatmentPathCount: pathTotals.treatment,
+      controlPathCount: pathTotals.control,
+      unknownPathCount: pathTotals.unknown,
+    };
+
     const totalErrors = Array.from(errorTotals.values()).reduce((sum, value) => sum + value, 0);
-    const errorBreakdown = (errorTypeList.length > 0 ? errorTypeList : Array.from(errorTotals.keys()))
-      .map((errorType) => {
-        const count = errorTotals.get(errorType) ?? 0;
-        const percentage = totalErrors > 0 ? (count / totalErrors) * 100 : 0;
-        return {
-          errorType,
-          count,
-          percentage: Number(percentage.toFixed(1)),
-        };
-      })
-      .sort((a, b) => b.count - a.count);
+    const errorBreakdown = Array.from(errorTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([errorType, count]) => ({
+        errorType,
+        count,
+        percentage: totalErrors > 0 ? Number(((count / totalErrors) * 100).toFixed(1)) : 0,
+      }));
 
     return {
-      summary: {
-        overallTarget: dashboardData.summary.overallTarget,
-        totalSubmissions: dashboardData.summary.totalSubmissions,
-        approvedSubmissions: dashboardData.summary.approvedSubmissions,
-        approvalRate: dashboardData.summary.approvalRate,
-        notApprovedSubmissions: dashboardData.summary.notApprovedSubmissions,
-        notApprovedRate: dashboardData.summary.notApprovedRate,
-        completionRate: dashboardData.quotaProgress,
-        treatmentPathCount: dashboardData.summary.treatmentPathCount,
-        controlPathCount: dashboardData.summary.controlPathCount,
-        unknownPathCount: dashboardData.summary.unknownPathCount,
-      },
-      quotaProgress: dashboardData.quotaProgress,
-      statusBreakdown: dashboardData.statusBreakdown,
+      summary,
+      quotaProgress,
+      statusBreakdown: { approved: approvedCount, notApproved: notApprovedCount },
       productivity,
       errorBreakdown,
       achievementsByInterviewer,
@@ -220,16 +355,14 @@ const QualityControl = ({
       filteredQuotaByLGA: relevantQuotaByLGA,
       filteredQuotaByLGAAge: relevantQuotaByLGAAge,
       filteredQuotaByLGAGender: relevantQuotaByLGAGender,
+      errorTypes: errorBreakdown.map((item) => item.errorType),
     };
   }, [
-    dashboardData.filters.errorTypes,
     dashboardData.quotaByLGA,
     dashboardData.quotaByLGAAge,
     dashboardData.quotaByLGAGender,
-    dashboardData.summary,
-    dashboardData.statusBreakdown,
-    dashboardData.quotaProgress,
-    filteredMapSubmissions,
+    dashboardData.summary.overallTarget,
+    filteredAnalysisRows,
     selectedLga,
   ]);
 
@@ -258,7 +391,10 @@ const QualityControl = ({
         byLGAGender={filteredQuotaByLGAGender}
       />
 
-      <UserProductivity data={productivity} errorTypes={dashboardData.filters.errorTypes} />
+      <UserProductivity
+        data={productivity}
+        errorTypes={errorTypes.length > 0 ? errorTypes : dashboardData.filters.errorTypes}
+      />
 
       <ErrorBreakdown data={errorBreakdown} />
 

@@ -130,8 +130,10 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   Export Interviewer Data
                 </Button>
               </div>
-              <div className="max-h-80 overflow-auto rounded-xl border bg-background/80">
-                <Table className="relative min-w-[860px]">
+              <Table
+                containerClassName="max-h-80 overflow-auto rounded-xl border bg-background/80"
+                className="min-w-[860px]"
+              >
                   <TableHeader className="sticky top-0 z-20 bg-background">
                     <TableRow>
                       <TableHead className="sticky left-0 top-0 z-30 bg-background">Interviewer ID</TableHead>
@@ -194,7 +196,6 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                     </TableRow>
                   </TableFooter>
                 </Table>
-              </div>
             </div>
           </TabsContent>
 
@@ -206,8 +207,10 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   Export LGA Data
                 </Button>
               </div>
-              <div className="max-h-80 overflow-auto rounded-xl border bg-background/80">
-                <Table className="relative min-w-[860px]">
+              <Table
+                containerClassName="max-h-80 overflow-auto rounded-xl border bg-background/80"
+                className="min-w-[860px]"
+              >
                   <TableHeader className="sticky top-0 z-20 bg-background">
                     <TableRow>
                       <TableHead className="sticky left-0 top-0 z-30 bg-background">LGA</TableHead>
@@ -270,7 +273,6 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                     </TableRow>
                   </TableFooter>
                 </Table>
-              </div>
             </div>
           </TabsContent>
         </Tabs>
