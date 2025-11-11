@@ -3,6 +3,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { URL } from "node:url";
 
 import { loadAppsScriptPayload, loadDashboardData } from "./dashboard";
+import {
+  generateAnalysisSchema,
+  generateAnalysisTable,
+} from "./analysis";
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   const body = JSON.stringify(payload);
@@ -74,6 +78,39 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       const message = error instanceof Error ? error.message : "Unknown error";
       console.error("Failed to proxy Apps Script payload:", error);
       sendJson(res, 500, { error: message });
+    }
+    return;
+  }
+
+  if (method === "GET" && parsedUrl.pathname === "/api/analysis/schema") {
+    try {
+      const schema = await generateAnalysisSchema();
+      sendJson(res, 200, schema);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("Failed to build analysis schema:", error);
+      sendJson(res, 500, { error: message });
+    }
+    return;
+  }
+
+  if (method === "GET" && parsedUrl.pathname === "/api/analysis/table") {
+    try {
+      const params = Object.fromEntries(parsedUrl.searchParams.entries());
+      const table = await generateAnalysisTable({
+        topbreak: params.topbreak ?? null,
+        variable: params.variable ?? null,
+        stat: params.stat ?? null,
+        limitCategories: params.limit_categories ?? null,
+      });
+      sendJson(res, 200, table);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("Failed to build analysis table:", error);
+      const isClientError =
+        typeof message === "string" &&
+        (message.toLowerCase().includes("required") || message.toLowerCase().includes("no data"));
+      sendJson(res, isClientError ? 400 : 500, { error: message });
     }
     return;
   }
