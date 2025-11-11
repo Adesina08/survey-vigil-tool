@@ -32,6 +32,7 @@ interface MapSubmission {
   status: "approved" | "not_approved";
   ogstepPath: OgstepPath;
   ogstepResponse: string | null;
+  directions: string | null;
 }
 
 interface SummaryData {
@@ -331,6 +332,46 @@ const extractOgstepDetails = (row: SheetSubmissionRow): { response: string | nul
   const response = String(raw).trim();
   const normalised = response.length > 0 ? response : null;
   return { response: normalised, path: determineOgstepPath(normalised) };
+};
+
+const extractDirections = (row: SheetSubmissionRow): string | null => {
+  const record = row as Record<string, unknown>;
+  const preferredKeys = [
+    "Directions",
+    "Direction",
+    "Location Directions",
+    "Directions to Location",
+    "Directions to location",
+    "Direction to Location",
+    "Direction to location",
+    "Directions / Landmark",
+    "Nearest Landmark / Directions",
+  ];
+
+  for (const key of preferredKeys) {
+    const value = record[key];
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+  }
+
+  for (const [key, value] of Object.entries(record)) {
+    if (!key || !key.toLowerCase().includes("direction")) {
+      continue;
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
+    }
+  }
+
+  return null;
 };
 
 const incrementPathCount = (counts: PathCounts, path: OgstepPath) => {
@@ -661,6 +702,7 @@ export const buildDashboardData = ({
         sortKey,
         ogstepPath,
         ogstepResponse: ogstepResponse,
+        directions: extractDirections(row),
       });
     }
   });
