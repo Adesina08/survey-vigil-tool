@@ -11,6 +11,8 @@ import {
 } from "@/data/sampleData";
 import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks";
 import { normaliseHeaderKey } from "./googleSheets";
+import { getSubmissionMetrics, type Row as MetricRow } from "@/utils/metrics";
+import { getErrorBreakdown } from "@/utils/errors";
 
 export type AnalysisRow = Record<string, unknown>;
 
@@ -258,16 +260,14 @@ export const buildDashboardData = ({
   stateGenderTargets = [],
   analysisRows,
 }: DashboardDataInput): DashboardData => {
+  const metricsRows: MetricRow[] = Array.isArray(analysisRows)
+    ? (analysisRows as MetricRow[])
+    : (submissions as unknown as MetricRow[]);
+  const requireGpsForApproval = true;
+  const metrics = getSubmissionMetrics(metricsRows, requireGpsForApproval);
+
   const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(submissions);
-
-  const submissionIndices = processedSubmissions
-    .map((row) => getSubmissionIndex(row))
-    .filter((value): value is number => value !== null && Number.isFinite(value));
-
-  const totalSubmissions =
-    submissionIndices.length > 0
-      ? Math.max(...submissionIndices)
-      : processedSubmissions.length;
+  const totalSubmissions = metrics.total;
 
   const approvedByState = new Map<string, number>();
   const approvedByStateAge = new Map<string, number>();
@@ -307,9 +307,9 @@ export const buildDashboardData = ({
     "ClusteredInterview",
     "Terminated",
   ];
-  const errorCounts = Object.fromEntries(
+  const errorCounts: Record<string, number> = Object.fromEntries(
     errorTypes.map((type) => [type, 0])
-  ) as Record<ErrorType, number>;
+  );
 
   const interviewerErrors = new Map<
     string,
@@ -376,7 +376,8 @@ export const buildDashboardData = ({
       duplicate: 0,
     };
 
-    const isApproved = approvalStatus === "Approved";
+    const isApproved =
+      approvalStatus === "Approved" && (!requireGpsForApproval || hasValidCoordinates);
 
     if (isApproved) {
       incrementMap(approvedByState, state);
@@ -399,7 +400,7 @@ export const buildDashboardData = ({
     }
 
     errorFlags.forEach((errorType) => {
-    errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
+      errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
       switch (errorType) {
         case "OddHour":
           interviewerError.oddHour += 1;
@@ -450,8 +451,8 @@ export const buildDashboardData = ({
     }
   });
 
-  const totalApproved = [...approvedByState.values()].reduce((sum, value) => sum + value, 0);
-  const totalNotApproved = Math.max(totalSubmissions - totalApproved, 0);
+  const totalApproved = metrics.approved;
+  const totalNotApproved = metrics.notApproved;
 
   const effectiveStateTargets =
     stateTargets.length > 0
@@ -580,12 +581,19 @@ export const buildDashboardData = ({
     })
     .filter((row) => !row.interviewer.toLowerCase().includes("unknown"));
 
-  const totalErrorEvents = Object.entries(errorCounts).reduce((sum, [, value]) => sum + value, 0);
-  const errorBreakdown: ErrorBreakdownRow[] = Object.entries(errorCounts).map(([label, count]) => ({
-    errorType: label,
-    count,
-    percentage: totalErrorEvents > 0 ? (count / totalErrorEvents) * 100 : 0,
-  }));
+  const rowErrorCounts = getErrorBreakdown(metricsRows);
+  const finalErrorCounts = Object.keys(rowErrorCounts).length > 0 ? rowErrorCounts : errorCounts;
+
+  Object.keys(finalErrorCounts).forEach((code) => errorTypeSet.add(code));
+
+  const totalErrorEvents = Object.values(finalErrorCounts).reduce((sum, value) => sum + value, 0);
+  const errorBreakdown: ErrorBreakdownRow[] = Object.entries(finalErrorCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({
+      errorType: label,
+      count,
+      percentage: totalErrorEvents > 0 ? (count / totalErrorEvents) * 100 : 0,
+    }));
 
   const achievementsByState: AchievementByStateRow[] = [...totalsByState.entries()].map(([state, total]) => {
     const approved = approvedByState.get(state) ?? 0;
