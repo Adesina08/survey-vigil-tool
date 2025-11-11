@@ -164,8 +164,10 @@ const ensureTargets = (
   };
 };
 
+export const loadAppsScriptPayload = async () => fetchFromAppsScript(APPS_SCRIPT_URL);
+
 export const loadDashboardData = async (): Promise<DashboardData> => {
-  const payload = await fetchFromAppsScript(APPS_SCRIPT_URL);
+  const payload = await loadAppsScriptPayload();
 
   const submissions = mapSheetRowsToSubmissions(payload.rows, {
     defaultState: OGUN_STATE_NAME,
