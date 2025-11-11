@@ -96,7 +96,7 @@ const Index = () => {
 
   if (isError || !dashboardData?.summary) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-6">
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 sm:px-6">
         <div className="w-full max-w-md rounded-lg border bg-card p-6 text-center">
           <div className="mb-3 flex justify-center">
             <AlertCircle className="h-8 w-8 text-destructive" />
@@ -122,7 +122,7 @@ const Index = () => {
         isRefreshing={isRefreshing || isFetching}
       />
 
-      <main className="mx-auto max-w-7xl flex-1 space-y-6 px-6 py-6">
+      <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-6 sm:px-6">
         <TabsQCAnalysis
           qualityControl={
             <QualityControl
@@ -138,7 +138,7 @@ const Index = () => {
       <ExportBar rows={dashboardData.analysisRows} filenamePrefix="ogstep-dashboard" />
 
       <footer className="border-t bg-background py-4">
-        <div className="mx-auto max-w-7xl px-6 text-center text-sm text-muted-foreground">
+        <div className="mx-auto w-full max-w-7xl px-4 text-center text-sm text-muted-foreground sm:px-6">
           © 2025
         </div>
       </footer>

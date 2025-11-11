@@ -40,14 +40,14 @@ export function ExportBar({ rows, filenamePrefix = "ogstep-dashboard" }: ExportB
   };
 
   return (
-    <div className="sticky bottom-0 z-10 border-t bg-card px-6 py-4">
-      <div className="mx-auto max-w-7xl">
+    <div className="sticky bottom-0 z-10 border-t bg-card px-4 py-4 sm:px-6">
+      <div className="mx-auto w-full max-w-7xl">
         <div className="flex flex-wrap justify-center gap-2 text-center">
           <Button
             onClick={() => handleExport("all")}
             variant="default"
             size="sm"
-            className="gap-2"
+            className="w-full gap-2 sm:w-auto"
             disabled={!hasRows}
           >
             <Download className="h-4 w-4" />
@@ -57,7 +57,7 @@ export function ExportBar({ rows, filenamePrefix = "ogstep-dashboard" }: ExportB
             onClick={() => handleExport("approved")}
             variant="outline"
             size="sm"
-            className="gap-2 border-success text-success hover:bg-success/10"
+            className="w-full gap-2 border-success text-success hover:bg-success/10 sm:w-auto"
             disabled={!hasRows}
           >
             <CheckCircle className="h-4 w-4" />
@@ -67,7 +67,7 @@ export function ExportBar({ rows, filenamePrefix = "ogstep-dashboard" }: ExportB
             onClick={() => handleExport("notApproved")}
             variant="outline"
             size="sm"
-            className="gap-2 border-destructive text-destructive hover:bg-destructive/10"
+            className="w-full gap-2 border-destructive text-destructive hover:bg-destructive/10 sm:w-auto"
             disabled={!hasRows}
           >
             <XCircle className="h-4 w-4" />
@@ -77,7 +77,7 @@ export function ExportBar({ rows, filenamePrefix = "ogstep-dashboard" }: ExportB
             onClick={() => handleExport("flags")}
             variant="outline"
             size="sm"
-            className="gap-2 border-warning text-warning hover:bg-warning/10"
+            className="w-full gap-2 border-warning text-warning hover:bg-warning/10 sm:w-auto"
             disabled={!hasRows}
           >
             <Flag className="h-4 w-4" />
