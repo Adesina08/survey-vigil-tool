@@ -45,14 +45,14 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
   const totalErrors = data.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <Card className="fade-in">
-      <CardHeader>
+    <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">
+      <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
         <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5 text-warning" />
+          <AlertTriangle className="h-5 w-5" />
           Error Breakdown
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="bg-card/60 p-6">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>

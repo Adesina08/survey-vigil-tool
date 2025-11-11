@@ -25,11 +25,11 @@ export function ProgressCharts({ quotaProgress, statusBreakdown }: ProgressChart
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <Card className="slide-in">
-        <CardHeader>
+      <Card className="slide-in overflow-hidden border-none shadow-lg shadow-primary/10">
+        <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
           <CardTitle>Quota Progress</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="bg-card/60 p-6">
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie
@@ -56,11 +56,11 @@ export function ProgressCharts({ quotaProgress, statusBreakdown }: ProgressChart
         </CardContent>
       </Card>
 
-      <Card className="slide-in">
-        <CardHeader>
+      <Card className="slide-in overflow-hidden border-none shadow-lg shadow-primary/10">
+        <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
           <CardTitle>Approval Breakdown</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="bg-card/60 p-6">
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie
