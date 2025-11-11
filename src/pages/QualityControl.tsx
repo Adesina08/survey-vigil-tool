@@ -33,6 +33,27 @@ const getFirstTextValue = (row: NormalisedRow, keys: string[]): string | null =>
   return null;
 };
 
+const normaliseKey = (value: string) => value.replace(/[^a-z0-9]/gi, "").toLowerCase();
+
+const matchesSelectedLga = (candidate: string | null, selected: string | null) => {
+  if (!candidate || !selected) {
+    return false;
+  }
+
+  return candidate.trim().toLowerCase() === selected.trim().toLowerCase();
+};
+
+const lgaKeyTokens = new Set(
+  [
+    "lga",
+    "a3selectthelga",
+    "a3selectthelocalgovernment",
+    "lganame",
+    "lgaofinterview",
+    "localgovernment",
+  ].map((key) => key.toLowerCase()),
+);
+
 const getInterviewerIdFromRow = (row: NormalisedRow): string =>
   getFirstTextValue(row, [
     "a1_enumerator_id",
@@ -55,14 +76,50 @@ const getInterviewerNameFromRow = (row: NormalisedRow, fallbackId: string): stri
 const getLgaFromRow = (row: NormalisedRow): string | null =>
   getFirstTextValue(row, [
     "lga",
+    "LGA",
     "a3_select_the_lga",
+    "A3_select_the_LGA",
+    "A3. select the LGA",
+    "A3. Select The LGA",
+    "a3. select the lga",
     "lga_name",
+    "LGA_name",
     "lga_of_interview",
+    "LGA_of_interview",
     "local_government",
-  ]);
+    "Local Government",
+  ]) ??
+  (() => {
+    for (const [key, value] of Object.entries(row)) {
+      if (value === null || value === undefined) {
+        continue;
+      }
+
+      const normalisedKey = normaliseKey(key);
+      if (!lgaKeyTokens.has(normalisedKey)) {
+        continue;
+      }
+
+      const text = String(value).trim();
+      if (text) {
+        return text;
+      }
+    }
+
+    return null;
+  })();
 
 const getStateFromRow = (row: NormalisedRow): string =>
-  getFirstTextValue(row, ["state", "state_name", "a2_state"]) ?? "Unknown State";
+  getFirstTextValue(row, [
+    "state",
+    "State",
+    "state_name",
+    "State_name",
+    "a2_state",
+    "A2_state",
+    "A2. select the state",
+    "A2. Select The State",
+  ]) ?? "Unknown State";
 
 const normaliseOgstepResponse = (value: string | null): OgstepPath => {
   if (!value) {
@@ -121,7 +178,7 @@ const QualityControl = ({
 
     return rows.filter((row) => {
       const lga = getLgaFromRow(row as NormalisedRow);
-      return lga === selectedLga;
+      return matchesSelectedLga(lga, selectedLga);
     });
   }, [dashboardData.analysisRows, selectedLga]);
 
@@ -139,13 +196,13 @@ const QualityControl = ({
     errorTypes,
   } = useMemo(() => {
     const relevantQuotaByLGA = selectedLga
-      ? dashboardData.quotaByLGA.filter((row) => row.lga === selectedLga)
+      ? dashboardData.quotaByLGA.filter((row) => matchesSelectedLga(row.lga, selectedLga))
       : dashboardData.quotaByLGA;
     const relevantQuotaByLGAAge = selectedLga
-      ? dashboardData.quotaByLGAAge.filter((row) => row.lga === selectedLga)
+      ? dashboardData.quotaByLGAAge.filter((row) => matchesSelectedLga(row.lga, selectedLga))
       : dashboardData.quotaByLGAAge;
     const relevantQuotaByLGAGender = selectedLga
-      ? dashboardData.quotaByLGAGender.filter((row) => row.lga === selectedLga)
+      ? dashboardData.quotaByLGAGender.filter((row) => matchesSelectedLga(row.lga, selectedLga))
       : dashboardData.quotaByLGAGender;
 
     const rows = filteredAnalysisRows as NormalisedRow[];
@@ -256,10 +313,12 @@ const QualityControl = ({
       const lga = getLgaFromRow(row);
       if (lga) {
         const state = getStateFromRow(row);
-        const key = `${state}|${lga}`;
+        const trimmedLga = lga.trim();
+        const trimmedState = state.trim();
+        const key = `${trimmedState.toLowerCase()}|${trimmedLga.toLowerCase()}`;
         const lgaEntry = achievementsByLGAMap.get(key) ?? {
-          state,
-          lga,
+          state: trimmedState,
+          lga: trimmedLga,
           total: 0,
           approved: 0,
           notApproved: 0,
