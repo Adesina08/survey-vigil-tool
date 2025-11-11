@@ -93,45 +93,35 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
               <ScrollArea className="h-80 rounded-xl border bg-background/80">
                 <div className="min-w-[720px] p-2">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead>Interviewer ID</TableHead>
-                        <TableHead>Name</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Approved</TableHead>
                         <TableHead className="text-right">Not Approved</TableHead>
                         <TableHead className="text-right">% Approved</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {byInterviewer.map((row) => (
-                      <TableRow key={row.interviewerId}>
-                        <TableCell className="font-semibold">{row.interviewerId}</TableCell>
-                        <TableCell>
-                          {row.interviewerName && row.interviewerName !== row.interviewerId ? (
-                            <span>{row.interviewerName}</span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-success">
-                          {row.approved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {row.notApproved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatPercentage(row.percentageApproved)}
-                        </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
+                    </TableHeader>
+                    <TableBody>
+                      {byInterviewer.map((row) => (
+                        <TableRow key={row.interviewerId}>
+                          <TableCell className="font-semibold">{row.interviewerId}</TableCell>
+                          <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-success">
+                            {row.approved.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right text-destructive">
+                            {row.notApproved.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatPercentage(row.percentageApproved)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
                     <TableFooter>
                       <TableRow>
-                        <TableCell className="font-bold" colSpan={2}>
-                          Total
-                        </TableCell>
+                        <TableCell className="font-bold">Total</TableCell>
                         <TableCell className="text-right font-bold">
                           {interviewerTotals.total.toLocaleString()}
                         </TableCell>
@@ -165,32 +155,32 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
               <ScrollArea className="h-80 rounded-xl border bg-background/80">
                 <div className="min-w-[720px] p-2">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 z-10 bg-background">
                       <TableRow>
                         <TableHead>LGA</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead className="text-right">Approved</TableHead>
-                      <TableHead className="text-right">Not Approved</TableHead>
-                      <TableHead className="text-right">% Approved</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {byLGA.map((row) => (
-                      <TableRow key={`${row.state}-${row.lga}`}>
-                        <TableCell className="font-medium">{row.lga}</TableCell>
-                        <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-success">
-                          {row.approved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {row.notApproved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatPercentage(row.percentageApproved)}
-                        </TableCell>
+                        <TableHead className="text-right">Not Approved</TableHead>
+                        <TableHead className="text-right">% Approved</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
+                    </TableHeader>
+                    <TableBody>
+                      {byLGA.map((row) => (
+                        <TableRow key={`${row.state}-${row.lga}`}>
+                          <TableCell className="font-medium">{row.lga}</TableCell>
+                          <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-success">
+                            {row.approved.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right text-destructive">
+                            {row.notApproved.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatPercentage(row.percentageApproved)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
                     <TableFooter>
                       <TableRow>
                         <TableCell className="font-bold">Total</TableCell>

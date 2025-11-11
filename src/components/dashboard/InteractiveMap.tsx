@@ -30,8 +30,7 @@ interface Submission {
   lat: number;
   lng: number;
   interviewerId: string;
-  interviewerName: string;
-  interviewerLabel: string;
+  // Names no longer used anywhere
   lga: string;
   state: string;
   errorTypes: string[];
@@ -41,8 +40,8 @@ interface Submission {
 
 interface InterviewerOption {
   id: string;
-  name: string;
-  label: string;
+  name?: string;
+  label?: string;
 }
 
 interface InteractiveMapProps {
@@ -76,37 +75,35 @@ const createCustomIcon = (status: Submission["status"]) => {
   });
 };
 
-const createPopupContent = (submission: Submission) => {
-  const statusColor = getMarkerColor(submission.status);
+const createPopupHtml = (submission: Submission): string => {
+  const statusLabel = submission.status === "approved" ? "Approved" : "Not Approved";
+  const statusColor = submission.status === "approved" ? "#16a34a" : "#dc2626";
   const errorsSection =
-    submission.errorTypes.length > 0
-      ? `<div><span style="font-weight: 600;">Errors:</span> ${submission.errorTypes
-          .map((value) => formatErrorLabel(value))
-          .join(", ")}</div>`
-      : "<div><span style=\"font-weight: 600;\">Errors:</span> None</div>";
-
-  const statusLabel = submission.status === "approved" ? "APPROVED" : "NOT APPROVED";
+    submission.errorTypes.length
+      ? `<div style="margin-top:8px;">
+           <div style="font-weight:600;">Error Types:</div>
+           <ul style="margin:6px 0 0 16px; padding:0; font-size:12px;">
+             ${submission.errorTypes.map((e) => `<li>${formatErrorLabel(e)}</li>`).join("")}
+           </ul>
+         </div>`
+      : "";
 
   return `
-      <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
-        <div style="display:flex;flex-direction:column;gap:2px;">
-          <div style="font-weight:700;color:#2563eb;">${submission.interviewerLabel}</div>
-          <div style="font-size:12px;color:#64748b;">Submission #${submission.id}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          <div><span style="font-weight:600;">Interviewer ID:</span> ${submission.interviewerId}</div>
-          <div><span style="font-weight:600;">Name:</span> ${
-            submission.interviewerName && submission.interviewerName !== submission.interviewerId
-              ? submission.interviewerName
-              : "N/A"
-          }</div>
-          <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
-          <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
-          ${errorsSection}
-          <div style="font-size:12px;color:#64748b;">${submission.timestamp}</div>
-        </div>
+    <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <div style="font-weight:700;color:#2563eb;">Enumerator ${submission.interviewerId}</div>
+        <div style="font-size:12px;color:#64748b;">Submission #${submission.id}</div>
       </div>
-    `;
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div><span style="font-weight:600;">Interviewer ID:</span> ${submission.interviewerId}</div>
+        <!-- Name removed -->
+        <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
+        <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
+        ${errorsSection}
+        <div style="font-size:12px;color:#64748b;">${submission.timestamp}</div>
+      </div>
+    </div>
+  `;
 };
 
 const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
@@ -237,8 +234,11 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
 
     const loadBoundary = async () => {
       try {
-        const response = await fetch("/ogun-lga.geojson");
-        if (!response.ok) return;
+        let response = await fetch(`${import.meta.env.BASE_URL ?? "/"}ogun-lga.geojson`).catch(() => null as any);
+        if (!response || !response.ok) {
+          response = await fetch("/ogun-lga.geojson").catch(() => null as any);
+        }
+        if (!response || !response.ok) return;
         const geoJson = (await response.json()) as FeatureCollection<Geometry, Record<string, unknown>>;
 
         boundaryLayerRef.current?.remove();
@@ -280,7 +280,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
         icon: createCustomIcon(submission.status),
       });
 
-      marker.bindPopup(createPopupContent(submission));
+      marker.bindPopup(createPopupHtml(submission));
       marker.addTo(layer);
     });
   }, [filteredSubmissions]);
@@ -362,7 +362,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
             <MapPin className="h-5 w-5 text-primary" />
             <CardTitle className="text-left text-base font-semibold">Live Submission Map</CardTitle>
           </div>
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-nowrap items-end gap-3 overflow-x-auto">
             <Select value={selectedLga} onValueChange={setSelectedLga}>
               <SelectTrigger className="min-w-[180px]">
                 <SelectValue placeholder="All LGAs" />
@@ -391,18 +391,13 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
             </Select>
             <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
               <SelectTrigger className="min-w-[200px]">
-                <SelectValue placeholder="All Interviewers" />
+                <SelectValue placeholder="All Interviewers (A1 only)" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Interviewers</SelectItem>
                 {interviewers.map((interviewer) => (
                   <SelectItem key={interviewer.id} value={interviewer.id}>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-medium">{interviewer.id}</span>
-                      {interviewer.name && interviewer.name !== interviewer.id ? (
-                        <span className="text-xs text-muted-foreground">{interviewer.name}</span>
-                      ) : null}
-                    </div>
+                    <span className="font-medium">{interviewer.id}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -410,8 +405,18 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-[500px] w-full overflow-hidden rounded-lg border">
-            <div ref={mapContainerRef} className="h-full w-full" />
+          <div className="h-[500px] w-full overflow-hidden rounded-lg border relative">
+            <div ref={mapContainerRef} className="h-full w-full sticky top-20 z-0" style={{ zIndex: 0 }} />
+            <div className="absolute right-4 top-4 z-10 flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowLabels((value) => !value)} className="gap-2">
+                <Tag className="h-4 w-4" />
+                {showLabels ? "Hide" : "Show"} LGA Labels
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleExportMap} className="gap-2">
+                <Download className="h-4 w-4" />
+                Export Map
+              </Button>
+            </div>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-muted-foreground">

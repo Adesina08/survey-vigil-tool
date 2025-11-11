@@ -155,7 +155,7 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
           <TabsContent value="lga">
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead>State</TableHead>
                     <TableHead>LGA</TableHead>
@@ -184,7 +184,7 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
           <TabsContent value="age">
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead>State</TableHead>
                     <TableHead>LGA</TableHead>
@@ -215,7 +215,7 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
           <TabsContent value="gender">
             <div className="overflow-x-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-background">
                   <TableRow>
                     <TableHead>State</TableHead>
                     <TableHead>LGA</TableHead>

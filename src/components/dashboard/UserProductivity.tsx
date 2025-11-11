@@ -55,7 +55,7 @@ const tooltipBackground = {
   backgroundColor: "hsl(var(--popover))",
   border: "1px solid hsl(var(--border))",
   borderRadius: "16px",
-  boxShadow: "0 18px 32px rgba(15, 23, 42, 0.16)",
+  boxShadow: "0 18px 32px rgba(0, 0, 0, 0.12)",
 };
 
 const SubmissionTooltip = ({
@@ -69,8 +69,7 @@ const SubmissionTooltip = ({
 
   const counts = payload.filter((item) => item.dataKey === "valid" || item.dataKey === "invalid");
   const approval = payload.find((item) => item.dataKey === "approvalRate");
-  const details = (payload[0]?.payload as { fullLabel?: string }) ?? {};
-  const title = details.fullLabel ?? label;
+  const title = String(label);
 
   return (
     <div className="rounded-2xl border bg-popover p-4 shadow-lg" style={tooltipBackground}>
@@ -97,16 +96,6 @@ const SubmissionTooltip = ({
   );
 };
 
-const formatName = (interviewer: InterviewerData) => {
-  if (
-    interviewer.interviewerName &&
-    interviewer.interviewerName !== interviewer.interviewerId
-  ) {
-    return interviewer.interviewerName;
-  }
-  return "";
-};
-
 export function UserProductivity({ data }: UserProductivityProps) {
   const sortedByValid = useMemo(
     () => [...data].sort((a, b) => b.validSubmissions - a.validSubmissions),
@@ -131,7 +120,7 @@ export function UserProductivity({ data }: UserProductivityProps) {
       sortedByValid.map((item) => ({
         id: item.interviewerId,
         label: item.interviewerId,
-        fullLabel: item.displayLabel,
+        fullLabel: item.interviewerId,
         valid: item.validSubmissions,
         invalid: item.invalidSubmissions,
         approvalRate: Number(item.approvalRate.toFixed(1)),
@@ -182,14 +171,7 @@ export function UserProductivity({ data }: UserProductivityProps) {
                   {topPerformer ? (
                     <>
                       <Crown className="h-5 w-5 text-yellow-400" />
-                      <div className="flex flex-col">
-                        <span>{topPerformer.interviewerId}</span>
-                        {formatName(topPerformer) ? (
-                          <span className="text-sm font-normal text-muted-foreground">
-                            {formatName(topPerformer)}
-                          </span>
-                        ) : null}
-                      </div>
+                      <span>{topPerformer.interviewerId}</span>
                     </>
                   ) : (
                     <span>No data available</span>
@@ -244,9 +226,6 @@ export function UserProductivity({ data }: UserProductivityProps) {
                             </Badge>
                             <span className="font-semibold text-foreground">{performer.interviewerId}</span>
                           </div>
-                          {formatName(performer) ? (
-                            <span className="text-xs text-muted-foreground">{formatName(performer)}</span>
-                          ) : null}
                           <p className="text-xs text-muted-foreground">
                             {performer.validSubmissions.toLocaleString()} approved of {performer.totalSubmissions.toLocaleString()} interviews
                           </p>
@@ -291,6 +270,10 @@ export function UserProductivity({ data }: UserProductivityProps) {
                       label: "Not Approved",
                       color: "hsl(var(--destructive))",
                     },
+                    approvalRate: {
+                      label: "Approval rate",
+                      color: "hsl(var(--primary))",
+                    },
                   }}
                   className="h-[420px] w-full"
                 >
@@ -317,7 +300,12 @@ export function UserProductivity({ data }: UserProductivityProps) {
                         height={80}
                         tick={{ fill: "hsl(var(--foreground))", fontSize: 12 }}
                       />
+                      <YAxis yAxisId="left" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
                       <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        domain={[0, 100]}
+                        tickFormatter={(value) => `${value}%`}
                         tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                       />
                       <ChartTooltip content={<ChartTooltipContent />} />
@@ -325,14 +313,25 @@ export function UserProductivity({ data }: UserProductivityProps) {
                       <Bar
                         dataKey="valid"
                         stackId="submissions"
+                        yAxisId="left"
                         fill="url(#approvedGradient)"
-                        radius={[0, 0, 0, 0]}
+                        radius={[6, 6, 0, 0]}
                       />
                       <Bar
                         dataKey="invalid"
                         stackId="submissions"
+                        yAxisId="left"
                         fill="url(#rejectedGradient)"
-                        radius={[8, 8, 0, 0]}
+                        radius={[6, 6, 0, 0]}
+                      />
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="approvalRate"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={false}
+                        isAnimationActive={false}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -344,33 +343,25 @@ export function UserProductivity({ data }: UserProductivityProps) {
               <ScrollArea className="h-[420px] rounded-2xl border bg-background/80">
                 <div className="min-w-[840px] p-2">
                   <Table>
-                    <TableHeader className="bg-background/90">
+                    <TableHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur">
                       <TableRow className="bg-muted/60">
-                        <TableHead className="w-[26%]">Interviewer ID</TableHead>
-                        <TableHead className="w-[20%]">Name</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right text-success">Approved</TableHead>
-                        <TableHead className="text-right text-destructive">Not approved</TableHead>
-                        <TableHead className="text-right">Approval %</TableHead>
+                        <TableHead className="w-[26%] sticky top-0 z-10 bg-background">Interviewer ID</TableHead>
+                        <TableHead className="text-right sticky top-0 z-10 bg-background">Total</TableHead>
+                        <TableHead className="text-right sticky top-0 z-10 bg-background text-success">Approved</TableHead>
+                        <TableHead className="text-right sticky top-0 z-10 bg-background text-destructive">Not approved</TableHead>
+                        <TableHead className="text-right sticky top-0 z-10 bg-background">Approval %</TableHead>
                         {errorColumns.map((errorType) => (
-                          <TableHead key={errorType} className="text-right">
+                          <TableHead key={errorType} className="text-right sticky top-0 z-10 bg-background">
                             {formatErrorLabel(errorType)}
                           </TableHead>
                         ))}
-                        <TableHead className="text-right">Total errors</TableHead>
+                        <TableHead className="text-right sticky top-0 z-10 bg-background">Total errors</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {data.map((row) => (
                         <TableRow key={row.interviewerId} className="group transition-colors hover:bg-primary/5">
                           <TableCell className="font-semibold">{row.interviewerId}</TableCell>
-                          <TableCell className="text-sm">
-                            {formatName(row) ? (
-                              <span className="text-foreground">{formatName(row)}</span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
                           <TableCell className="text-right">{row.totalSubmissions.toLocaleString()}</TableCell>
                           <TableCell className="text-right text-success">
                             {row.validSubmissions.toLocaleString()}
