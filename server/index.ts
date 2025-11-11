@@ -2,7 +2,7 @@ import http from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { URL } from "node:url";
 
-import { loadDashboardData } from "./dashboard";
+import { loadAppsScriptPayload, loadDashboardData } from "./dashboard";
 
 const sendJson = (res: ServerResponse, status: number, payload: unknown) => {
   const body = JSON.stringify(payload);
@@ -63,6 +63,18 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
       },
       timestamp: new Date().toISOString(),
     });
+    return;
+  }
+
+  if (method === "GET" && parsedUrl.pathname === "/api/apps-script") {
+    try {
+      const payload = await loadAppsScriptPayload();
+      sendJson(res, 200, payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("Failed to proxy Apps Script payload:", error);
+      sendJson(res, 500, { error: message });
+    }
     return;
   }
 

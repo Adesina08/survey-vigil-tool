@@ -71,6 +71,11 @@ Set the Google Apps Script Web App URL that returns JSON as the single data sour
 - **Local development (Vite)**: add `VITE_APPS_SCRIPT_URL=...` to your `.env` file.
 - **Netlify / serverless functions**: set `APPS_SCRIPT_URL=...` (the server also falls back to `VITE_APPS_SCRIPT_URL`).
 
+The app now proxies requests through `/api/apps-script` by default when running in the browser to avoid
+Apps Script CORS header conflicts. If you need the frontend to talk to the Apps Script endpoint directly
+(for example when hosting the build on a static file server without the proxy), set
+`VITE_APPS_SCRIPT_DIRECT_FETCH=true` in your environment.
+
 Example entry for your environment file:
 
 ```
