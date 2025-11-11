@@ -512,6 +512,15 @@ export const applyQualityChecks = (
       "Outcome Status": isValid ? "Valid" : "Invalid",
     };
 
+    if (
+      typeof (baseRow as Record<string, unknown>).Approval !== "string" ||
+      !String((baseRow as Record<string, unknown>).Approval).trim()
+    ) {
+      (baseRow as Record<string, unknown>).Approval = isValid
+        ? "Approved"
+        : "Not Approved";
+    }
+
     const qualityMetadata: SubmissionQualityMetadata = {
       errors: uniqueErrors,
       isValid,

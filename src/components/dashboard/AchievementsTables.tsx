@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download, Award } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface StateAchievement {
   state: string;
@@ -131,71 +130,71 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   Export Interviewer Data
                 </Button>
               </div>
-              <ScrollArea className="h-80 rounded-xl border bg-background/80">
-                <div className="min-w-[860px] p-2">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-background">
-                      <TableRow>
-                        <TableHead>Interviewer ID</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right">Approved</TableHead>
-                        <TableHead className="text-right">Not Approved</TableHead>
-                        <TableHead className="text-right">Treatment</TableHead>
-                        <TableHead className="text-right">Control</TableHead>
-                        <TableHead className="text-right">% Approved</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {byInterviewer.map((row) => (
-                        <TableRow key={row.interviewerId}>
-                          <TableCell className="font-semibold">{row.interviewerId}</TableCell>
-                          <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-success">
-                            {row.approved.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right text-destructive">
-                            {row.notApproved.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {renderPathCell(row.treatmentPathCount, "treatment")}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {renderPathCell(row.controlPathCount, "control")}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {formatPercentage(row.percentageApproved)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableFooter>
-                      <TableRow>
-                        <TableCell className="font-bold">Total</TableCell>
-                        <TableCell className="text-right font-bold">
-                          {interviewerTotals.total.toLocaleString()}
+              <div className="max-h-80 overflow-auto rounded-xl border bg-background/80">
+                <Table className="relative min-w-[860px]">
+                  <TableHeader className="sticky top-0 z-20 bg-background">
+                    <TableRow>
+                      <TableHead className="sticky left-0 top-0 z-30 bg-background">Interviewer ID</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Total</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Approved</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Not Approved</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Treatment</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Control</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">% Approved</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {byInterviewer.map((row) => (
+                      <TableRow key={row.interviewerId}>
+                        <TableCell className="sticky left-0 z-10 bg-background font-semibold">
+                          {row.interviewerId}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-success">
-                          {interviewerTotals.approved.toLocaleString()}
+                        <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-success">
+                          {row.approved.toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-destructive">
-                          {interviewerTotals.notApproved.toLocaleString()}
+                        <TableCell className="text-right text-destructive">
+                          {row.notApproved.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          {renderPathCell(interviewerTotals.treatmentPathCount, "treatment")}
+                          {renderPathCell(row.treatmentPathCount, "treatment")}
                         </TableCell>
                         <TableCell className="text-right">
-                          {renderPathCell(interviewerTotals.controlPathCount, "control")}
+                          {renderPathCell(row.controlPathCount, "control")}
                         </TableCell>
-                        <TableCell className="text-right font-bold">
-                          {interviewerTotals.total > 0
-                            ? formatPercentage((interviewerTotals.approved / interviewerTotals.total) * 100)
-                            : "0.0%"}
+                        <TableCell className="text-right font-semibold">
+                          {formatPercentage(row.percentageApproved)}
                         </TableCell>
                       </TableRow>
-                    </TableFooter>
-                  </Table>
-                </div>
-              </ScrollArea>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell className="sticky left-0 z-10 bg-background font-bold">Total</TableCell>
+                      <TableCell className="text-right font-bold">
+                        {interviewerTotals.total.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-success">
+                        {interviewerTotals.approved.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-destructive">
+                        {interviewerTotals.notApproved.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {renderPathCell(interviewerTotals.treatmentPathCount, "treatment")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {renderPathCell(interviewerTotals.controlPathCount, "control")}
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        {interviewerTotals.total > 0
+                          ? formatPercentage((interviewerTotals.approved / interviewerTotals.total) * 100)
+                          : "0.0%"}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
             </div>
           </TabsContent>
 
@@ -207,71 +206,71 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                   Export LGA Data
                 </Button>
               </div>
-              <ScrollArea className="h-80 rounded-xl border bg-background/80">
-                <div className="min-w-[860px] p-2">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-10 bg-background">
-                      <TableRow>
-                        <TableHead>LGA</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="text-right">Approved</TableHead>
-                        <TableHead className="text-right">Not Approved</TableHead>
-                        <TableHead className="text-right">Treatment</TableHead>
-                        <TableHead className="text-right">Control</TableHead>
-                        <TableHead className="text-right">% Approved</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {byLGA.map((row) => (
-                        <TableRow key={`${row.state}-${row.lga}`}>
-                          <TableCell className="font-medium">{row.lga}</TableCell>
-                          <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-success">
-                            {row.approved.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right text-destructive">
-                            {row.notApproved.toLocaleString()}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {renderPathCell(row.treatmentPathCount, "treatment")}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {renderPathCell(row.controlPathCount, "control")}
-                          </TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {formatPercentage(row.percentageApproved)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    <TableFooter>
-                      <TableRow>
-                        <TableCell className="font-bold">Total</TableCell>
-                        <TableCell className="text-right font-bold">
-                          {lgaTotals.total.toLocaleString()}
+              <div className="max-h-80 overflow-auto rounded-xl border bg-background/80">
+                <Table className="relative min-w-[860px]">
+                  <TableHeader className="sticky top-0 z-20 bg-background">
+                    <TableRow>
+                      <TableHead className="sticky left-0 top-0 z-30 bg-background">LGA</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Total</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Approved</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Not Approved</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Treatment</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Control</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">% Approved</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {byLGA.map((row) => (
+                      <TableRow key={`${row.state}-${row.lga}`}>
+                        <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                          {row.lga}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-success">
-                          {lgaTotals.approved.toLocaleString()}
+                        <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
+                        <TableCell className="text-right text-success">
+                          {row.approved.toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-right font-bold text-destructive">
-                          {lgaTotals.notApproved.toLocaleString()}
+                        <TableCell className="text-right text-destructive">
+                          {row.notApproved.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          {renderPathCell(lgaTotals.treatmentPathCount, "treatment")}
+                          {renderPathCell(row.treatmentPathCount, "treatment")}
                         </TableCell>
                         <TableCell className="text-right">
-                          {renderPathCell(lgaTotals.controlPathCount, "control")}
+                          {renderPathCell(row.controlPathCount, "control")}
                         </TableCell>
-                        <TableCell className="text-right font-bold">
-                          {lgaTotals.total > 0
-                            ? formatPercentage((lgaTotals.approved / lgaTotals.total) * 100)
-                            : "0.0%"}
+                        <TableCell className="text-right font-semibold">
+                          {formatPercentage(row.percentageApproved)}
                         </TableCell>
                       </TableRow>
-                    </TableFooter>
-                  </Table>
-                </div>
-              </ScrollArea>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell className="sticky left-0 z-10 bg-background font-bold">Total</TableCell>
+                      <TableCell className="text-right font-bold">
+                        {lgaTotals.total.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-success">
+                        {lgaTotals.approved.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-destructive">
+                        {lgaTotals.notApproved.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {renderPathCell(lgaTotals.treatmentPathCount, "treatment")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {renderPathCell(lgaTotals.controlPathCount, "control")}
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        {lgaTotals.total > 0
+                          ? formatPercentage((lgaTotals.approved / lgaTotals.total) * 100)
+                          : "0.0%"}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

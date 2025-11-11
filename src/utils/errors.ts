@@ -82,11 +82,7 @@ export const extractErrorCodes = (row: Record<string, unknown>): string[] => {
           ? Number(val)
           : 0;
       if (Number.isFinite(num) && num > 0) {
-        const token = key
-          .replace(/^QC_/, "")
-          .replace(/_{2,}/g, "_")
-          .replace(/_+$/, "");
-        perRow.add(token);
+        perRow.add(key);
       }
     }
   });
@@ -123,11 +119,47 @@ export function getErrorBreakdown(rows: Record<string, unknown>[]) {
       return;
     }
 
-    const codes = extractErrorCodes(rawRow as Record<string, unknown>);
-    codes.forEach((code) => {
-      counts[code] = (counts[code] ?? 0) + 1;
+    const indicatorCounts = extractQualityIndicatorCounts(
+      rawRow as Record<string, unknown>,
+    );
+    Object.entries(indicatorCounts).forEach(([code, value]) => {
+      counts[code] = (counts[code] ?? 0) + value;
     });
+
+    const codes = extractErrorCodes(rawRow as Record<string, unknown>);
+    codes
+      .filter((code) => !/^QC_(FLAG|WARN)_/i.test(code))
+      .forEach((code) => {
+        counts[code] = (counts[code] ?? 0) + 1;
+      });
   });
 
   return counts;
 }
+
+export const extractQualityIndicatorCounts = (
+  row: Record<string, unknown>,
+): Record<string, number> => {
+  const counts: Record<string, number> = {};
+
+  Object.entries(row).forEach(([key, value]) => {
+    if (!/^QC_(FLAG|WARN)_/i.test(key)) {
+      return;
+    }
+
+    let numericValue: number | null = null;
+    if (typeof value === "number") {
+      numericValue = value;
+    } else if (typeof value === "string" && value.trim().length > 0) {
+      const parsed = Number.parseFloat(value);
+      numericValue = Number.isNaN(parsed) ? null : parsed;
+    }
+
+    if (numericValue && Number.isFinite(numericValue) && numericValue > 0) {
+      const normalisedKey = key.trim();
+      counts[normalisedKey] = (counts[normalisedKey] ?? 0) + numericValue;
+    }
+  });
+
+  return counts;
+};

@@ -40,6 +40,7 @@ export interface SheetSubmissionRow {
   simserial?: string;
   "Age Group"?: AgeGroup;
   Gender?: Gender;
+  Approval?: ApprovalStatus | string;
   "Approval Status"?: ApprovalStatus;
   "Outcome Status"?: "Valid" | "Invalid";
   "Error Flags": ErrorType[];
@@ -157,6 +158,7 @@ export const sheetSubmissions: SheetSubmissionRow[] = baseDefinitions.flatMap((d
       "Age Group": definition.ageGroup,
       Gender: definition.gender,
       "Approval Status": status,
+      Approval: status,
       "Outcome Status": status === "Approved" ? "Valid" : "Invalid",
       "Error Flags": [],
       "Interview Length (mins)": definition.interviewLength,

@@ -40,7 +40,7 @@ export function ExportBar({ rows, filenamePrefix = "ogstep-dashboard" }: ExportB
   };
 
   return (
-    <div className="sticky bottom-0 z-10 border-t bg-card px-4 py-4 sm:px-6">
+    <div className="sticky bottom-0 z-10 hidden border-t bg-card px-4 py-4 sm:block sm:px-6">
       <div className="mx-auto w-full max-w-7xl">
         <div className="flex flex-wrap justify-center gap-2 text-center">
           <Button

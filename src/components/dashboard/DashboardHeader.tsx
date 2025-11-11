@@ -1,16 +1,28 @@
-import { RefreshCw } from "lucide-react";
+import { useMemo } from "react";
+import { RefreshCw, Menu, Download, CheckCircle, XCircle, Flag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP_VERSION_LABEL } from "@/lib/appVersion";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { createDashboardCsvExporter, type DashboardExportRow } from "@/lib/exportDashboard";
 
 interface DashboardHeaderProps {
   statusMessage: string;
   lastUpdated?: string;
   onRefresh: () => void;
   isRefreshing: boolean;
+  exportRows?: DashboardExportRow[];
+  exportFilenamePrefix?: string;
 }
 
-export function DashboardHeader({ statusMessage, lastUpdated, onRefresh, isRefreshing }: DashboardHeaderProps) {
+export function DashboardHeader({
+  statusMessage,
+  lastUpdated,
+  onRefresh,
+  isRefreshing,
+  exportRows,
+  exportFilenamePrefix = "ogstep-dashboard",
+}: DashboardHeaderProps) {
   const versionLabel = typeof APP_VERSION_LABEL === "string" ? APP_VERSION_LABEL.trim() : "";
   const shouldShowVersion = versionLabel.length > 0;
 
@@ -35,8 +47,41 @@ export function DashboardHeader({ statusMessage, lastUpdated, onRefresh, isRefre
     return true;
   })();
 
+  const hasExportRows = Array.isArray(exportRows) && exportRows.length > 0;
+  const exporter = useMemo(
+    () =>
+      createDashboardCsvExporter({
+        rows: hasExportRows ? exportRows! : [],
+        filenamePrefix: exportFilenamePrefix,
+      }),
+    [exportFilenamePrefix, exportRows, hasExportRows],
+  );
+
+  const handleExport = (type: "all" | "approved" | "notApproved" | "flags") => {
+    if (!hasExportRows) {
+      console.warn("No dashboard data available to export.");
+      return;
+    }
+
+    switch (type) {
+      case "approved":
+        exporter.exportApproved();
+        break;
+      case "notApproved":
+        exporter.exportNotApproved();
+        break;
+      case "flags":
+        exporter.exportErrorFlags();
+        break;
+      case "all":
+      default:
+        exporter.exportAll();
+        break;
+    }
+  };
+
   return (
-    <header className="border-b bg-card px-4 py-4 sm:px-6">
+    <header className="sticky top-0 z-50 border-b bg-card/95 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:px-6">
       <div className="mx-auto w-full max-w-7xl">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
@@ -77,15 +122,42 @@ export function DashboardHeader({ statusMessage, lastUpdated, onRefresh, isRefre
               ) : null}
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-              <Button
-                onClick={onRefresh}
-                disabled={isRefreshing}
-                size="default"
-                className="w-full gap-2 sm:w-auto"
-              >
-                <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                Refresh Data
-              </Button>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Button
+                  onClick={onRefresh}
+                  disabled={isRefreshing}
+                  size="default"
+                  className="w-full gap-2 sm:w-auto"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                  Refresh Data
+                </Button>
+                <div className="sm:hidden">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" className="h-10 w-10">
+                        <Menu className="h-5 w-5" />
+                        <span className="sr-only">Open export menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>Export options</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => handleExport("all")} disabled={!hasExportRows}>
+                        <Download className="mr-2 h-4 w-4" /> Export All Data
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport("approved")} disabled={!hasExportRows}>
+                        <CheckCircle className="mr-2 h-4 w-4 text-success" /> Export Approved Data
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport("notApproved")} disabled={!hasExportRows}>
+                        <XCircle className="mr-2 h-4 w-4 text-destructive" /> Export Not Approved Data
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport("flags")} disabled={!hasExportRows}>
+                        <Flag className="mr-2 h-4 w-4 text-warning" /> Export Error Flags
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
               <div className="flex justify-center sm:justify-end">
                 <ThemeToggle />
               </div>
