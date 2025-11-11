@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { MapPin, Tag, Download } from "lucide-react";
+import { MapPin } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
@@ -39,6 +39,7 @@ interface Submission {
   status: "approved" | "not_approved";
   ogstepPath: "treatment" | "control" | "unknown";
   ogstepResponse: string | null;
+  directions: string | null;
 }
 
 interface InterviewerOption {
@@ -54,9 +55,7 @@ interface InteractiveMapProps {
   lgas: string[];
 }
 
-type Html2CanvasFn = (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
-
-type Html2CanvasWindow = typeof window & { html2canvas?: Html2CanvasFn };
+type ColorMode = "path" | "approval";
 
 const getPathMetadata = (submission: Submission) => {
   switch (submission.ogstepPath) {
@@ -78,10 +77,19 @@ const getPathMetadata = (submission: Submission) => {
   }
 };
 
-const getMarkerColor = (submission: Submission) => getPathMetadata(submission).color;
+const getApprovalMetadata = (submission: Submission) => {
+  const isApproved = submission.status === "approved";
+  return {
+    color: isApproved ? "#16a34a" : "#dc2626",
+    label: isApproved ? "Approved" : "Not Approved",
+  } as const;
+};
 
-const createCustomIcon = (submission: Submission) => {
-  const color = getMarkerColor(submission);
+const getMarkerColor = (submission: Submission, mode: ColorMode) =>
+  mode === "approval" ? getApprovalMetadata(submission).color : getPathMetadata(submission).color;
+
+const createCustomIcon = (submission: Submission, mode: ColorMode) => {
+  const color = getMarkerColor(submission, mode);
   return L.divIcon({
     className: "custom-marker",
     html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
@@ -95,6 +103,7 @@ const createPopupHtml = (submission: Submission): string => {
   const statusColor = submission.status === "approved" ? "#16a34a" : "#dc2626";
   const pathMetadata = getPathMetadata(submission);
   const ogstepResponse = submission.ogstepResponse ?? "Not provided";
+  const directions = submission.directions ? submission.directions : "Not provided";
   const errorsSection =
     submission.errorTypes.length
       ? `<div style="margin-top:8px;">
@@ -115,54 +124,22 @@ const createPopupHtml = (submission: Submission): string => {
         <div><span style="font-weight:600;">Interviewer ID:</span> ${submission.interviewerId}</div>
         <!-- Name removed -->
         <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
+        <div><span style="font-weight:600;">Directions:</span> ${directions}</div>
         <div><span style="font-weight:600;">OGSTEP Path:</span> <span style="font-weight:700;">${pathMetadata.label}</span></div>
         <div style="font-size:12px;color:#64748b;">Response: ${ogstepResponse}</div>
         <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
-        ${errorsSection}
-        <div style="font-size:12px;color:#64748b;">${submission.timestamp}</div>
+        <div><span style="font-weight:600;">Submitted:</span> ${submission.timestamp}</div>
       </div>
+      ${errorsSection}
     </div>
   `;
 };
 
-const loadHtml2Canvas = async (): Promise<Html2CanvasFn> => {
-  if (typeof window === "undefined") {
-    throw new Error("html2canvas can only be used in the browser");
-  }
-
-  const existingInstance = (window as Html2CanvasWindow).html2canvas;
-  if (existingInstance) {
-    return existingInstance;
-  }
-
-  const existingScript = document.querySelector<HTMLScriptElement>("script[data-html2canvas]");
-  if (existingScript) {
-    return new Promise((resolve, reject) => {
-      existingScript.addEventListener(
-        "load",
-        () => resolve((window as Html2CanvasWindow).html2canvas as Html2CanvasFn),
-        { once: true }
-      );
-      existingScript.addEventListener("error", reject, { once: true });
-    });
-  }
-
-  return new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
-    script.async = true;
-    script.dataset.html2canvas = "true";
-    script.onload = () => resolve((window as Html2CanvasWindow).html2canvas as Html2CanvasFn);
-    script.onerror = (event) => reject(event);
-    document.body.appendChild(script);
-  });
-};
-
 export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: InteractiveMapProps) {
-  const [showLabels, setShowLabels] = useState(true);
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
   const [selectedLga, setSelectedLga] = useState("all");
+  const [colorMode, setColorMode] = useState<ColorMode>("path");
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
@@ -204,24 +181,6 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
         return matchesError && matchesInterviewer && matchesLga;
       });
   }, [submissions, selectedErrorType, selectedInterviewer, selectedLga]);
-
-  const handleExportMap = async () => {
-    if (!mapContainerRef.current) return;
-
-    try {
-      const html2canvas = await loadHtml2Canvas();
-      const canvas = await html2canvas(mapContainerRef.current, {
-        useCORS: true,
-        scale: window.devicePixelRatio || 1,
-      });
-      const link = document.createElement("a");
-      link.href = canvas.toDataURL("image/png");
-      link.download = `ogun-survey-map-${Date.now()}.png`;
-      link.click();
-    } catch (error) {
-      console.error("Failed to export map", error);
-    }
-  };
 
   useEffect(() => {
     if (!mapRef.current && mapContainerRef.current) {
@@ -272,13 +231,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
         const geoJson = (await response.json()) as FeatureCollection<Geometry, Record<string, unknown>>;
 
         boundaryLayerRef.current?.remove();
-        boundaryLayerRef.current = L.geoJSON(geoJson, {
-          style: () => ({
-            color: "#1f2937",
-            weight: 1.5,
-            fillOpacity: 0,
-          }),
-        }).addTo(mapRef.current!);
+        boundaryLayerRef.current = L.geoJSON(geoJson).addTo(mapRef.current!);
 
         boundaryLayerRef.current.bringToBack();
 
@@ -308,13 +261,13 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
 
     filteredSubmissions.forEach((submission) => {
       const marker = L.marker([submission.lat, submission.lng], {
-        icon: createCustomIcon(submission),
+        icon: createCustomIcon(submission, colorMode),
       });
 
       marker.bindPopup(createPopupHtml(submission));
       marker.addTo(layer);
     });
-  }, [filteredSubmissions]);
+  }, [filteredSubmissions, colorMode]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -361,10 +314,6 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
     const layer = labelLayerRef.current;
     layer.clearLayers();
 
-    if (!showLabels) {
-      return;
-    }
-
     const addLabel = (name: string, center: L.LatLngExpression) => {
       const icon = L.divIcon({
         className: "lga-label",
@@ -410,7 +359,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
       const avgLng = data.lng / data.count;
       addLabel(lga, [avgLat, avgLng]);
     });
-  }, [showLabels, filteredSubmissions, geoJsonFeatures]);
+  }, [filteredSubmissions, geoJsonFeatures]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -471,45 +420,55 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
           </div>
         </CardHeader>
         <CardContent>
-          <div className="h-[500px] w-full overflow-hidden rounded-lg border relative">
-            <div ref={mapContainerRef} className="h-full w-full sticky top-20 z-0" style={{ zIndex: 0 }} />
-            <div className="absolute right-4 top-4 z-10 flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowLabels((value) => !value)} className="gap-2">
-                <Tag className="h-4 w-4" />
-                {showLabels ? "Hide" : "Show"} LGA Labels
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportMap} className="gap-2">
-                <Download className="h-4 w-4" />
-                Export Map
-              </Button>
-            </div>
+          <div className="relative h-[500px] w-full overflow-hidden rounded-lg border">
+            <div ref={mapContainerRef} className="sticky top-20 z-0 h-full w-full" style={{ zIndex: 0 }} />
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span>Treatment path (B2 = Yes)</span>
+          <div className="mt-4 flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              {(
+                colorMode === "path"
+                  ? [
+                      { label: "Treatment path (B2 = Yes)", color: "#2563eb" },
+                      { label: "Control path (B2 = No)", color: "#22c55e" },
+                    ]
+                  : [
+                      { label: "Approved", color: "#16a34a" },
+                      { label: "Not Approved", color: "#dc2626" },
+                    ]
+              ).map((item) => (
+                <div key={item.label} className="flex items-center gap-2">
+                  <span
+                    className="inline-flex h-3 w-3 rounded-full border border-white shadow"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span>{item.label}</span>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              <span>Control path (B2 = No)</span>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-muted-foreground">
-              Showing {filteredSubmissions.length.toLocaleString()} submissions
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowLabels((value) => !value)}
-                className="gap-2"
-              >
-                <Tag className="h-4 w-4" />
-                {showLabels ? "Hide" : "Show"} LGA Labels
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleExportMap} className="gap-2">
-                <Download className="h-4 w-4" />
-                Export Map
-              </Button>
+            <div className="flex flex-col gap-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
+              <div>Showing {filteredSubmissions.length.toLocaleString()} submissions</div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Color mode</span>
+                <ToggleGroup
+                  type="single"
+                  value={colorMode}
+                  onValueChange={(value) => {
+                    if (value === "path" || value === "approval") {
+                      setColorMode(value);
+                    }
+                  }}
+                  className="rounded-md border p-1"
+                  variant="outline"
+                  size="sm"
+                >
+                  <ToggleGroupItem value="approval" className="px-3 py-1 text-xs font-medium uppercase tracking-wide">
+                    Approval
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="path" className="px-3 py-1 text-xs font-medium uppercase tracking-wide">
+                    Path
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
             </div>
           </div>
         </CardContent>
