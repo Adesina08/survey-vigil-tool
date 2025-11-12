@@ -709,7 +709,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
           </div>
         </CardHeader>
         <CardContent className="space-y-6 bg-card/60 p-6">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="flex flex-wrap items-end gap-3">
               <Select value={selectedLga} onValueChange={setSelectedLga}>
                 <SelectTrigger className="min-w-[180px]">
