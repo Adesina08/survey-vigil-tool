@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, CheckCircle, XCircle, Flag } from "lucide-react";
-import { createDashboardCsvExporter, type DashboardExportRow } from "@/lib/exportDashboard";
+import { createDashboardExcelExporter, type DashboardExportRow } from "@/lib/exportDashboard";
 import type { ErrorBreakdownRow } from "@/lib/dashboardData";
 
 interface ExportBarProps {
@@ -14,7 +14,7 @@ export function ExportBar({ rows, errorBreakdown }: ExportBarProps) {
 
   const exporter = useMemo(
     () =>
-      createDashboardCsvExporter({
+      createDashboardExcelExporter({
         rows: Array.isArray(rows) ? rows : [],
         errorBreakdown: errorBreakdown ?? [],
       }),

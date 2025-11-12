@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP_VERSION_LABEL } from "@/lib/appVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { createDashboardCsvExporter, type DashboardExportRow } from "@/lib/exportDashboard";
+import { createDashboardExcelExporter, type DashboardExportRow } from "@/lib/exportDashboard";
 import type { ErrorBreakdownRow } from "@/lib/dashboardData";
 
 interface DashboardHeaderProps {
@@ -51,7 +51,7 @@ export function DashboardHeader({
   const hasExportRows = Array.isArray(exportRows) && exportRows.length > 0;
   const exporter = useMemo(
     () =>
-      createDashboardCsvExporter({
+      createDashboardExcelExporter({
         rows: hasExportRows ? exportRows! : [],
         errorBreakdown: errorBreakdown ?? [],
       }),
