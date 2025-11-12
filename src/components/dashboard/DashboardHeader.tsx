@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { APP_VERSION_LABEL } from "@/lib/appVersion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { createDashboardCsvExporter, type DashboardExportRow } from "@/lib/exportDashboard";
+import type { ErrorBreakdownRow } from "@/lib/dashboardData";
 
 interface DashboardHeaderProps {
   statusMessage: string;
@@ -12,7 +13,7 @@ interface DashboardHeaderProps {
   onRefresh: () => void;
   isRefreshing: boolean;
   exportRows?: DashboardExportRow[];
-  exportFilenamePrefix?: string;
+  errorBreakdown?: ErrorBreakdownRow[];
 }
 
 export function DashboardHeader({
@@ -21,7 +22,7 @@ export function DashboardHeader({
   onRefresh,
   isRefreshing,
   exportRows,
-  exportFilenamePrefix = "ogstep-dashboard",
+  errorBreakdown,
 }: DashboardHeaderProps) {
   const versionLabel = typeof APP_VERSION_LABEL === "string" ? APP_VERSION_LABEL.trim() : "";
   const shouldShowVersion = versionLabel.length > 0;
@@ -52,9 +53,9 @@ export function DashboardHeader({
     () =>
       createDashboardCsvExporter({
         rows: hasExportRows ? exportRows! : [],
-        filenamePrefix: exportFilenamePrefix,
+        errorBreakdown: errorBreakdown ?? [],
       }),
-    [exportFilenamePrefix, exportRows, hasExportRows],
+    [errorBreakdown, exportRows, hasExportRows],
   );
 
   const handleExport = (type: "all" | "approved" | "notApproved" | "flags") => {

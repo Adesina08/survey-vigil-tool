@@ -80,6 +80,19 @@ const Index = () => {
     }
   }, [dashboardData, selectedLga]);
 
+  useEffect(() => {
+    if (!dashboardData || isLoading || isFetching) {
+      return;
+    }
+
+    setStatusMessage((previous) => {
+      if (/loading/i.test(previous) || /refreshing/i.test(previous)) {
+        return `Last refreshed: ${new Date().toLocaleString()}`;
+      }
+      return previous;
+    });
+  }, [dashboardData, isFetching, isLoading]);
+
   if (isLoading && !dashboardData) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -121,7 +134,7 @@ const Index = () => {
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing || isFetching}
         exportRows={dashboardData.analysisRows}
-        exportFilenamePrefix="ogstep-dashboard"
+        errorBreakdown={dashboardData.errorBreakdown}
       />
 
       <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-6 sm:px-6">
@@ -137,11 +150,11 @@ const Index = () => {
         />
       </main>
 
-      <ExportBar rows={dashboardData.analysisRows} filenamePrefix="ogstep-dashboard" />
+      <ExportBar rows={dashboardData.analysisRows} errorBreakdown={dashboardData.errorBreakdown} />
 
       <footer className="border-t bg-background py-4">
         <div className="mx-auto w-full max-w-7xl px-4 text-center text-sm text-muted-foreground sm:px-6">
-          © 2025
+          © 2025 OGSTEP IMPCT SURVEY
         </div>
       </footer>
     </div>

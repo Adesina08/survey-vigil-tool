@@ -155,7 +155,7 @@ function buildUserProductivity(submissions: SheetSubmissionRow[]): ProductivityR
   });
 }
 
-interface ErrorBreakdownRow {
+export interface ErrorBreakdownRow {
   errorType: string;
   count: number;
   percentage: number;
@@ -1042,8 +1042,8 @@ export const dashboardData = buildDashboardData({
   stateAgeTargets: sheetStateAgeTargets,
   stateGenderTargets: sheetStateGenderTargets,
   mapMetadata: {
-    title: "OGUN LGA MAP",
-    subtitle: "Submissions by LGA",
+    title: null,
+    subtitle: null,
     exportFilenamePrefix: "ogun-lga-map",
   },
 });

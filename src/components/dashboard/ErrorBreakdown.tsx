@@ -48,6 +48,8 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
   };
 
   const totalErrors = filteredData.reduce((sum, item) => sum + item.count, 0);
+  const totalPercentageRaw = filteredData.reduce((sum, item) => sum + item.percentage, 0);
+  const totalPercentage = Math.min(Math.round(totalPercentageRaw * 10) / 10, 100);
 
   return (
     <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">
@@ -64,20 +66,24 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
         >
             <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
               <TableRow>
-                <TableHead className="sticky left-0 top-0 z-30 bg-background">Error Type</TableHead>
+                <TableHead className="sticky left-0 top-0 z-30 bg-background w-[55%] max-w-[340px]">
+                  Error Type
+                </TableHead>
                 <TableHead
-                  className="top-0 z-20 bg-background text-right hover:text-primary cursor-pointer"
+                  className="top-0 z-20 bg-background text-right hover:text-primary cursor-pointer w-[22%]"
                   onClick={() => handleSort("count")}
                 >
                   Count {sortConfig.key === "count" && (sortConfig.direction === "desc" ? "↓" : "↑")}
                 </TableHead>
-                <TableHead className="top-0 z-20 bg-background text-right">Percentage</TableHead>
+                <TableHead className="top-0 z-20 bg-background text-right w-[23%]">
+                  Percentage
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedData.map((row) => (
                 <TableRow key={row.errorType}>
-                  <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                  <TableCell className="sticky left-0 z-10 bg-background font-medium pr-4 whitespace-normal break-words">
                     {formatErrorLabel(row.errorType)}
                   </TableCell>
                   <TableCell className="text-right font-semibold text-destructive">
@@ -89,9 +95,10 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
             </TableBody>
         </Table>
         <div className="mt-4 border-t pt-4">
-          <div className="grid grid-cols-[1fr_auto] items-center text-sm font-semibold">
-            <span>Total Errors</span>
+          <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] items-center gap-2 text-sm font-semibold">
+            <span className="text-muted-foreground">Totals</span>
             <span className="text-right text-destructive">{totalErrors.toLocaleString()}</span>
+            <span className="text-right">{totalPercentage.toFixed(1)}%</span>
           </div>
         </div>
       </CardContent>
