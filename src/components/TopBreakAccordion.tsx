@@ -18,7 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, FileSpreadsheet } from "lucide-react";
 import { ANALYSIS_TABLE_ENDPOINT } from "@/lib/api.endpoints";
 
-/** Minimal type to avoid coupling to api.analysis.ts */
 type StatType = "counts" | "rowpct" | "colpct" | "totalpct";
 type AnalysisTableResponse = {
   html: string;
@@ -32,7 +31,6 @@ type AnalysisTableResponse = {
   chart?: unknown;
 };
 
-/** Build a query string that matches your backend API */
 function buildQuery(params: Record<string, string | number | boolean | null | undefined>) {
   const s = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -42,7 +40,6 @@ function buildQuery(params: Record<string, string | number | boolean | null | un
   return s.toString();
 }
 
-/** Local fetcher that replaces buildAnalysisTable */
 async function fetchAnalysisTable(opts: {
   topbreak: string;
   variable: string;
@@ -63,7 +60,6 @@ async function fetchAnalysisTable(opts: {
   return res.json() as Promise<AnalysisTableResponse>;
 }
 
-/** Simple debounce */
 function useDebouncedValue<T>(value: T, delay = 400): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -73,12 +69,10 @@ function useDebouncedValue<T>(value: T, delay = 400): T {
   return debounced;
 }
 
-/** Basic sanitizer */
 function basicSanitize(html: string): string {
   return html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
 }
 
-/** Light HTML → Excel export */
 function exportAnalysisToExcel(
   html: string,
   topbreak: string,
@@ -104,15 +98,13 @@ function exportAnalysisToExcel(
 }
 
 interface TopBreakAccordionProps {
-  /** existing props */
   topbreak: string;
   allVariables: string[];
   formatLabel: (key: string) => string;
 
-  /** external-control props used by the redesigned Analysis page */
-  variable?: string | null; // Sidebreak key (single select)
+  variable?: string | null; // external sidebreak
   statExternal?: StatType;
-  analyzeKey?: number; // bump to force re-run
+  analyzeKey?: number; // bump to refetch
   hideControls?: boolean; // hide internal selects when externally controlled
 }
 
@@ -125,34 +117,26 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
   analyzeKey,
   hideControls,
 }) => {
-  // Internal state (used only if not externally controlled)
   const [selectedVariable, setSelectedVariable] = useState<string | undefined>();
   const [stat, setStat] = useState<StatType>("counts");
 
-  // Effective values
   const effectiveVariable =
     typeof variable !== "undefined" && variable !== null ? variable : selectedVariable;
   const effectiveStat = statExternal ?? stat;
 
-  // Data state
   const [response, setResponse] = useState<AnalysisTableResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cache
   const cacheRef = useRef<Map<string, AnalysisTableResponse>>(new Map());
-
-  // Debounce variable to limit calls
   const debouncedVariable = useDebouncedValue(effectiveVariable, 400);
 
-  // Compose a stable cache key
   const cacheKey = useMemo(
     () =>
       `${topbreak}::${debouncedVariable || ""}::${effectiveStat}::${analyzeKey ?? 0}`,
     [topbreak, debouncedVariable, effectiveStat, analyzeKey]
   );
 
-  // Fetch on change (when variable present)
   useEffect(() => {
     if (!debouncedVariable) {
       setResponse(null);
@@ -221,10 +205,8 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
 
       <AccordionContent>
         <div className="space-y-4">
-          {/* Internal controls (hidden if externally controlled) */}
           {!hideControls && (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {/* Variable select */}
               <div className="space-y-1">
                 <div className="text-xs font-medium text-muted-foreground">Variable</div>
                 <Select value={selectedVariable} onValueChange={(val) => setSelectedVariable(val)}>
@@ -241,13 +223,9 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
                 </Select>
               </div>
 
-              {/* Stat select */}
               <div className="space-y-1">
                 <div className="text-xs font-medium text-muted-foreground">Statistic</div>
-                <Select
-                  value={stat}
-                  onValueChange={(val) => setStat(val as StatType)}
-                >
+                <Select value={stat} onValueChange={(val) => setStat(val as StatType)}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Counts" />
                   </SelectTrigger>
@@ -262,7 +240,6 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
             </div>
           )}
 
-          {/* Loading */}
           {loading && (
             <div className="space-y-3">
               <Skeleton className="h-10 w-full" />
@@ -270,7 +247,6 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
             </div>
           )}
 
-          {/* Error */}
           {error && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="mt-0.5 h-4 w-4" />
@@ -278,7 +254,6 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
             </div>
           )}
 
-          {/* Result */}
           {!loading && !error && response && (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">
@@ -330,7 +305,6 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
             </div>
           )}
 
-          {/* Empty state */}
           {!loading && !error && !response && (
             <div className="rounded-md border border-dashed border-border/60 bg-muted/10 p-6 text-sm text-muted-foreground">
               Select a variable to generate a cross-tabulation for {formatLabel(topbreak)}.
