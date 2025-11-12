@@ -235,9 +235,10 @@ const createPopupHtml = (submission: Submission): string => {
   const pathLabel = escapeHtml(pathMetadata.label);
   const statusLabelEscaped = escapeHtml(statusLabel);
   const rawDirection = submission.directions?.trim() ?? "";
-  const directionsHtml = rawDirection && isLikelyUrl(rawDirection)
-    ? `<a href="${escapeHtml(rawDirection)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">Direction link</a>`
-    : '<span>Direction link (unavailable)</span>';
+  const directionsHtml =
+    rawDirection.length > 0
+      ? `<a href="${escapeHtml(rawDirection)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">Direction link</a>`
+      : '<span>Direction link (unavailable)</span>';
   const errorsSection =
     submission.errorTypes.length
       ? `<div style="margin-top:8px;">

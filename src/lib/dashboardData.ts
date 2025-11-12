@@ -349,9 +349,15 @@ const extractOgstepDetails = (row: SheetSubmissionRow): { response: string | nul
 
 const extractDirections = (row: SheetSubmissionRow): string | null => {
   const record = row as Record<string, unknown>;
+
+  // 1) Exact key "Direction" takes precedence
+  if (typeof record["Direction"] === "string") {
+    const trimmed = (record["Direction"] as string).trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+
+  // 2) Otherwise check common variants you already had
   const preferredKeys = [
-    "Directions",
-    "Direction",
     "Location Directions",
     "Directions to Location",
     "Directions to location",
@@ -371,16 +377,12 @@ const extractDirections = (row: SheetSubmissionRow): string | null => {
     }
   }
 
+  // 3) Fallback: any key that includes "direction"
   for (const [key, value] of Object.entries(record)) {
-    if (!key || !key.toLowerCase().includes("direction")) {
-      continue;
-    }
-
+    if (!key || !key.toLowerCase().includes("direction")) continue;
     if (typeof value === "string") {
       const trimmed = value.trim();
-      if (trimmed.length > 0) {
-        return trimmed;
-      }
+      if (trimmed.length > 0) return trimmed;
     }
   }
 
