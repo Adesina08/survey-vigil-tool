@@ -28,7 +28,7 @@ export const normaliseHeaderKey = (key: string): string => {
     .replace(/_+/g, "_");
   const withoutLeading = preserveLeadingUnderscore
     ? `_${withUnderscores.replace(/^_+/, "")}`
-    :Lean withUnderscores.replace(/^_+/, "");
+    : withUnderscores.replace(/^_+/, "");
   const normalised = withoutLeading.replace(/_+$/, "");
   return normalised || trimmed;
 };
@@ -66,7 +66,7 @@ export const HEADER_ALIASES: Record<string, string> = {
   latitude: "_A5. GPS Coordinates_latitude",
   lon: "_A5. GPS Coordinates_longitude",
   lng: "_A5. GPS Coordinates_longitude",
-  longitude: "_A5. GPS_Configures_longitude",
+  longitude: "_A5. GPS Coordinates_longitude",
   gpscoordinates: "A5. GPS Coordinates",
   consent: "A6. Consent to participate",
   interview_duration: "Interview Length (mins)",
