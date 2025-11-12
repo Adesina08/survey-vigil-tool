@@ -1,15 +1,17 @@
-
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Loader2, RefreshCcw } from "lucide-react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion } from "@/components/ui/accordion";
+
 import TopBreakAccordion from "@/components/TopBreakAccordion";
 import SidebreakChips, { SidebreakOption } from "@/components/SidebreakChips";
+
 import { useDashboardData } from "@/hooks/useDashboardData";
-import { getAnalysisSchema, AnalysisSchema } from "@/lib/api.analysis";
+import { getAnalysisSchema, type AnalysisSchema } from "@/lib/api.analysis";
 
 // Curated Top breaks (multiselect)
 const CURATED_TOP_BREAKS = [
@@ -106,10 +108,12 @@ const SIDEBREAK_GROUPS: { group: string; items: { key: string; label: string }[]
 type StatType = "counts" | "rowpct" | "colpct" | "totalpct";
 
 const Analysis: React.FC = () => {
-  const { data: initialData } = useDashboardData();
+  // Keep data hook in case you use it elsewhere on the page
+  useDashboardData();
+
   const { data: schema, isLoading, isError, refetch, isFetching } = useQuery<AnalysisSchema, Error>({
     queryKey: ["analysis-schema"],
-    queryFn: () => getAnalysisSchema({ signal: undefined }),
+    queryFn: () => getAnalysisSchema(undefined),
     staleTime: 10 * 60 * 1000,
   });
 
@@ -119,19 +123,26 @@ const Analysis: React.FC = () => {
   const [stat, setStat] = useState<StatType>("counts");
   const [analyzeKey, setAnalyzeKey] = useState(0);
 
-  const allVariables = useMemo(() => schema?.fields?.map(f => f.name) ?? [], [schema]);
+  const allVariables = useMemo(() => schema?.fields?.map((f) => f.name) ?? [], [schema]);
+
+  const sidebreakOptions: SidebreakOption[] = useMemo(
+    () => SIDEBREAK_GROUPS.flatMap(({ group, items }) => items.map(({ key, label }) => ({ key, label, group }))),
+    []
+  );
 
   const onAnalyze = () => setAnalyzeKey((n) => n + 1);
-
-  const sidebreakOptions: SidebreakOption[] = useMemo(() => {
-    return SIDEBREAK_GROUPS.flatMap(({ group, items }) => items.map(({ key, label }) => ({ key, label, group })));
-  }, []);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-3 md:p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Analysis</h1>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          className="gap-2"
+        >
           <RefreshCcw className={"h-4 w-4 " + (isFetching ? "animate-spin" : "")} />
           Refresh schema
         </Button>
@@ -168,7 +179,9 @@ const Analysis: React.FC = () => {
                   }
                   className={
                     "rounded-full border px-3 py-1 text-sm " +
-                    (active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background hover:bg-muted")
+                    (active
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background hover:bg-muted")
                   }
                 >
                   {formatKeyToLabel(key)}
@@ -191,7 +204,7 @@ const Analysis: React.FC = () => {
             onChange={setSelectedSidebreak}
           />
 
-          {/* Measure dropdown (small) */}
+          {/* Measure dropdown (small) + Analyze */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Measure:</span>
             <select
@@ -216,8 +229,8 @@ const Analysis: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Results: one block per selected Top break */}
-      <div className="space-y-4">
+      {/* Results: one block per selected Top break (WRAPPED IN ACCORDION) */}
+      <Accordion type="multiple" className="space-y-4">
         {selectedTopBreaks.map((tb) => (
           <TopBreakAccordion
             key={`${tb}-${analyzeKey}`}
@@ -230,7 +243,7 @@ const Analysis: React.FC = () => {
             hideControls
           />
         ))}
-      </div>
+      </Accordion>
     </div>
   );
 };
