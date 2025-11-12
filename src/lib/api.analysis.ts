@@ -1,5 +1,7 @@
 import { ANALYSIS_SCHEMA_ENDPOINT, ANALYSIS_TABLE_ENDPOINT } from "@/lib/api.endpoints";
 
+const DATASET_URL = import.meta.env.VITE_ANALYSIS_DATASET_URL?.trim();
+
 export interface AnalysisField {
   name: string;
   type: "numeric" | "categorical" | string;
@@ -70,6 +72,7 @@ interface FetchTableOptions {
   dropMissing?: boolean;
   minCount?: number;
   signal?: AbortSignal;
+  datasetUrl?: string;
 }
 
 const buildQueryString = (options: FetchTableOptions): string => {
@@ -96,11 +99,23 @@ const buildQueryString = (options: FetchTableOptions): string => {
   if (typeof options.dropMissing === "boolean") {
     params.set("drop_missing", options.dropMissing ? "true" : "false");
   }
+  const datasetUrl = options.datasetUrl?.trim() || DATASET_URL;
+  if (datasetUrl) {
+    params.set("datasetUrl", datasetUrl);
+  }
   return params.toString();
 };
 
-export const getAnalysisSchema = async (signal?: AbortSignal): Promise<AnalysisSchema> => {
-  const response = await fetch(ANALYSIS_SCHEMA_ENDPOINT, { signal });
+export const getAnalysisSchema = async (
+  options?: { signal?: AbortSignal; datasetUrl?: string },
+): Promise<AnalysisSchema> => {
+  const params = new URLSearchParams();
+  const datasetUrl = options?.datasetUrl?.trim() || DATASET_URL;
+  if (datasetUrl) {
+    params.set("datasetUrl", datasetUrl);
+  }
+  const url = params.size ? `${ANALYSIS_SCHEMA_ENDPOINT}?${params.toString()}` : ANALYSIS_SCHEMA_ENDPOINT;
+  const response = await fetch(url, { signal: options?.signal });
   if (!response.ok) {
     throw new Error("Failed to load analysis schema");
   }
