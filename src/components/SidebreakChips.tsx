@@ -11,7 +11,7 @@ export interface SidebreakOption {
 interface SidebreakChipsProps {
   options: SidebreakOption[];
   value: string | null;
-  onChange: (key: string) => void;
+  onChange: (key: string | null) => void;
 }
 
 /** Horizontal, scrollable, single-select chip list grouped by sections */
@@ -38,7 +38,7 @@ const SidebreakChips: React.FC<SidebreakChipsProps> = ({ options, value, onChang
                   <button
                     type="button"
                     key={opt.key}
-                    onClick={() => onChange(opt.key)}
+                    onClick={() => onChange(active ? null : opt.key)}
                     className={cn(
                       "whitespace-nowrap rounded-full border px-3 py-1 text-xs transition",
                       active
