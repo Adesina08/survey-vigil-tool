@@ -1,16 +1,16 @@
-import { extractErrorCodes } from "@/utils/errors";
+import { formatErrorLabel } from "@/lib/utils";
 
 export type DashboardExportRow = Record<string, unknown>;
 
-interface ExporterOptions {
-  rows: DashboardExportRow[];
-  filenamePrefix?: string;
+interface ErrorBreakdownRow {
+  errorType: string;
+  count: number;
+  percentage: number;
 }
 
-interface AnnotatedRow {
-  source: DashboardExportRow;
-  parsedFlags: string[];
-  exportRow: DashboardExportRow;
+interface ExporterOptions {
+  rows: DashboardExportRow[];
+  errorBreakdown?: ErrorBreakdownRow[];
 }
 
 interface DashboardCsvExporter {
@@ -20,15 +20,7 @@ interface DashboardCsvExporter {
   exportErrorFlags: () => void;
 }
 
-const VALUE_DELIMITER = "; ";
-const PARSED_FLAGS_HEADER = "Parsed Flags";
-
-const formatTimestamp = () => {
-  const iso = new Date().toISOString();
-  return iso.replace(/[-:]/g, "").split(".")[0];
-};
-
-const createFileName = (prefix: string, label: string) => `${prefix}-${label}-${formatTimestamp()}.csv`;
+const ARRAY_DELIMITER = "; ";
 
 const serialisePrimitive = (value: unknown): string => {
   if (value === null || value === undefined) {
@@ -69,7 +61,7 @@ const serialisePrimitive = (value: unknown): string => {
         return serialisePrimitive(item);
       })
       .filter((chunk) => chunk.length > 0)
-      .join(VALUE_DELIMITER);
+      .join(ARRAY_DELIMITER);
   }
 
   if (typeof value === "object") {
@@ -91,7 +83,7 @@ const escapeCsvValue = (value: string): string => {
   return value;
 };
 
-const buildHeaderOrder = (rows: DashboardExportRow[], extraHeaders: string[]): string[] => {
+const buildHeaderOrder = (rows: DashboardExportRow[], stopKey?: string): string[] => {
   const seen = new Set<string>();
   const order: string[] = [];
 
@@ -104,12 +96,12 @@ const buildHeaderOrder = (rows: DashboardExportRow[], extraHeaders: string[]): s
     });
   });
 
-  extraHeaders.forEach((header) => {
-    if (!seen.has(header)) {
-      seen.add(header);
-      order.push(header);
+  if (stopKey) {
+    const stopIndex = order.findIndex((key) => key === stopKey);
+    if (stopIndex >= 0) {
+      return order.slice(0, stopIndex + 1);
     }
-  });
+  }
 
   return order;
 };
@@ -149,110 +141,85 @@ const triggerCsvDownload = (fileName: string, csv: string) => {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 };
 
-const normaliseStatus = (value: unknown): "approved" | "not_approved" | null => {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim().toLowerCase();
-  if (!trimmed) {
-    return null;
-  }
-
-  if (trimmed.includes("invalid")) {
-    return "not_approved";
-  }
-
-  if (trimmed.includes("not") && trimmed.includes("approv")) {
-    return "not_approved";
-  }
-
-  if (trimmed.includes("reject")) {
-    return "not_approved";
-  }
-
-  if (trimmed.includes("approv")) {
-    return "approved";
-  }
-
-  if (trimmed.includes("valid")) {
-    return "approved";
-  }
-
-  if (trimmed.includes("pass")) {
-    return "approved";
-  }
-
-  return null;
-};
-
-const resolveStatus = (row: DashboardExportRow): "approved" | "not_approved" | null => {
-  const fields = [
-    row["Approval Status"],
-    row["approval_status"],
-    row["Outcome Status"],
-    row["outcome_status"],
-    row["Status"],
-    row["status"],
-  ];
-
-  for (const field of fields) {
-    const resolved = normaliseStatus(field);
-    if (resolved) {
-      return resolved;
+const trimRowToIndex = (row: DashboardExportRow): DashboardExportRow => {
+  const output: DashboardExportRow = {};
+  for (const [key, value] of Object.entries(row)) {
+    output[key] = value;
+    if (key === "_index") {
+      break;
     }
   }
-
-  return null;
+  return output;
 };
 
-const annotateRows = (rows: DashboardExportRow[]): AnnotatedRow[] =>
-  rows.map((row) => {
-    const parsedFlags = extractErrorCodes(row);
-    const exportRow: DashboardExportRow = {
-      ...row,
-      [PARSED_FLAGS_HEADER]: parsedFlags.join(VALUE_DELIMITER),
-    };
+const normaliseApproval = (value: unknown): string => {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.trim().toLowerCase();
+};
 
-    return {
-      source: row,
-      parsedFlags,
-      exportRow,
-    };
-  });
+const formatCurrentDateLabel = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const createExportFileName = (label: string) =>
+  `OGSTEP_IMPACT_SURVEY_${label}_${formatCurrentDateLabel()}.csv`;
+
+const prepareRows = (rows: DashboardExportRow[]): DashboardExportRow[] =>
+  rows.map(trimRowToIndex);
 
 export const createDashboardCsvExporter = ({
   rows,
-  filenamePrefix = "ogstep-dashboard",
+  errorBreakdown = [],
 }: ExporterOptions): DashboardCsvExporter => {
-  const annotated = annotateRows(rows ?? []);
-  const exportRows = annotated.map((item) => item.exportRow);
-  const headers = buildHeaderOrder(exportRows, [PARSED_FLAGS_HEADER]);
+  const preparedRows = prepareRows(Array.isArray(rows) ? rows : []);
+  const baseHeaders = buildHeaderOrder(preparedRows, "_index");
 
-  const download = (label: string, selectedRows: AnnotatedRow[]) => {
-    const payload = selectedRows.map((item) => item.exportRow);
-    const csv = buildCsv(payload, headers);
-    const fileName = createFileName(filenamePrefix, label);
+  const download = (label: string, dataset: DashboardExportRow[]) => {
+    const trimmed = prepareRows(dataset);
+    const headersToUse = baseHeaders.length > 0 ? baseHeaders : buildHeaderOrder(trimmed, "_index");
+
+    if (headersToUse.length === 0) {
+      console.warn(`No headers available for ${label} export.`);
+      return;
+    }
+
+    const csv = buildCsv(trimmed, headersToUse);
+    const fileName = createExportFileName(label);
+    triggerCsvDownload(fileName, csv);
+  };
+
+  const downloadErrorBreakdown = () => {
+    const headers = ["Error Type", "Count", "Percentage"];
+    const rowsForExport = (errorBreakdown ?? []).map((row) => ({
+      "Error Type": formatErrorLabel(row.errorType),
+      Count: row.count,
+      Percentage: `${row.percentage.toFixed(1)}%`,
+    }));
+
+    const csv = buildCsv(rowsForExport, headers);
+    const fileName = createExportFileName("Error Flags");
     triggerCsvDownload(fileName, csv);
   };
 
   return {
-    exportAll: () => download("all-data", annotated),
+    exportAll: () => download("AllData", rows ?? []),
     exportApproved: () =>
       download(
-        "approved",
-        annotated.filter((item) => resolveStatus(item.source) === "approved"),
+        "ApprovedData",
+        (rows ?? []).filter((row) => normaliseApproval(row["Approval"]) === "approved"),
       ),
     exportNotApproved: () =>
       download(
-        "not-approved",
-        annotated.filter((item) => resolveStatus(item.source) === "not_approved"),
+        "NotApprovedData",
+        (rows ?? []).filter((row) => normaliseApproval(row["Approval"]) === "not approved"),
       ),
-    exportErrorFlags: () =>
-      download(
-        "error-flags",
-        annotated.filter((item) => item.parsedFlags.length > 0),
-      ),
+    exportErrorFlags: downloadErrorBreakdown,
   };
 };
 

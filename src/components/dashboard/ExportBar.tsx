@@ -2,18 +2,23 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, CheckCircle, XCircle, Flag } from "lucide-react";
 import { createDashboardCsvExporter, type DashboardExportRow } from "@/lib/exportDashboard";
+import type { ErrorBreakdownRow } from "@/lib/dashboardData";
 
 interface ExportBarProps {
   rows: DashboardExportRow[];
-  filenamePrefix?: string;
+  errorBreakdown?: ErrorBreakdownRow[];
 }
 
-export function ExportBar({ rows, filenamePrefix = "ogstep-dashboard" }: ExportBarProps) {
+export function ExportBar({ rows, errorBreakdown }: ExportBarProps) {
   const hasRows = Array.isArray(rows) && rows.length > 0;
 
   const exporter = useMemo(
-    () => createDashboardCsvExporter({ rows: Array.isArray(rows) ? rows : [], filenamePrefix }),
-    [rows, filenamePrefix],
+    () =>
+      createDashboardCsvExporter({
+        rows: Array.isArray(rows) ? rows : [],
+        errorBreakdown: errorBreakdown ?? [],
+      }),
+    [errorBreakdown, rows],
   );
 
   const handleExport = (type: "all" | "approved" | "notApproved" | "flags") => {

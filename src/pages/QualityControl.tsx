@@ -145,6 +145,7 @@ const normaliseOgstepResponse = (value: string | null): OgstepPath => {
 const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
   const response =
     getFirstTextValue(row, [
+      "B2. Did you participate in OGSTEP?",
       "b2_did_you_participate_in_ogstep",
       "did_you_participate_in_ogstep",
       "ogstep",
@@ -441,7 +442,6 @@ const QualityControl = ({
         submissions={filteredMapSubmissions}
         interviewers={dashboardData.filters.interviewers}
         errorTypes={dashboardData.filters.errorTypes}
-        lgas={dashboardData.filters.lgas}
         metadata={dashboardData.mapMetadata}
       />
 

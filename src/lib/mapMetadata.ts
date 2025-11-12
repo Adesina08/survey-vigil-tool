@@ -1,5 +1,5 @@
-const DEFAULT_TITLE = "OGUN LGA MAP";
-const DEFAULT_SUBTITLE = "Submissions by LGA";
+const DEFAULT_TITLE = "";
+const DEFAULT_SUBTITLE: string | null = null;
 const DEFAULT_EXPORT_PREFIX = "ogun-lga-map";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -51,12 +51,13 @@ export interface NormalizedMapMetadata {
 }
 
 export const normalizeMapMetadata = (input?: MapMetadataConfig): NormalizedMapMetadata => {
-  const titleCandidate = toOptionalString(input?.title ?? undefined);
+  const explicitTitleNull = input?.title === null;
+  const titleCandidate = explicitTitleNull ? "" : toOptionalString(input?.title ?? undefined);
   const subtitleCandidate = toOptionalStringOrNull(input?.subtitle ?? undefined);
   const exportPrefixCandidate = toOptionalString(input?.exportFilenamePrefix ?? undefined);
 
   return {
-    title: titleCandidate ?? DEFAULT_TITLE,
+    title: explicitTitleNull ? "" : titleCandidate ?? DEFAULT_TITLE,
     subtitle:
       input?.subtitle === null
         ? null

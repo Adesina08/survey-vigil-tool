@@ -54,7 +54,6 @@ interface InteractiveMapProps {
   submissions: Submission[];
   interviewers: InterviewerOption[];
   errorTypes: string[];
-  lgas: string[];
   metadata: NormalizedMapMetadata;
 }
 
@@ -115,6 +114,36 @@ const sanitizeFilePrefix = (value: string) =>
     .replace(/[^a-z0-9-_]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/--+/g, "-") || "map-export";
+
+const normaliseText = (value: string) => value.trim().toLowerCase();
+
+const getFeatureLgaName = (
+  feature: Feature<Geometry, Record<string, unknown>>,
+): string => {
+  const properties = feature.properties ?? {};
+  const candidate =
+    (properties?.lganame as string | undefined) ??
+    (properties?.LGA as string | undefined) ??
+    (properties?.LGA_NAME as string | undefined) ??
+    (properties?.name as string | undefined) ??
+    "";
+
+  return typeof candidate === "string" ? candidate : "";
+};
+
+const filterFeaturesByLga = (
+  features: Feature<Geometry, Record<string, unknown>>[],
+  lga: string,
+) => {
+  const target = normaliseText(lga);
+  if (!target) {
+    return [];
+  }
+
+  return features.filter((feature) => normaliseText(getFeatureLgaName(feature)) === target);
+};
+
+const isLikelyUrl = (value: string) => /^https?:\/\//i.test(value.trim());
 
 const inlineComputedStyles = (source: Element, target: Element) => {
   const computedStyle = window.getComputedStyle(source);
@@ -202,9 +231,12 @@ const createPopupHtml = (submission: Submission): string => {
   const timestampLabel = escapeHtml(submission.timestamp);
   const pathLabel = escapeHtml(pathMetadata.label);
   const statusLabelEscaped = escapeHtml(statusLabel);
-  const directionsHtml = submission.directions
-    ? `<a href="${escapeHtml(submission.directions)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">Location</a>`
-    : "<span>Not provided</span>";
+  const rawDirection = submission.directions?.trim() ?? "";
+  const directionsHtml = rawDirection
+    ? isLikelyUrl(rawDirection)
+      ? `<a href="${escapeHtml(rawDirection)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">${escapeHtml(rawDirection)}</a>`
+      : `<span>${escapeHtml(rawDirection)}</span>`
+    : "<span>—</span>";
   const errorsSection =
     submission.errorTypes.length
       ? `<div style="margin-top:8px;">
@@ -224,7 +256,7 @@ const createPopupHtml = (submission: Submission): string => {
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
         <div><span style="font-weight:600;">LGA:</span> ${lgaLabel}</div>
-        <div><span style="font-weight:600;">Directions:</span> ${directionsHtml}</div>
+        <div><span style="font-weight:600;">Direction:</span> ${directionsHtml}</div>
         <div><span style="font-weight:600;">OGSTEP Path:</span> <span style="font-weight:700;">${pathLabel}</span></div>
         <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabelEscaped}</span></div>
         <div><span style="font-weight:600;">Submitted:</span> ${timestampLabel}</div>
@@ -234,7 +266,7 @@ const createPopupHtml = (submission: Submission): string => {
   `;
 };
 
-export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, metadata }: InteractiveMapProps) {
+export function InteractiveMap({ submissions, interviewers, errorTypes, metadata }: InteractiveMapProps) {
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
   const [selectedLga, setSelectedLga] = useState("all");
@@ -249,6 +281,76 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
   const [geoJsonFeatures, setGeoJsonFeatures] = useState<
     Feature<Geometry, Record<string, unknown>>[]
   >([]);
+  const baseSubmissions = useMemo(
+    () => submissions.filter((submission) => submission.ogstepPath !== "unknown"),
+    [submissions],
+  );
+  const interviewerLookup = useMemo(() => {
+    const map = new Map<string, InterviewerOption>();
+    interviewers.forEach((option) => {
+      map.set(option.id, option);
+    });
+    return map;
+  }, [interviewers]);
+  const availableLgas = useMemo(() => {
+    const set = new Set<string>();
+    baseSubmissions.forEach((submission) => {
+      if (
+        (selectedErrorType === "all" || submission.errorTypes.includes(selectedErrorType)) &&
+        (selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer)
+      ) {
+        if (submission.lga && submission.lga.trim().length > 0) {
+          set.add(submission.lga);
+        }
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [baseSubmissions, selectedErrorType, selectedInterviewer]);
+  const availableErrorTypes = useMemo(() => {
+    const set = new Set<string>();
+    baseSubmissions.forEach((submission) => {
+      if (
+        (selectedLga === "all" || submission.lga === selectedLga) &&
+        (selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer)
+      ) {
+        submission.errorTypes.forEach((type) => {
+          if (type && type.trim().length > 0) {
+            set.add(type);
+          }
+        });
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [baseSubmissions, selectedInterviewer, selectedLga]);
+  const availableInterviewers = useMemo(() => {
+    const set = new Set<string>();
+    baseSubmissions.forEach((submission) => {
+      if (
+        (selectedLga === "all" || submission.lga === selectedLga) &&
+        (selectedErrorType === "all" || submission.errorTypes.includes(selectedErrorType))
+      ) {
+        if (submission.interviewerId && submission.interviewerId.trim().length > 0) {
+          set.add(submission.interviewerId);
+        }
+      }
+    });
+
+    return Array.from(set)
+      .sort((a, b) => a.localeCompare(b))
+      .map((id) => {
+        const option = interviewerLookup.get(id);
+        if (option) {
+          return option;
+        }
+        return { id, name: id, label: id } as InterviewerOption;
+      });
+  }, [baseSubmissions, interviewerLookup, selectedErrorType, selectedLga]);
+  const visibleGeoJsonFeatures = useMemo(() => {
+    if (selectedLga === "all") {
+      return geoJsonFeatures;
+    }
+    return filterFeaturesByLga(geoJsonFeatures, selectedLga);
+  }, [geoJsonFeatures, selectedLga]);
 
   const handleToggleLabels = () => {
     setShowLgaLabels((previous) => !previous);
@@ -259,33 +361,41 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
       return;
     }
 
-    if (!lgas.includes(selectedLga)) {
+    if (!availableLgas.includes(selectedLga)) {
       setSelectedLga("all");
     }
-  }, [lgas, selectedLga]);
+  }, [availableLgas, selectedLga]);
 
   useEffect(() => {
     if (selectedInterviewer === "all") {
       return;
     }
 
-    if (!interviewers.some((option) => option.id === selectedInterviewer)) {
+    if (!availableInterviewers.some((option) => option.id === selectedInterviewer)) {
       setSelectedInterviewer("all");
     }
-  }, [interviewers, selectedInterviewer]);
+  }, [availableInterviewers, selectedInterviewer]);
+
+  useEffect(() => {
+    if (selectedErrorType === "all") {
+      return;
+    }
+
+    if (!availableErrorTypes.includes(selectedErrorType)) {
+      setSelectedErrorType("all");
+    }
+  }, [availableErrorTypes, selectedErrorType]);
 
   const filteredSubmissions = useMemo(() => {
-    return submissions
-      .filter((submission) => submission.ogstepPath !== "unknown")
-      .filter((submission) => {
-        const matchesError =
-          selectedErrorType === "all" || submission.errorTypes.includes(selectedErrorType);
-        const matchesInterviewer =
-          selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer;
-        const matchesLga = selectedLga === "all" || submission.lga === selectedLga;
-        return matchesError && matchesInterviewer && matchesLga;
-      });
-  }, [submissions, selectedErrorType, selectedInterviewer, selectedLga]);
+    return baseSubmissions.filter((submission) => {
+      const matchesError =
+        selectedErrorType === "all" || submission.errorTypes.includes(selectedErrorType);
+      const matchesInterviewer =
+        selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer;
+      const matchesLga = selectedLga === "all" || submission.lga === selectedLga;
+      return matchesError && matchesInterviewer && matchesLga;
+    });
+  }, [baseSubmissions, selectedErrorType, selectedInterviewer, selectedLga]);
 
   const handleExportMap = useCallback(async () => {
     if (isExporting) {
@@ -375,17 +485,14 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
 
         const geoJson = (await response.json()) as FeatureCollection<Geometry, Record<string, unknown>>;
 
-        boundaryLayerRef.current?.remove();
-        boundaryLayerRef.current = L.geoJSON(geoJson).addTo(mapRef.current!);
-
-        boundaryLayerRef.current.bringToBack();
-
         setGeoJsonFeatures(geoJson.features ?? []);
 
-        const bounds = boundaryLayerRef.current.getBounds();
+        const layer = L.geoJSON(geoJson);
+        const bounds = layer.getBounds();
         if (bounds.isValid()) {
           mapRef.current!.fitBounds(bounds, { padding: [32, 32] });
         }
+        layer.remove();
       } catch (error) {
         console.error("Failed to load Ogun LGA boundaries", error);
       }
@@ -393,6 +500,35 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
 
     loadBoundary();
   }, []);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    boundaryLayerRef.current?.remove();
+    boundaryLayerRef.current = null;
+
+    const featuresToRender = selectedLga === "all" ? geoJsonFeatures : visibleGeoJsonFeatures;
+
+    if (!featuresToRender || featuresToRender.length === 0) {
+      return;
+    }
+
+    const layer = L.geoJSON(
+      { type: "FeatureCollection", features: featuresToRender },
+      {
+        style: () => ({
+          weight: selectedLga === "all" ? 1 : 2,
+          color: selectedLga === "all" ? "#1f2937" : "#2563eb",
+          fillOpacity: selectedLga === "all" ? 0.04 : 0.12,
+          fillColor: selectedLga === "all" ? "#bfdbfe" : "#93c5fd",
+        }),
+      },
+    );
+
+    layer.addTo(mapRef.current);
+    layer.bringToBack();
+    boundaryLayerRef.current = layer;
+  }, [geoJsonFeatures, selectedLga, visibleGeoJsonFeatures]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -418,6 +554,17 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
     if (!mapRef.current) return;
 
     const map = mapRef.current;
+    const boundaryBounds = boundaryLayerRef.current?.getBounds();
+
+    if (
+      selectedLga !== "all" &&
+      boundaryBounds &&
+      boundaryBounds.isValid()
+    ) {
+      map.fitBounds(boundaryBounds, { padding: [28, 28] });
+      return;
+    }
+
     const points = filteredSubmissions
       .map((submission) => {
         const { lat, lng } = submission;
@@ -429,7 +576,6 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
       .filter((value): value is ReturnType<typeof L.latLng> => value !== null);
 
     if (points.length === 0) {
-      const boundaryBounds = boundaryLayerRef.current?.getBounds();
       if (boundaryBounds && boundaryBounds.isValid()) {
         map.fitBounds(boundaryBounds, { padding: [32, 32] });
       } else {
@@ -479,16 +625,16 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
     };
 
     if (geoJsonFeatures.length > 0) {
-      geoJsonFeatures.forEach((feature) => {
-        const { properties } = feature;
-        const lgaName =
-          (properties?.lganame as string | undefined) ??
-          (properties?.LGA as string | undefined) ??
-          (properties?.name as string | undefined) ??
-          "Unknown";
+      const featuresForLabels =
+        selectedLga === "all" || visibleGeoJsonFeatures.length === 0
+          ? geoJsonFeatures
+          : visibleGeoJsonFeatures;
 
+      featuresForLabels.forEach((feature) => {
+        const lgaName = getFeatureLgaName(feature) || "Unknown";
         const featureLayer = L.geoJSON(feature);
         addLabel(lgaName, featureLayer.getBounds().getCenter());
+        featureLayer.remove();
       });
 
       return;
@@ -513,7 +659,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
       const avgLng = data.lng / data.count;
       addLabel(lga, [avgLat, avgLng]);
     });
-  }, [filteredSubmissions, geoJsonFeatures, showLgaLabels]);
+  }, [filteredSubmissions, geoJsonFeatures, selectedLga, showLgaLabels, visibleGeoJsonFeatures]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -522,9 +668,12 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
     }, 200);
   }, [filteredSubmissions.length]);
 
+  const trimmedTitle = metadata.title.trim();
+  const trimmedSubtitle = metadata.subtitle ? metadata.subtitle.trim() : undefined;
+
   return (
     <section className="space-y-4">
-      <SectionHeader title={metadata.title} subtitle={metadata.subtitle ?? undefined} />
+      <SectionHeader title={trimmedTitle} subtitle={trimmedSubtitle} />
       <Card className="fade-in">
         <CardHeader className="flex flex-col gap-4 border-b bg-muted/30 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2 self-start">
@@ -538,7 +687,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All LGAs</SelectItem>
-                {lgas.map((lga) => (
+                {availableLgas.map((lga) => (
                   <SelectItem key={lga} value={lga}>
                     {lga}
                   </SelectItem>
@@ -551,7 +700,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Error Types</SelectItem>
-                {errorTypes.map((type) => (
+                {availableErrorTypes.map((type) => (
                   <SelectItem key={type} value={type}>
                     {formatErrorLabel(type)}
                   </SelectItem>
@@ -564,9 +713,11 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, me
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Interviewers</SelectItem>
-                {interviewers.map((interviewer) => (
+                {availableInterviewers.map((interviewer) => (
                   <SelectItem key={interviewer.id} value={interviewer.id}>
-                    <span className="font-medium">{interviewer.id}</span>
+                    <span className="font-medium">
+                      {interviewer.label ?? interviewer.name ?? interviewer.id}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
