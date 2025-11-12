@@ -1,27 +1,29 @@
 import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-
 import type { DashboardData } from "@/lib/dashboardData";
 import { ensureCacheVersion } from "@/services/cache";
-import {
-  getCachedDashboardData,
-  loadDashboardDataWithCache,
-} from "@/services/loadDashboard";
+import { getCachedDashboardData, loadDashboardDataWithCache } from "@/services/loadDashboard";
 
 interface UseDashboardDataOptions {
   onStatusChange?: (status: string) => void;
+  sections?: string;
+  mapLimit?: number;
+  prodLimit?: number;
+  analysisLimit?: number;
 }
 
-export const useDashboardData = (
-  options: UseDashboardDataOptions = {},
-) => {
-  const { onStatusChange } = options;
-
+export const useDashboardData = ({
+  onStatusChange,
+  sections = "summary,quota",
+  mapLimit,
+  prodLimit,
+  analysisLimit,
+}: UseDashboardDataOptions = {}) => {
   useEffect(() => {
     ensureCacheVersion();
   }, []);
 
-  const cached = useMemo(() => getCachedDashboardData(), []);
+  const cached = useMemo(() => getCachedDashboardData(sections), [sections]);
   const initialData = cached.dashboard;
   let initialUpdatedAt: number | undefined;
   if (cached.cachedAt) {
@@ -29,9 +31,9 @@ export const useDashboardData = (
     initialUpdatedAt = Number.isNaN(parsed.getTime()) ? undefined : parsed.getTime();
   }
 
-  return useQuery<DashboardData, Error>({
-    queryKey: ["dashboard-data"],
-    queryFn: () => loadDashboardDataWithCache(onStatusChange),
+  return useQuery<Partial<DashboardData>, Error>({
+    queryKey: ["dashboard-data", sections, { mapLimit, prodLimit, analysisLimit }],
+    queryFn: () => loadDashboardDataWithCache(sections, { mapLimit, prodLimit, analysisLimit }, onStatusChange),
     initialData,
     initialDataUpdatedAt: initialUpdatedAt,
     staleTime: 5 * 60 * 1000,
