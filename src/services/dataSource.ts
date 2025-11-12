@@ -1,9 +1,23 @@
-const viteUrl = typeof import.meta !== "undefined" && import.meta.env?.VITE_APPS_SCRIPT_URL
-  ? String(import.meta.env.VITE_APPS_SCRIPT_URL)
-  : "";
-const nodeUrl = typeof process !== "undefined" && process.env?.APPS_SCRIPT_URL
-  ? String(process.env.APPS_SCRIPT_URL)
-  : "";
+const toEnvString = (value: unknown) => {
+  if (typeof value === "string") return value;
+  if (value === undefined || value === null) return "";
+  return String(value);
+};
+
+const getClientEnvUrl = () => {
+  if (typeof import.meta === "undefined") return "";
+  const env = import.meta.env ?? {};
+  return toEnvString(env.VITE_APPS_SCRIPT_URL ?? env.APPS_SCRIPT_URL ?? "");
+};
+
+const getNodeEnvUrl = () => {
+  if (typeof process === "undefined") return "";
+  const env = process.env ?? {};
+  return toEnvString(env.APPS_SCRIPT_URL ?? env.VITE_APPS_SCRIPT_URL ?? "");
+};
+
+const viteUrl = getClientEnvUrl();
+const nodeUrl = getNodeEnvUrl();
 const preferDirectFetch = (() => {
   const value =
     (typeof import.meta !== "undefined" && import.meta.env?.VITE_APPS_SCRIPT_DIRECT_FETCH) ??
