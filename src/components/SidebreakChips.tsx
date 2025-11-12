@@ -1,11 +1,10 @@
-
 import React from "react";
 import { cn } from "@/lib/utils";
 
 export interface SidebreakOption {
   key: string;
   label: string;
-  group: string; // group label e.g., "SECTION B – PROGRAM EXPOSURE / PARTICIPATION"
+  group: string;
 }
 
 interface SidebreakChipsProps {
@@ -16,7 +15,6 @@ interface SidebreakChipsProps {
 
 /** Horizontal, scrollable, single-select chip list grouped by sections */
 const SidebreakChips: React.FC<SidebreakChipsProps> = ({ options, value, onChange }) => {
-  // group by section
   const groups = options.reduce<Record<string, SidebreakOption[]>>((acc, opt) => {
     if (!acc[opt.group]) acc[opt.group] = [];
     acc[opt.group].push(opt);
