@@ -78,7 +78,7 @@ const toSheetValue = (
   return String(value);
 };
 
-const buildHeaderOrder = (rows: DashboardExportRow[], stopKey?: string): string[] => {
+const buildHeaderOrder = (rows: DashboardExportRow[]): string[] => {
   const seen = new Set<string>();
   const order: string[] = [];
 
@@ -91,14 +91,24 @@ const buildHeaderOrder = (rows: DashboardExportRow[], stopKey?: string): string[
     });
   });
 
-  if (stopKey) {
-    const stopIndex = order.findIndex((key) => key === stopKey);
-    if (stopIndex >= 0) {
-      return order.slice(0, stopIndex + 1);
-    }
+  return order;
+};
+
+const trimHeadersAtKey = (
+  headers: string[],
+  rows: DashboardExportRow[],
+  stopKey: string,
+): string[] => {
+  const shouldTrim = rows.some((row) =>
+    Object.prototype.hasOwnProperty.call(row, stopKey),
+  );
+
+  if (!shouldTrim) {
+    return headers;
   }
 
-  return order;
+  const stopIndex = headers.indexOf(stopKey);
+  return stopIndex === -1 ? headers : headers.slice(0, stopIndex + 1);
 };
 
 const sanitizeSheetName = (raw: string): string => {
@@ -166,22 +176,32 @@ const triggerWorkbookDownload = async (
   }
 };
 
-const trimRowToIndex = (row: DashboardExportRow): DashboardExportRow => {
-  const output: DashboardExportRow = {};
-  for (const [key, value] of Object.entries(row)) {
-    output[key] = value;
-    if (key === "_index") {
-      break;
-    }
-  }
-  return output;
-};
-
 const normaliseApproval = (value: unknown): string => {
   if (typeof value !== "string") {
     return "";
   }
-  return value.trim().toLowerCase();
+
+  return value
+    .replace(/\u00A0/g, " ")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+};
+
+const isApproved = (value: unknown) => normaliseApproval(value) === "approved";
+
+const isNotApproved = (value: unknown) => normaliseApproval(value) === "not approved";
+
+const resolveApprovalValue = (row: DashboardExportRow): unknown => {
+  const record = row as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(record, "Approval")) {
+    return record["Approval"];
+  }
+  if (Object.prototype.hasOwnProperty.call(record, "approval")) {
+    return record["approval"];
+  }
+  return undefined;
 };
 
 const formatCurrentDateLabel = () => {
@@ -203,19 +223,21 @@ const createSheetLabel = (label: string) =>
       .trim() || "Sheet1",
   );
 
-const prepareRows = (rows: DashboardExportRow[]): DashboardExportRow[] =>
-  rows.map(trimRowToIndex);
-
 export const createDashboardExcelExporter = ({
   rows,
   errorBreakdown = [],
 }: ExporterOptions): DashboardExcelExporter => {
-  const preparedRows = prepareRows(Array.isArray(rows) ? rows : []);
-  const baseHeaders = buildHeaderOrder(preparedRows, "_index");
+  const allRows = Array.isArray(rows) ? rows : [];
 
   const download = (label: string, dataset: DashboardExportRow[]) => {
-    const trimmed = prepareRows(dataset);
-    const headersToUse = baseHeaders.length > 0 ? baseHeaders : buildHeaderOrder(trimmed, "_index");
+    const rowsForExport = Array.isArray(dataset) ? dataset : [];
+    if (rowsForExport.length === 0) {
+      console.warn(`No rows available for ${label} export.`);
+      return;
+    }
+
+    const headerOrder = buildHeaderOrder(rowsForExport);
+    const headersToUse = trimHeadersAtKey(headerOrder, rowsForExport, "_index");
 
     if (headersToUse.length === 0) {
       console.warn(`No headers available for ${label} export.`);
@@ -225,7 +247,7 @@ export const createDashboardExcelExporter = ({
     const fileName = createExportFileName(label);
     const sheetLabel = createSheetLabel(label);
 
-    void triggerWorkbookDownload(fileName, sheetLabel, headersToUse, trimmed);
+    void triggerWorkbookDownload(fileName, sheetLabel, headersToUse, rowsForExport);
   };
 
   const downloadErrorBreakdown = () => {
@@ -243,16 +265,16 @@ export const createDashboardExcelExporter = ({
   };
 
   return {
-    exportAll: () => download("AllData", rows ?? []),
+    exportAll: () => download("AllData", allRows),
     exportApproved: () =>
       download(
         "ApprovedData",
-        (rows ?? []).filter((row) => normaliseApproval(row["Approval"]) === "approved"),
+        allRows.filter((row) => isApproved(resolveApprovalValue(row))),
       ),
     exportNotApproved: () =>
       download(
         "NotApprovedData",
-        (rows ?? []).filter((row) => normaliseApproval(row["Approval"]) === "not approved"),
+        allRows.filter((row) => isNotApproved(resolveApprovalValue(row))),
       ),
     exportErrorFlags: downloadErrorBreakdown,
   };
