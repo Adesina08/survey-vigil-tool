@@ -89,13 +89,17 @@ const getApprovalMetadata = (submission: Submission) => {
 const getMarkerColor = (submission: Submission, mode: ColorMode) =>
   mode === "approval" ? getApprovalMetadata(submission).color : getPathMetadata(submission).color;
 
+const MARKER_DIAMETER = 18;
+const MARKER_BORDER_WIDTH = 3;
+const MARKER_TOTAL_SIZE = MARKER_DIAMETER + MARKER_BORDER_WIDTH * 2;
+
 const createCustomIcon = (submission: Submission, mode: ColorMode) => {
   const color = getMarkerColor(submission, mode);
   return L.divIcon({
     className: "custom-marker",
-    html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
+    html: `<div style="background-color: ${color}; width: ${MARKER_DIAMETER}px; height: ${MARKER_DIAMETER}px; border-radius: 50%; border: ${MARKER_BORDER_WIDTH}px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.35);"></div>`,
+    iconSize: [MARKER_TOTAL_SIZE, MARKER_TOTAL_SIZE],
+    iconAnchor: [MARKER_TOTAL_SIZE / 2, MARKER_TOTAL_SIZE / 2],
   });
 };
 
@@ -231,11 +235,9 @@ const createPopupHtml = (submission: Submission): string => {
   const pathLabel = escapeHtml(pathMetadata.label);
   const statusLabelEscaped = escapeHtml(statusLabel);
   const rawDirection = submission.directions?.trim() ?? "";
-  const directionsHtml = rawDirection
-    ? isLikelyUrl(rawDirection)
-      ? `<a href="${escapeHtml(rawDirection)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">${escapeHtml(rawDirection)}</a>`
-      : `<span>${escapeHtml(rawDirection)}</span>`
-    : "<span>—</span>";
+  const directionsHtml = rawDirection && isLikelyUrl(rawDirection)
+    ? `<a href="${escapeHtml(rawDirection)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">Direction link</a>`
+    : '<span>Direction link (unavailable)</span>';
   const errorsSection =
     submission.errorTypes.length
       ? `<div style="margin-top:8px;">
@@ -709,50 +711,48 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
           </div>
         </CardHeader>
         <CardContent className="space-y-6 bg-card/60 p-6">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <Select value={selectedLga} onValueChange={setSelectedLga}>
-                <SelectTrigger className="min-w-[180px]">
-                  <SelectValue placeholder="All LGAs" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All LGAs</SelectItem>
-                  {availableLgas.map((lga) => (
-                    <SelectItem key={lga} value={lga}>
-                      {lga}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
-                <SelectTrigger className="min-w-[200px]">
-                  <SelectValue placeholder="All Flags" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Flags</SelectItem>
-                  {availableErrorTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {formatErrorLabel(type)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
-                <SelectTrigger className="min-w-[220px]">
-                  <SelectValue placeholder="All Interviewers" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Interviewers</SelectItem>
-                  {availableInterviewers.map((interviewer) => (
-                    <SelectItem key={interviewer.id} value={interviewer.id}>
-                      <span className="font-medium">
-                        {interviewer.label ?? interviewer.name ?? interviewer.id}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <Select value={selectedLga} onValueChange={setSelectedLga}>
+              <SelectTrigger className="min-w-[180px]">
+                <SelectValue placeholder="All LGAs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All LGAs</SelectItem>
+                {availableLgas.map((lga) => (
+                  <SelectItem key={lga} value={lga}>
+                    {lga}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
+              <SelectTrigger className="min-w-[200px]">
+                <SelectValue placeholder="All Flags" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Flags</SelectItem>
+                {availableErrorTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {formatErrorLabel(type)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
+              <SelectTrigger className="min-w-[220px]">
+                <SelectValue placeholder="All Interviewers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Interviewers</SelectItem>
+                {availableInterviewers.map((interviewer) => (
+                  <SelectItem key={interviewer.id} value={interviewer.id}>
+                    <span className="font-medium">
+                      {interviewer.label ?? interviewer.name ?? interviewer.id}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="relative h-[500px] w-full overflow-hidden rounded-xl border bg-background">
             <div ref={mapContainerRef} className="sticky top-20 z-0 h-full w-full" style={{ zIndex: 0 }} />
