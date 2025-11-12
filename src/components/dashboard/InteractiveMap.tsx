@@ -15,7 +15,6 @@ import L from "leaflet";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { formatErrorLabel } from "@/lib/utils";
 import type { NormalizedMapMetadata } from "@/lib/mapMetadata";
-import { SectionHeader } from "./SectionHeader";
 import ogunLgaGeoJsonUrl from "@/assets/ogun-lga.geojson?url";
 
 const defaultIconPrototype = L.Icon.Default.prototype as unknown as {
@@ -281,10 +280,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
   const [geoJsonFeatures, setGeoJsonFeatures] = useState<
     Feature<Geometry, Record<string, unknown>>[]
   >([]);
-  const baseSubmissions = useMemo(
-    () => submissions.filter((submission) => submission.ogstepPath !== "unknown"),
-    [submissions],
-  );
+  const baseSubmissions = useMemo(() => (Array.isArray(submissions) ? submissions : []), [submissions]);
   const interviewerLookup = useMemo(() => {
     const map = new Map<string, InterviewerOption>();
     interviewers.forEach((option) => {
@@ -308,6 +304,12 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
   }, [baseSubmissions, selectedErrorType, selectedInterviewer]);
   const availableErrorTypes = useMemo(() => {
     const set = new Set<string>();
+
+    errorTypes
+      .map((type) => (typeof type === "string" ? type.trim() : ""))
+      .filter((type) => type.length > 0)
+      .forEach((type) => set.add(type));
+
     baseSubmissions.forEach((submission) => {
       if (
         (selectedLga === "all" || submission.lga === selectedLga) &&
@@ -315,13 +317,14 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
       ) {
         submission.errorTypes.forEach((type) => {
           if (type && type.trim().length > 0) {
-            set.add(type);
+            set.add(type.trim());
           }
         });
       }
     });
+
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [baseSubmissions, selectedInterviewer, selectedLga]);
+  }, [baseSubmissions, errorTypes, selectedInterviewer, selectedLga]);
   const availableInterviewers = useMemo(() => {
     const set = new Set<string>();
     baseSubmissions.forEach((submission) => {
@@ -516,12 +519,15 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
     const layer = L.geoJSON(
       { type: "FeatureCollection", features: featuresToRender },
       {
-        style: () => ({
-          weight: selectedLga === "all" ? 1 : 2,
-          color: selectedLga === "all" ? "#1f2937" : "#2563eb",
-          fillOpacity: selectedLga === "all" ? 0.04 : 0.12,
-          fillColor: selectedLga === "all" ? "#bfdbfe" : "#93c5fd",
-        }),
+        style: () => {
+          const isAll = selectedLga === "all";
+          return {
+            weight: isAll ? 1.2 : 2,
+            color: isAll ? "#3388ff" : "#1d4ed8",
+            fillOpacity: isAll ? 0.08 : 0.18,
+            fillColor: isAll ? "#c7d2fe" : "#93c5fd",
+          };
+        },
       },
     );
 
@@ -668,128 +674,155 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
     }, 200);
   }, [filteredSubmissions.length]);
 
-  const trimmedTitle = metadata.title.trim();
-  const trimmedSubtitle = metadata.subtitle ? metadata.subtitle.trim() : undefined;
+  const totalRecords = baseSubmissions.length;
+  const trimmedMetadataTitle = typeof metadata.title === "string" ? metadata.title.trim() : "";
+  const trimmedMetadataSubtitle =
+    typeof metadata.subtitle === "string" ? metadata.subtitle.trim() : "";
+  const headerSubtitle =
+    trimmedMetadataSubtitle.length > 0
+      ? trimmedMetadataSubtitle
+      : trimmedMetadataTitle && trimmedMetadataTitle.toLowerCase() !== "live submission map"
+        ? trimmedMetadataTitle
+        : "";
 
   return (
-    <section className="space-y-4">
-      <SectionHeader title={trimmedTitle} subtitle={trimmedSubtitle} />
-      <Card className="fade-in">
-        <CardHeader className="flex flex-col gap-4 border-b bg-muted/30 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2 self-start">
-            <MapPin className="h-5 w-5 text-primary" />
-            <CardTitle className="text-left text-base font-semibold">Live Submission Map</CardTitle>
-          </div>
-          <div className="flex flex-nowrap items-end gap-3 overflow-x-auto">
-            <Select value={selectedLga} onValueChange={setSelectedLga}>
-              <SelectTrigger className="min-w-[180px]">
-                <SelectValue placeholder="All LGAs" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All LGAs</SelectItem>
-                {availableLgas.map((lga) => (
-                  <SelectItem key={lga} value={lga}>
-                    {lga}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
-              <SelectTrigger className="min-w-[180px]">
-                <SelectValue placeholder="All Error Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Error Types</SelectItem>
-                {availableErrorTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {formatErrorLabel(type)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
-              <SelectTrigger className="min-w-[200px]">
-                <SelectValue placeholder="All Interviewers (A1 only)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Interviewers</SelectItem>
-                {availableInterviewers.map((interviewer) => (
-                  <SelectItem key={interviewer.id} value={interviewer.id}>
-                    <span className="font-medium">
-                      {interviewer.label ?? interviewer.name ?? interviewer.id}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <section className="space-y-6">
+      <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">
+        <CardHeader className="border-b bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-foreground/20 text-primary-foreground">
+                <MapPin className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <CardTitle className="text-left text-lg font-semibold text-primary-foreground">
+                  Live Submission Map
+                </CardTitle>
+                {headerSubtitle ? (
+                  <p className="text-sm text-primary-foreground/90">{headerSubtitle}</p>
+                ) : null}
+              </div>
+            </div>
+            <div className="text-sm font-medium text-primary-foreground/90">
+              Total records: {totalRecords.toLocaleString()}
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="relative h-[500px] w-full overflow-hidden rounded-lg border">
+        <CardContent className="space-y-6 bg-card/60 p-6">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-wrap items-end gap-3">
+              <Select value={selectedLga} onValueChange={setSelectedLga}>
+                <SelectTrigger className="min-w-[180px]">
+                  <SelectValue placeholder="All LGAs" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All LGAs</SelectItem>
+                  {availableLgas.map((lga) => (
+                    <SelectItem key={lga} value={lga}>
+                      {lga}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
+                <SelectTrigger className="min-w-[200px]">
+                  <SelectValue placeholder="All Flags" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Flags</SelectItem>
+                  {availableErrorTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {formatErrorLabel(type)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
+                <SelectTrigger className="min-w-[220px]">
+                  <SelectValue placeholder="All Interviewers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Interviewers</SelectItem>
+                  {availableInterviewers.map((interviewer) => (
+                    <SelectItem key={interviewer.id} value={interviewer.id}>
+                      <span className="font-medium">
+                        {interviewer.label ?? interviewer.name ?? interviewer.id}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="relative h-[500px] w-full overflow-hidden rounded-xl border bg-background">
             <div ref={mapContainerRef} className="sticky top-20 z-0 h-full w-full" style={{ zIndex: 0 }} />
           </div>
-          <div className="mt-4 flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              {(
-                colorMode === "path"
-                  ? [
-                      { label: "Treatment path (B2 = Yes)", color: "#2563eb" },
-                      { label: "Control path (B2 = No)", color: "#22c55e" },
-                    ]
-                  : [
-                      { label: "Approved", color: "#16a34a" },
-                      { label: "Not Approved", color: "#dc2626" },
-                    ]
-              ).map((item) => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <span
-                    className="inline-flex h-3 w-3 rounded-full border border-white shadow"
-                    style={{ backgroundColor: item.color }}
-                  />
-                  <span>{item.label}</span>
-                </div>
-              ))}
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+            {(colorMode === "path"
+              ? [
+                  { label: "Treatment path (B2 = Yes)", color: "#2563eb" },
+                  { label: "Control path (B2 = No)", color: "#22c55e" },
+                  { label: "Path unavailable", color: "#6b7280" },
+                ]
+              : [
+                  { label: "Approved", color: "#16a34a" },
+                  { label: "Not Approved", color: "#dc2626" },
+                ]).map((item) => (
+              <div key={item.label} className="flex items-center gap-2">
+                <span
+                  className="inline-flex h-3 w-3 rounded-full border border-white shadow"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span>{item.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-4 text-sm text-muted-foreground md:flex-row md:items-center md:gap-6">
+            <div className="flex flex-1 flex-col gap-1">
+              <span>
+                Showing {filteredSubmissions.length.toLocaleString()} of {totalRecords.toLocaleString()} records
+              </span>
             </div>
-            <div className="flex flex-col gap-4 text-sm text-muted-foreground md:flex-row md:items-center md:gap-6">
-              <div className="flex flex-1 justify-start">
-                <span>Showing {filteredSubmissions.length.toLocaleString()} submissions</span>
-              </div>
-              <div className="flex flex-1 flex-col items-center gap-3 md:flex-row md:justify-center">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Color mode</span>
-                <ToggleGroup
-                  type="single"
-                  value={colorMode}
-                  onValueChange={(value) => {
-                    if (value === "path" || value === "approval") {
-                      setColorMode(value);
-                    }
-                  }}
-                  className="rounded-md border p-1"
-                  variant="outline"
-                  size="sm"
-                >
-                  <ToggleGroupItem value="approval" className="px-3 py-1 text-xs font-medium uppercase tracking-wide">
-                    Approval
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="path" className="px-3 py-1 text-xs font-medium uppercase tracking-wide">
-                    Path
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-              <div className="flex flex-1 flex-col items-center gap-2 md:flex-row md:justify-end">
-                <Button onClick={handleExportMap} disabled={isExporting} size="sm" className="w-full md:w-auto">
-                  <Download className="mr-2 h-4 w-4" /> {isExporting ? "Exporting…" : "Export Map"}
-                </Button>
-                <Button
-                  onClick={handleToggleLabels}
-                  variant="outline"
-                  size="sm"
-                  className="w-full md:w-auto"
-                >
-                  {showLgaLabels ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                  {showLgaLabels ? "Hide LGA Labels" : "Show LGA Labels"}
-                </Button>
-              </div>
+            <div className="flex flex-1 flex-col items-center gap-3 md:flex-row md:justify-center">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Color mode</span>
+              <ToggleGroup
+                type="single"
+                value={colorMode}
+                onValueChange={(value) => {
+                  if (value === "path" || value === "approval") {
+                    setColorMode(value);
+                  }
+                }}
+                className="rounded-md border bg-background p-1"
+                variant="outline"
+                size="sm"
+              >
+                <ToggleGroupItem value="approval" className="px-3 py-1 text-xs font-medium uppercase tracking-wide">
+                  Approval
+                </ToggleGroupItem>
+                <ToggleGroupItem value="path" className="px-3 py-1 text-xs font-medium uppercase tracking-wide">
+                  Path
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            <div className="flex flex-1 flex-col items-center gap-2 md:flex-row md:justify-end">
+              <Button
+                onClick={handleExportMap}
+                disabled={isExporting}
+                size="sm"
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 md:w-auto"
+              >
+                <Download className="mr-2 h-4 w-4" /> {isExporting ? "Exporting…" : "Export Map"}
+              </Button>
+              <Button
+                onClick={handleToggleLabels}
+                variant="outline"
+                size="sm"
+                className="w-full md:w-auto"
+              >
+                {showLgaLabels ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                {showLgaLabels ? "Hide LGA Labels" : "Show LGA Labels"}
+              </Button>
             </div>
           </div>
         </CardContent>

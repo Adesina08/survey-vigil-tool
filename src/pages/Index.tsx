@@ -154,7 +154,7 @@ const Index = () => {
 
       <footer className="border-t bg-background py-4">
         <div className="mx-auto w-full max-w-7xl px-4 text-center text-sm text-muted-foreground sm:px-6">
-          © 2025 OGSTEP IMPCT SURVEY
+          © 2025 OGSTEP IMPACT SURVEY
         </div>
       </footer>
     </div>

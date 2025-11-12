@@ -1,5 +1,7 @@
 import { formatErrorLabel } from "@/lib/utils";
 
+type SheetJS = typeof import("xlsx");
+
 export type DashboardExportRow = Record<string, unknown>;
 
 interface ErrorBreakdownRow {
@@ -13,7 +15,7 @@ interface ExporterOptions {
   errorBreakdown?: ErrorBreakdownRow[];
 }
 
-interface DashboardCsvExporter {
+interface DashboardExcelExporter {
   exportAll: () => void;
   exportApproved: () => void;
   exportNotApproved: () => void;
@@ -22,9 +24,9 @@ interface DashboardCsvExporter {
 
 const ARRAY_DELIMITER = "; ";
 
-const serialisePrimitive = (value: unknown): string => {
+const toSheetValue = (value: unknown): string | number | boolean | null => {
   if (value === null || value === undefined) {
-    return "";
+    return null;
   }
 
   if (value instanceof Date) {
@@ -32,14 +34,11 @@ const serialisePrimitive = (value: unknown): string => {
   }
 
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) {
-      return "";
-    }
-    return String(value);
+    return Number.isFinite(value) ? value : null;
   }
 
   if (typeof value === "boolean") {
-    return value ? "true" : "false";
+    return value;
   }
 
   if (Array.isArray(value)) {
@@ -53,12 +52,13 @@ const serialisePrimitive = (value: unknown): string => {
           try {
             return JSON.stringify(item);
           } catch (error) {
-            console.warn("Failed to serialise array entry for CSV export", error);
+            console.warn("Failed to serialise array entry for Excel export", error);
             return String(item);
           }
         }
 
-        return serialisePrimitive(item);
+        const flattened = toSheetValue(item);
+        return flattened === null ? "" : String(flattened);
       })
       .filter((chunk) => chunk.length > 0)
       .join(ARRAY_DELIMITER);
@@ -68,19 +68,12 @@ const serialisePrimitive = (value: unknown): string => {
     try {
       return JSON.stringify(value);
     } catch (error) {
-      console.warn("Failed to serialise object for CSV export", error);
-      return "";
+      console.warn("Failed to serialise object for Excel export", error);
+      return null;
     }
   }
 
   return String(value);
-};
-
-const escapeCsvValue = (value: string): string => {
-  if (/[",\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
 };
 
 const buildHeaderOrder = (rows: DashboardExportRow[], stopKey?: string): string[] => {
@@ -106,39 +99,77 @@ const buildHeaderOrder = (rows: DashboardExportRow[], stopKey?: string): string[
   return order;
 };
 
-const buildCsv = (rows: DashboardExportRow[], headers: string[]): string => {
-  if (headers.length === 0) {
-    return "";
+const sanitizeSheetName = (raw: string): string => {
+  const fallback = "Sheet1";
+  if (!raw || typeof raw !== "string") {
+    return fallback;
   }
 
-  const lines = [headers.join(",")];
+  const cleaned = raw
+    .replace(/[\\/?*:]/g, " ")
+    .replace(/\[/g, " ")
+    .replace(/\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
-  rows.forEach((row) => {
-    const line = headers
-      .map((header) => escapeCsvValue(serialisePrimitive((row as Record<string, unknown>)[header])))
-      .join(",");
-    lines.push(line);
-  });
+  if (!cleaned) {
+    return fallback;
+  }
 
-  return lines.join("\n");
+  return cleaned.slice(0, 31);
 };
 
-const triggerCsvDownload = (fileName: string, csv: string) => {
+const loadSheetJS = async (): Promise<SheetJS> => {
+  const module = (await import("xlsx")) as SheetJS & { default?: SheetJS };
+  return module.default ?? module;
+};
+
+const createSheetData = (
+  headers: string[],
+  rows: DashboardExportRow[],
+): Array<Array<string | number | boolean | null>> => {
+  const headerRow = headers.map((header) => header ?? "");
+  const bodyRows = rows.map((row) =>
+    headers.map((header) => toSheetValue((row as Record<string, unknown>)[header])),
+  );
+  return [headerRow, ...bodyRows];
+};
+
+const triggerExcelDownload = async (
+  fileName: string,
+  sheetName: string,
+  headers: string[],
+  rows: DashboardExportRow[],
+) => {
   if (typeof window === "undefined") {
-    console.warn("CSV export is only supported in the browser context.");
+    console.warn("Excel export is only supported in the browser context.");
     return;
   }
 
-  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.rel = "noopener";
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+  try {
+    const XLSX = await loadSheetJS();
+    const workbook = XLSX.utils.book_new();
+    const data = createSheetData(headers, rows);
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+    const columnWidths = headers.map((header, index) => {
+      const headerLength = header?.length ?? 0;
+      const maxCellLength = rows.reduce((max, row) => {
+        const cellValue = toSheetValue((row as Record<string, unknown>)[headers[index]]);
+        const length = cellValue === null ? 0 : String(cellValue).length;
+        return Math.max(max, length);
+      }, headerLength);
+      const width = Math.min(Math.max(maxCellLength + 2, 8), 60);
+      return { wch: width };
+    });
+
+    worksheet["!cols"] = columnWidths;
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, sanitizeSheetName(sheetName));
+    XLSX.writeFile(workbook, fileName);
+  } catch (error) {
+    console.error("Failed to export Excel file", error);
+  }
 };
 
 const trimRowToIndex = (row: DashboardExportRow): DashboardExportRow => {
@@ -168,15 +199,23 @@ const formatCurrentDateLabel = () => {
 };
 
 const createExportFileName = (label: string) =>
-  `OGSTEP_IMPACT_SURVEY_${label}_${formatCurrentDateLabel()}.csv`;
+  `OGSTEP_IMPACT_SURVEY_${label}_${formatCurrentDateLabel()}.xlsx`;
+
+const createSheetLabel = (label: string) =>
+  sanitizeSheetName(
+    label
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/_/g, " ")
+      .trim() || "Sheet1",
+  );
 
 const prepareRows = (rows: DashboardExportRow[]): DashboardExportRow[] =>
   rows.map(trimRowToIndex);
 
-export const createDashboardCsvExporter = ({
+export const createDashboardExcelExporter = ({
   rows,
   errorBreakdown = [],
-}: ExporterOptions): DashboardCsvExporter => {
+}: ExporterOptions): DashboardExcelExporter => {
   const preparedRows = prepareRows(Array.isArray(rows) ? rows : []);
   const baseHeaders = buildHeaderOrder(preparedRows, "_index");
 
@@ -189,9 +228,10 @@ export const createDashboardCsvExporter = ({
       return;
     }
 
-    const csv = buildCsv(trimmed, headersToUse);
     const fileName = createExportFileName(label);
-    triggerCsvDownload(fileName, csv);
+    const sheetLabel = createSheetLabel(label);
+
+    void triggerExcelDownload(fileName, sheetLabel, headersToUse, trimmed);
   };
 
   const downloadErrorBreakdown = () => {
@@ -202,9 +242,10 @@ export const createDashboardCsvExporter = ({
       Percentage: `${row.percentage.toFixed(1)}%`,
     }));
 
-    const csv = buildCsv(rowsForExport, headers);
     const fileName = createExportFileName("Error Flags");
-    triggerCsvDownload(fileName, csv);
+    const sheetLabel = createSheetLabel("Error Flags");
+
+    void triggerExcelDownload(fileName, sheetLabel, headers, rowsForExport);
   };
 
   return {
@@ -223,4 +264,4 @@ export const createDashboardCsvExporter = ({
   };
 };
 
-export type { DashboardCsvExporter };
+export type { DashboardExcelExporter };
