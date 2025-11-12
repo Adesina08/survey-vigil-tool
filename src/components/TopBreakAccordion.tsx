@@ -16,12 +16,54 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, FileSpreadsheet } from "lucide-react";
-import {
-  buildAnalysisTable,
-  type AnalysisTableResponse,
-} from "@/lib/api.analysis";
+import { ANALYSIS_TABLE_ENDPOINT } from "@/lib/api.endpoints";
 
-/** Simple debounce hook kept local to make this component self-contained */
+/** Minimal type to avoid coupling to api.analysis.ts */
+type StatType = "counts" | "rowpct" | "colpct" | "totalpct";
+type AnalysisTableResponse = {
+  html: string;
+  meta: {
+    n?: number;
+    stat?: string;
+    topbreak?: string;
+    variable?: string;
+    notes?: string[];
+  };
+  chart?: unknown;
+};
+
+/** Build a query string that matches your backend API */
+function buildQuery(params: Record<string, string | number | boolean | null | undefined>) {
+  const s = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === null || v === undefined) return;
+    s.set(k, String(v));
+  });
+  return s.toString();
+}
+
+/** Local fetcher that replaces buildAnalysisTable */
+async function fetchAnalysisTable(opts: {
+  topbreak: string;
+  variable: string;
+  stat: StatType;
+  signal?: AbortSignal;
+}): Promise<AnalysisTableResponse> {
+  const qs = buildQuery({
+    topbreak: opts.topbreak,
+    variable: opts.variable,
+    stat: opts.stat,
+  });
+  const url = qs ? `${ANALYSIS_TABLE_ENDPOINT}?${qs}` : ANALYSIS_TABLE_ENDPOINT;
+  const res = await fetch(url, { signal: opts.signal });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Failed to build analysis table");
+  }
+  return res.json() as Promise<AnalysisTableResponse>;
+}
+
+/** Simple debounce */
 function useDebouncedValue<T>(value: T, delay = 400): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -31,40 +73,29 @@ function useDebouncedValue<T>(value: T, delay = 400): T {
   return debounced;
 }
 
-/** Minimal sanitize to avoid scripts; feel free to replace with your project’s sanitizer */
+/** Basic sanitizer */
 function basicSanitize(html: string): string {
   return html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "");
 }
 
-/** Very lightweight HTML->Excel download.
- * NOTE: If you already have a more robust `exportAnalysisToExcel(...)`, you can swap this call.
- */
+/** Light HTML → Excel export */
 function exportAnalysisToExcel(
   html: string,
   topbreak: string,
   variable: string | undefined | null,
-  stat: "counts" | "rowpct" | "colpct" | "totalpct"
+  stat: StatType
 ) {
   const blob = new Blob(
     [
-      `
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-        </head>
-        <body>
-          ${html}
-        </body>
-      </html>
-      `,
+      `<!doctype html><html><head><meta charset="UTF-8" /></head><body>${html}</body></html>`,
     ],
     { type: "application/vnd.ms-excel" }
   );
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
+  a.href = url;
   const tb = topbreak || "topbreak";
   const v = variable || "variable";
-  a.href = url;
   a.download = `analysis_${tb}_${v}_${stat}.xls`;
   document.body.appendChild(a);
   a.click();
@@ -78,10 +109,10 @@ interface TopBreakAccordionProps {
   allVariables: string[];
   formatLabel: (key: string) => string;
 
-  /** new external-control props (used by the redesigned Analysis page) */
-  variable?: string | null; // sidebreak key (externally selected)
-  statExternal?: "counts" | "rowpct" | "colpct" | "totalpct";
-  analyzeKey?: number; // bump to trigger fresh analysis
+  /** external-control props used by the redesigned Analysis page */
+  variable?: string | null; // Sidebreak key (single select)
+  statExternal?: StatType;
+  analyzeKey?: number; // bump to force re-run
   hideControls?: boolean; // hide internal selects when externally controlled
 }
 
@@ -89,47 +120,40 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
   topbreak,
   allVariables,
   formatLabel,
-
   variable,
   statExternal,
   analyzeKey,
   hideControls,
 }) => {
-  /** Internal state (used when not externally controlled) */
+  // Internal state (used only if not externally controlled)
   const [selectedVariable, setSelectedVariable] = useState<string | undefined>();
-  const [stat, setStat] = useState<"counts" | "rowpct" | "colpct" | "totalpct">(
-    "counts"
-  );
+  const [stat, setStat] = useState<StatType>("counts");
 
-  /** Effective values (external wins if provided) */
+  // Effective values
   const effectiveVariable =
-    typeof variable !== "undefined" && variable !== null
-      ? variable
-      : selectedVariable;
-
+    typeof variable !== "undefined" && variable !== null ? variable : selectedVariable;
   const effectiveStat = statExternal ?? stat;
 
-  /** Result & status */
+  // Data state
   const [response, setResponse] = useState<AnalysisTableResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /** Cache by key: prevents flicker and avoids repeated fetches for the same query */
+  // Cache
   const cacheRef = useRef<Map<string, AnalysisTableResponse>>(new Map());
 
-  /** Debounce variable to avoid spamming the API while typing/selecting */
+  // Debounce variable to limit calls
   const debouncedVariable = useDebouncedValue(effectiveVariable, 400);
 
-  /** Stable cache key (includes analyzeKey so the page’s Analyze button forces a refetch) */
+  // Compose a stable cache key
   const cacheKey = useMemo(
     () =>
       `${topbreak}::${debouncedVariable || ""}::${effectiveStat}::${analyzeKey ?? 0}`,
     [topbreak, debouncedVariable, effectiveStat, analyzeKey]
   );
 
-  /** Fetch on change */
+  // Fetch on change (when variable present)
   useEffect(() => {
-    // If no variable yet, clear result and stop
     if (!debouncedVariable) {
       setResponse(null);
       setError(null);
@@ -137,7 +161,6 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
       return;
     }
 
-    // Cache hit?
     const cached = cacheRef.current.get(cacheKey);
     if (cached) {
       setResponse(cached);
@@ -150,7 +173,7 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
     setError(null);
     const controller = new AbortController();
 
-    buildAnalysisTable({
+    fetchAnalysisTable({
       topbreak,
       variable: debouncedVariable,
       stat: effectiveStat,
@@ -162,19 +185,17 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
       })
       .catch((err) => {
         if (err?.name === "AbortError") return;
-        setError(
-          err instanceof Error ? err.message : "Unable to build analysis table"
-        );
+        setError(err instanceof Error ? err.message : "Unable to build analysis table");
       })
       .finally(() => setLoading(false));
 
     return () => controller.abort();
   }, [cacheKey, debouncedVariable, effectiveStat, topbreak]);
 
-  const sanitizedHtml = useMemo(() => {
-    if (!response?.html) return "";
-    return basicSanitize(response.html);
-  }, [response]);
+  const sanitizedHtml = useMemo(
+    () => (response?.html ? basicSanitize(response.html) : ""),
+    [response]
+  );
 
   return (
     <AccordionItem value={topbreak} className="border-b border-border/60">
@@ -200,18 +221,13 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
 
       <AccordionContent>
         <div className="space-y-4">
-          {/* Internal controls (hidden when externally controlled) */}
+          {/* Internal controls (hidden if externally controlled) */}
           {!hideControls && (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {/* Variable select */}
               <div className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">
-                  Variable
-                </div>
-                <Select
-                  value={selectedVariable}
-                  onValueChange={(val) => setSelectedVariable(val)}
-                >
+                <div className="text-xs font-medium text-muted-foreground">Variable</div>
+                <Select value={selectedVariable} onValueChange={(val) => setSelectedVariable(val)}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Select a variable to analyze" />
                   </SelectTrigger>
@@ -227,16 +243,10 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
 
               {/* Stat select */}
               <div className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">
-                  Statistic
-                </div>
+                <div className="text-xs font-medium text-muted-foreground">Statistic</div>
                 <Select
                   value={stat}
-                  onValueChange={(val) =>
-                    setStat(
-                      val as "counts" | "rowpct" | "colpct" | "totalpct"
-                    )
-                  }
+                  onValueChange={(val) => setStat(val as StatType)}
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Counts" />
@@ -272,9 +282,7 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
           {!loading && !error && response && (
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  Analysis Results
-                </h3>
+                <h3 className="text-sm font-medium text-muted-foreground">Analysis Results</h3>
                 <Button
                   variant="outline"
                   size="sm"
@@ -295,7 +303,6 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
 
               <Card>
                 <CardContent className="pt-4">
-                  {/* Server-rendered HTML table */}
                   <div
                     className="prose max-w-none overflow-auto"
                     dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
@@ -305,22 +312,16 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
 
               <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                 {typeof response.meta?.n === "number" && (
-                  <Badge variant="outline">
-                    n = {response.meta.n.toLocaleString()}
-                  </Badge>
+                  <Badge variant="outline">n = {response.meta.n.toLocaleString()}</Badge>
                 )}
                 {response.meta?.stat && (
                   <Badge variant="outline">Statistic: {response.meta.stat}</Badge>
                 )}
                 {response.meta?.topbreak && (
-                  <Badge variant="outline">
-                    Top break: {formatLabel(response.meta.topbreak)}
-                  </Badge>
+                  <Badge variant="outline">Top break: {formatLabel(response.meta.topbreak)}</Badge>
                 )}
                 {response.meta?.variable && (
-                  <Badge variant="outline">
-                    Variable: {formatLabel(response.meta.variable)}
-                  </Badge>
+                  <Badge variant="outline">Variable: {formatLabel(response.meta.variable)}</Badge>
                 )}
                 {response.meta?.notes?.map((note) => (
                   <span key={note}>{note}</span>
@@ -329,11 +330,10 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
             </div>
           )}
 
-          {/* Empty state when no variable chosen yet */}
+          {/* Empty state */}
           {!loading && !error && !response && (
             <div className="rounded-md border border-dashed border-border/60 bg-muted/10 p-6 text-sm text-muted-foreground">
-              Select a variable to generate a cross-tabulation for{" "}
-              {formatLabel(topbreak)}.
+              Select a variable to generate a cross-tabulation for {formatLabel(topbreak)}.
             </div>
           )}
         </div>
