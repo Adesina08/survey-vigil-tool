@@ -7,6 +7,7 @@ import {
   HEADER_ALIASES as BASE_HEADER_ALIASES,
 } from "@/lib/googleSheets";
 import { buildDashboardData, type DashboardData } from "@/lib/dashboardData";
+import { extractMapMetadataFromPayload } from "@/lib/mapMetadata";
 import { fetchAppsScript, type AppsScriptPayload } from "./dataSource";
 import { readCache, saveCache } from "./cache";
 
@@ -196,12 +197,15 @@ export const buildDashboardFromPayload = (payload: AppsScriptPayload): Dashboard
     ? mapSheetRowsToStateGenderTargets(toRecordArray(payload.stateGenderTargets))
     : [];
 
+  const mapMetadata = extractMapMetadataFromPayload(payload);
+
   return buildDashboardData({
     submissions,
     stateTargets,
     stateAgeTargets,
     stateGenderTargets,
     analysisRows: rows,
+    mapMetadata,
   });
 };
 

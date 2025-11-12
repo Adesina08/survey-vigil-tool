@@ -40,14 +40,18 @@ const candidateUrls = (() => {
 
 export const API_URL = candidateUrls[0] ?? "";
 
-export type AppsScriptPayload =
-  | {
-      rows: Record<string, unknown>[];
-      stateTargets?: Record<string, unknown>[];
-      stateAgeTargets?: Record<string, unknown>[];
-      stateGenderTargets?: Record<string, unknown>[];
-    }
-  | Record<string, unknown>[];
+export interface StructuredAppsScriptPayload {
+  rows: Record<string, unknown>[];
+  stateTargets?: Record<string, unknown>[];
+  stateAgeTargets?: Record<string, unknown>[];
+  stateGenderTargets?: Record<string, unknown>[];
+  metadata?: Record<string, unknown>;
+  sections?: unknown;
+  settings?: Record<string, unknown>;
+  mapMetadata?: unknown;
+}
+
+export type AppsScriptPayload = StructuredAppsScriptPayload | Record<string, unknown>[];
 
 const isProbablyJson = (contentType: string, raw: string) => {
   if (/application\/json/i.test(contentType)) {
@@ -88,7 +92,11 @@ const normaliseAppsScriptPayload = (value: unknown): AppsScriptPayload => {
     stateTargets: toRecordArray(value["stateTargets"]),
     stateAgeTargets: toRecordArray(value["stateAgeTargets"]),
     stateGenderTargets: toRecordArray(value["stateGenderTargets"]),
-  };
+    metadata: isRecord(value["metadata"]) ? (value["metadata"] as Record<string, unknown>) : undefined,
+    sections: value["sections"],
+    settings: isRecord(value["settings"]) ? (value["settings"] as Record<string, unknown>) : undefined,
+    mapMetadata: value["mapMetadata"],
+  } satisfies StructuredAppsScriptPayload;
 };
 
 const fetchAndParse = async (url: string): Promise<AppsScriptPayload> => {

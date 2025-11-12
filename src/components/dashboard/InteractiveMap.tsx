@@ -14,6 +14,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { formatErrorLabel } from "@/lib/utils";
+import type { NormalizedMapMetadata } from "@/lib/mapMetadata";
 import { SectionHeader } from "./SectionHeader";
 import ogunLgaGeoJsonUrl from "@/assets/ogun-lga.geojson?url";
 
@@ -54,6 +55,7 @@ interface InteractiveMapProps {
   interviewers: InterviewerOption[];
   errorTypes: string[];
   lgas: string[];
+  metadata: NormalizedMapMetadata;
 }
 
 type ColorMode = "path" | "approval";
@@ -99,18 +101,118 @@ const createCustomIcon = (submission: Submission, mode: ColorMode) => {
   });
 };
 
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const sanitizeFilePrefix = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/--+/g, "-") || "map-export";
+
+const inlineComputedStyles = (source: Element, target: Element) => {
+  const computedStyle = window.getComputedStyle(source);
+  const styleString = Array.from(computedStyle)
+    .map((property) => `${property}:${computedStyle.getPropertyValue(property)};`)
+    .join("");
+
+  target.setAttribute("style", styleString);
+
+  Array.from(source.childNodes).forEach((child, index) => {
+    const targetChild = target.childNodes[index];
+    if (child.nodeType === Node.ELEMENT_NODE && targetChild?.nodeType === Node.ELEMENT_NODE) {
+      inlineComputedStyles(child as Element, targetChild as Element);
+    }
+  });
+};
+
+const cloneNodeWithStyles = (node: HTMLElement) => {
+  const clone = node.cloneNode(true) as HTMLElement;
+  inlineComputedStyles(node, clone);
+  clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+  clone.querySelectorAll("img").forEach((img) => {
+    img.setAttribute("crossorigin", "anonymous");
+  });
+  return clone;
+};
+
+const renderNodeToPng = async (node: HTMLElement): Promise<string> => {
+  const width = node.clientWidth;
+  const height = node.clientHeight;
+
+  if (width === 0 || height === 0) {
+    throw new Error("Map area has no size to export");
+  }
+
+  const clone = cloneNodeWithStyles(node);
+  const serialized = new XMLSerializer().serializeToString(clone);
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">\n  <foreignObject width="100%" height="100%">${serialized}</foreignObject>\n</svg>`;
+  const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+
+  try {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const image = new Image();
+      image.crossOrigin = "anonymous";
+      image.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext("2d");
+          if (!context) {
+            reject(new Error("Unable to create canvas context"));
+            return;
+          }
+
+          const background = window.getComputedStyle(node).backgroundColor;
+          const fill = background && background !== "rgba(0, 0, 0, 0)" ? background : "#ffffff";
+          context.fillStyle = fill;
+          context.fillRect(0, 0, width, height);
+          context.drawImage(image, 0, 0);
+          resolve(canvas.toDataURL("image/png"));
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      };
+      image.onerror = () => {
+        reject(new Error("Failed to render map for export"));
+      };
+      image.src = url;
+    });
+
+    return dataUrl;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
+
 const createPopupHtml = (submission: Submission): string => {
   const statusLabel = submission.status === "approved" ? "Approved" : "Not Approved";
   const statusColor = submission.status === "approved" ? "#16a34a" : "#dc2626";
   const pathMetadata = getPathMetadata(submission);
-  const ogstepResponse = submission.ogstepResponse ?? "Not provided";
-  const directions = submission.directions ? submission.directions : "Not provided";
+  const enumeratorLabel = escapeHtml(`Enumerator ${submission.interviewerId}`);
+  const lgaLabel = escapeHtml(submission.lga);
+  const timestampLabel = escapeHtml(submission.timestamp);
+  const pathLabel = escapeHtml(pathMetadata.label);
+  const statusLabelEscaped = escapeHtml(statusLabel);
+  const directionsHtml = submission.directions
+    ? `<a href="${escapeHtml(submission.directions)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">Location</a>`
+    : "<span>Not provided</span>";
   const errorsSection =
     submission.errorTypes.length
       ? `<div style="margin-top:8px;">
            <div style="font-weight:600;">Error Types:</div>
            <ul style="margin:6px 0 0 16px; padding:0; font-size:12px;">
-             ${submission.errorTypes.map((e) => `<li>${formatErrorLabel(e)}</li>`).join("")}
+             ${submission.errorTypes
+               .map((e) => `<li>${escapeHtml(formatErrorLabel(e))}</li>`)
+               .join("")}
            </ul>
          </div>`
       : "";
@@ -118,25 +220,21 @@ const createPopupHtml = (submission: Submission): string => {
   return `
     <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
       <div style="display:flex;flex-direction:column;gap:2px;">
-        <div style="font-weight:700;color:#2563eb;">Enumerator ${submission.interviewerId}</div>
-        <div style="font-size:12px;color:#64748b;">Submission #${submission.id}</div>
+        <div style="font-weight:700;color:#2563eb;">${enumeratorLabel}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;">
-        <div><span style="font-weight:600;">Interviewer ID:</span> ${submission.interviewerId}</div>
-        <!-- Name removed -->
-        <div><span style="font-weight:600;">LGA:</span> ${submission.lga}</div>
-        <div><span style="font-weight:600;">Directions:</span> ${directions}</div>
-        <div><span style="font-weight:600;">OGSTEP Path:</span> <span style="font-weight:700;">${pathMetadata.label}</span></div>
-        <div style="font-size:12px;color:#64748b;">Response: ${ogstepResponse}</div>
-        <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabel}</span></div>
-        <div><span style="font-weight:600;">Submitted:</span> ${submission.timestamp}</div>
+        <div><span style="font-weight:600;">LGA:</span> ${lgaLabel}</div>
+        <div><span style="font-weight:600;">Directions:</span> ${directionsHtml}</div>
+        <div><span style="font-weight:600;">OGSTEP Path:</span> <span style="font-weight:700;">${pathLabel}</span></div>
+        <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabelEscaped}</span></div>
+        <div><span style="font-weight:600;">Submitted:</span> ${timestampLabel}</div>
       </div>
       ${errorsSection}
     </div>
   `;
 };
 
-export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: InteractiveMapProps) {
+export function InteractiveMap({ submissions, interviewers, errorTypes, lgas, metadata }: InteractiveMapProps) {
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
   const [selectedLga, setSelectedLga] = useState("all");
@@ -189,7 +287,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
       });
   }, [submissions, selectedErrorType, selectedInterviewer, selectedLga]);
 
-  const handleExportMap = useCallback(() => {
+  const handleExportMap = useCallback(async () => {
     if (isExporting) {
       return;
     }
@@ -199,78 +297,34 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
       return;
     }
 
+    const container = mapContainerRef.current;
+    const mapElement = container?.querySelector(".leaflet-container") as HTMLElement | null;
+
+    if (!container || !mapElement) {
+      console.warn("Map element is not ready for export.");
+      return;
+    }
+
     setIsExporting(true);
 
     try {
-      const headers = [
-        "Submission ID",
-        "Interviewer",
-        "LGA",
-        "State",
-        "Latitude",
-        "Longitude",
-        "Status",
-        "Path",
-        "Timestamp",
-        "Error Types",
-      ];
-
-      const rows = filteredSubmissions.map((submission) => {
-        const errorSummary = submission.errorTypes
-          .map((type) => formatErrorLabel(type))
-          .filter((label) => label.length > 0)
-          .join("; ");
-
-        return [
-          submission.id,
-          submission.interviewerId,
-          submission.lga,
-          submission.state,
-          submission.lat,
-          submission.lng,
-          submission.status === "approved" ? "Approved" : "Not Approved",
-          submission.ogstepPath === "treatment"
-            ? "Treatment"
-            : submission.ogstepPath === "control"
-            ? "Control"
-            : "Unknown",
-          submission.timestamp,
-          errorSummary,
-        ];
-      });
-
-      const csvLines = [headers.join(",")].concat(
-        rows.map((row) =>
-          row
-            .map((value) => {
-              const stringValue = value === null || value === undefined ? "" : String(value);
-              return /[",\n\r]/.test(stringValue)
-                ? `"${stringValue.replace(/"/g, '""')}"`
-                : stringValue;
-            })
-            .join(","),
-        ),
-      );
-
-      const blob = new Blob([`\uFEFF${csvLines.join("\n")}`], {
-        type: "text/csv;charset=utf-8;",
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
+      const dataUrl = await renderNodeToPng(mapElement);
+      const sanitizedPrefix = sanitizeFilePrefix(metadata.exportFilenamePrefix);
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      anchor.href = url;
-      anchor.download = `ogun-lga-map-${timestamp}.csv`;
+
+      const anchor = document.createElement("a");
+      anchor.href = dataUrl;
+      anchor.download = `${sanitizedPrefix}-${timestamp}.png`;
       anchor.rel = "noopener";
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
-      setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (error) {
-      console.error("Failed to export map data", error);
+      console.error("Failed to export map image", error);
     } finally {
       setIsExporting(false);
     }
-  }, [filteredSubmissions, isExporting]);
+  }, [isExporting, metadata.exportFilenamePrefix]);
 
   useEffect(() => {
     if (!mapRef.current && mapContainerRef.current) {
@@ -470,7 +524,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
 
   return (
     <section className="space-y-4">
-      <SectionHeader title="OGUN LGA MAP" subtitle="Submissions by LGA" />
+      <SectionHeader title={metadata.title} subtitle={metadata.subtitle ?? undefined} />
       <Card className="fade-in">
         <CardHeader className="flex flex-col gap-4 border-b bg-muted/30 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2 self-start">

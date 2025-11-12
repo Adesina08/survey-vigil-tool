@@ -13,6 +13,11 @@ import { normaliseHeaderKey } from "./googleSheets";
 import { getSubmissionMetrics, type Row as MetricRow } from "@/utils/metrics";
 import { getErrorBreakdown, extractQualityIndicatorCounts } from "@/utils/errors";
 import { determineApprovalStatus } from "@/utils/approval";
+import {
+  normalizeMapMetadata,
+  type MapMetadataConfig,
+  type NormalizedMapMetadata,
+} from "./mapMetadata";
 
 type OgstepPath = "treatment" | "control" | "unknown";
 
@@ -189,6 +194,7 @@ export interface DashboardData {
   quotaByLGAAge: QuotaLGAAgeRow[];
   quotaByLGAGender: QuotaLGAGenderRow[];
   mapSubmissions: MapSubmission[];
+  mapMetadata: NormalizedMapMetadata;
   userProductivity: ProductivityRow[];
   userProductivityDetailed: DetailedProductivityRow[];
   errorBreakdown: ErrorBreakdownRow[];
@@ -508,6 +514,7 @@ interface DashboardDataInput {
   stateAgeTargets?: SheetStateAgeTargetRow[];
   stateGenderTargets?: SheetStateGenderTargetRow[];
   analysisRows?: AnalysisRow[];
+  mapMetadata?: MapMetadataConfig;
 }
 
 export const buildDashboardData = ({
@@ -516,6 +523,7 @@ export const buildDashboardData = ({
   stateAgeTargets = [],
   stateGenderTargets = [],
   analysisRows,
+  mapMetadata,
 }: DashboardDataInput): DashboardData => {
   const metricsRows: MetricRow[] = Array.isArray(analysisRows)
     ? (analysisRows as MetricRow[])
@@ -525,6 +533,7 @@ export const buildDashboardData = ({
 
   const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(submissions);
   const totalSubmissions = metrics.total;
+  const normalizedMapMetadata = normalizeMapMetadata(mapMetadata);
 
   const approvedByState = new Map<string, number>();
   const approvedByStateAge = new Map<string, number>();
@@ -995,6 +1004,7 @@ export const buildDashboardData = ({
     quotaByLGAAge,
     quotaByLGAGender,
     mapSubmissions: sortedMapSubmissions,
+    mapMetadata: normalizedMapMetadata,
     userProductivity,
     userProductivityDetailed,
     errorBreakdown,
@@ -1031,4 +1041,9 @@ export const dashboardData = buildDashboardData({
   stateTargets: sheetStateTargets,
   stateAgeTargets: sheetStateAgeTargets,
   stateGenderTargets: sheetStateGenderTargets,
+  mapMetadata: {
+    title: "OGUN LGA MAP",
+    subtitle: "Submissions by LGA",
+    exportFilenamePrefix: "ogun-lga-map",
+  },
 });

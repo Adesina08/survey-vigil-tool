@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import type { AriaAttributes } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -13,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CartesianGrid, ComposedChart, Bar, XAxis, YAxis, Label } from "recharts";
-import { Crown, TrendingUp, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Crown, TrendingUp, Users } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
@@ -75,6 +76,98 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
 
     return normalised.sort(compare);
   }, [data]);
+
+  const [sortState, setSortState] = useState<{ column: string; direction: "asc" | "desc" }>(
+    () => ({ column: "default", direction: "desc" })
+  );
+
+  const getSortValue = (row: InterviewerData, column: string): number | string => {
+    if (column === "interviewerId") {
+      return row.displayLabel || row.interviewerId;
+    }
+
+    if (column === "totalSubmissions") {
+      return row.totalSubmissions ?? 0;
+    }
+
+    if (column === "validSubmissions") {
+      return row.validSubmissions ?? 0;
+    }
+
+    if (column === "invalidSubmissions") {
+      return row.invalidSubmissions ?? 0;
+    }
+
+    if (row.errors && column in row.errors) {
+      return row.errors[column] ?? 0;
+    }
+
+    return 0;
+  };
+
+  const tableData = useMemo(() => {
+    const rows = [...rankedProductivity];
+    if (sortState.column === "default") {
+      return rows;
+    }
+
+    const { column, direction } = sortState;
+    const multiplier = direction === "asc" ? 1 : -1;
+
+    rows.sort((a, b) => {
+      const aValue = getSortValue(a, column);
+      const bValue = getSortValue(b, column);
+
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        if (aValue !== bValue) {
+          return (aValue - bValue) * multiplier;
+        }
+      } else {
+        const comparison = String(aValue).localeCompare(String(bValue), undefined, {
+          sensitivity: "base",
+          numeric: true,
+        });
+        if (comparison !== 0) {
+          return comparison * multiplier;
+        }
+      }
+
+      const aLabel = (a.displayLabel || a.interviewerId).toLowerCase();
+      const bLabel = (b.displayLabel || b.interviewerId).toLowerCase();
+      return aLabel.localeCompare(bLabel);
+    });
+
+    return rows;
+  }, [rankedProductivity, sortState]);
+
+  const handleSort = (column: string, type: "string" | "number" = "string") => {
+    setSortState((previous) => {
+      if (previous.column === column) {
+        return { column, direction: previous.direction === "asc" ? "desc" : "asc" };
+      }
+
+      return { column, direction: type === "string" ? "asc" : "desc" };
+    });
+  };
+
+  const renderSortIcon = (column: string) => {
+    if (sortState.column !== column) {
+      return <ArrowUpDown className="h-3 w-3 opacity-60" aria-hidden />;
+    }
+
+    return sortState.direction === "asc" ? (
+      <ArrowUp className="h-3 w-3" aria-hidden />
+    ) : (
+      <ArrowDown className="h-3 w-3" aria-hidden />
+    );
+  };
+
+  const getAriaSort = (column: string): AriaAttributes["aria-sort"] => {
+    if (sortState.column !== column) {
+      return "none";
+    }
+    return sortState.direction === "asc" ? "ascending" : "descending";
+  };
 
   const errorColumns = useMemo(() => {
     const unique = new Set<string>(errorTypes ?? []);
@@ -353,30 +446,78 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
               >
                   <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
                     <TableRow className="bg-muted/60">
-                      <TableHead className="sticky left-0 top-0 z-30 w-[26%] bg-background">
-                        Interviewer ID
+                      <TableHead
+                        className="sticky left-0 top-0 z-30 w-[26%] bg-background"
+                        aria-sort={getAriaSort("interviewerId")}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSort("interviewerId", "string")}
+                          className="flex w-full items-center justify-between gap-1 text-left text-xs font-semibold text-foreground sm:text-sm"
+                        >
+                          <span>Interviewer ID</span>
+                          {renderSortIcon("interviewerId")}
+                        </button>
                       </TableHead>
-                      <TableHead className="top-0 z-20 bg-background text-right">
-                        Total interviews
+                      <TableHead
+                        className="top-0 z-20 bg-background text-right"
+                        aria-sort={getAriaSort("totalSubmissions")}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSort("totalSubmissions", "number")}
+                          className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-foreground sm:text-sm"
+                        >
+                          <span>Total interviews</span>
+                          {renderSortIcon("totalSubmissions")}
+                        </button>
                       </TableHead>
-                      <TableHead className="top-0 z-20 bg-background text-right text-success">
-                        Approved interviews
+                      <TableHead
+                        className="top-0 z-20 bg-background text-right text-success"
+                        aria-sort={getAriaSort("validSubmissions")}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSort("validSubmissions", "number")}
+                          className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-success sm:text-sm"
+                        >
+                          <span>Approved interviews</span>
+                          {renderSortIcon("validSubmissions")}
+                        </button>
                       </TableHead>
-                      <TableHead className="top-0 z-20 bg-background text-right text-destructive">
-                        Flagged interviews
+                      <TableHead
+                        className="top-0 z-20 bg-background text-right text-destructive"
+                        aria-sort={getAriaSort("invalidSubmissions")}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => handleSort("invalidSubmissions", "number")}
+                          className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-destructive sm:text-sm"
+                        >
+                          <span>Flagged interviews</span>
+                          {renderSortIcon("invalidSubmissions")}
+                        </button>
                       </TableHead>
                       {errorColumns.map((errorType) => (
                         <TableHead
                           key={errorType}
                           className="top-0 z-20 bg-background text-right"
+                          aria-sort={getAriaSort(errorType)}
                         >
-                          {formatErrorLabel(errorType)}
+                          <button
+                            type="button"
+                            onClick={() => handleSort(errorType, "number")}
+                            className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-foreground sm:text-sm"
+                          >
+                            <span>{formatErrorLabel(errorType)}</span>
+                            {renderSortIcon(errorType)}
+                          </button>
                         </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rankedProductivity.map((row) => (
+                    {tableData.map((row) => (
                       <TableRow key={row.interviewerId} className="group transition-colors hover:bg-primary/5">
                         <TableCell className="sticky left-0 z-10 bg-background font-semibold">
                           {row.displayLabel || row.interviewerId}
