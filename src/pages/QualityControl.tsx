@@ -442,6 +442,7 @@ const QualityControl = ({
         interviewers={dashboardData.filters.interviewers}
         errorTypes={dashboardData.filters.errorTypes}
         lgas={dashboardData.filters.lgas}
+        metadata={dashboardData.mapMetadata}
       />
 
       <QuotaTracker

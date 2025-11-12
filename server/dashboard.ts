@@ -5,6 +5,7 @@ import {
   mapSheetRowsToSubmissions,
 } from "../src/lib/googleSheets";
 import { buildDashboardData, type DashboardData } from "../src/lib/dashboardData";
+import { extractMapMetadataFromPayload } from "../src/lib/mapMetadata";
 import type {
   SheetStateAgeTargetRow,
   SheetStateGenderTargetRow,
@@ -27,11 +28,18 @@ const BODY_SNIPPET_LENGTH = 200;
 
 type PresentGender = "Male" | "Female";
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
 interface AppsScriptPayload {
   rows: Record<string, unknown>[];
   stateTargets: Record<string, unknown>[];
   stateAgeTargets: Record<string, unknown>[];
   stateGenderTargets: Record<string, unknown>[];
+  metadata?: Record<string, unknown>;
+  sections?: unknown;
+  settings?: Record<string, unknown>;
+  mapMetadata?: unknown;
 }
 
 const toRecordArray = (value: unknown): Record<string, unknown>[] =>
@@ -79,6 +87,10 @@ export async function fetchFromAppsScript(url: string): Promise<AppsScriptPayloa
         stateTargets: [],
         stateAgeTargets: [],
         stateGenderTargets: [],
+        metadata: undefined,
+        sections: undefined,
+        settings: undefined,
+        mapMetadata: undefined,
       }
     : {
         rows:
@@ -89,6 +101,10 @@ export async function fetchFromAppsScript(url: string): Promise<AppsScriptPayloa
         stateAgeTargets: (parsed as Record<string, unknown>).stateAgeTargets ?? [],
         stateGenderTargets:
           (parsed as Record<string, unknown>).stateGenderTargets ?? [],
+        metadata: (parsed as Record<string, unknown>).metadata ?? undefined,
+        sections: (parsed as Record<string, unknown>).sections ?? undefined,
+        settings: (parsed as Record<string, unknown>).settings ?? undefined,
+        mapMetadata: (parsed as Record<string, unknown>).mapMetadata ?? undefined,
       };
 
   if (!Array.isArray(base.rows)) {
@@ -101,6 +117,10 @@ export async function fetchFromAppsScript(url: string): Promise<AppsScriptPayloa
     stateTargets: toRecordArray(base.stateTargets),
     stateAgeTargets: toRecordArray(base.stateAgeTargets),
     stateGenderTargets: toRecordArray(base.stateGenderTargets),
+    metadata: isRecord(base.metadata) ? base.metadata : undefined,
+    sections: base.sections,
+    settings: isRecord(base.settings) ? base.settings : undefined,
+    mapMetadata: base.mapMetadata,
   };
 }
 
@@ -193,11 +213,14 @@ export const loadDashboardData = async (): Promise<DashboardData> => {
     stateGenderTargets,
   });
 
+  const mapMetadata = extractMapMetadataFromPayload(payload);
+
   return buildDashboardData({
     submissions,
     stateTargets: ensured.stateTargets,
     stateAgeTargets: ensured.stateAgeTargets,
     stateGenderTargets: ensured.stateGenderTargets,
     analysisRows: submissions,
+    mapMetadata,
   });
 };
