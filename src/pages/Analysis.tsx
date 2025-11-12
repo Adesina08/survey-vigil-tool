@@ -1,270 +1,509 @@
-import React, { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, ChevronDown, Loader2, RefreshCcw } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import Select, { type GroupBase, type StylesConfig } from "react-select";
+import makeAnimated from "react-select/animated";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import * as XLSX from "xlsx";
+import { AlertCircle, BarChart3, Download, Loader2, RefreshCcw } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Accordion } from "@/components/ui/accordion";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Separator } from "@/components/ui/separator";
+import type { AnalysisResponse, DisplayMode } from "@/services/analysis";
+import { generateAnalysis } from "@/services/analysis";
 
-import TopBreakAccordion from "@/components/TopBreakAccordion";
-import SidebreakChips, { SidebreakOption } from "@/components/SidebreakChips";
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
-import { useDashboardData } from "@/hooks/useDashboardData";
-import { getAnalysisSchema, type AnalysisSchema } from "@/lib/api.analysis";
+const animatedComponents = makeAnimated();
 
-// Curated Top breaks (multiselect)
-const CURATED_TOP_BREAKS = [
-  "a3_select_the_lga",
-  "a7_sex",
-  "a9_marital_status",
-  "a10_highest_education_completed",
-];
+type Option = { label: string; value: string };
 
-const LABELS: Record<string, string> = {
-  a3_select_the_lga: "A3. select the LGA",
-  a7_sex: "A7. Sex",
-  a9_marital_status: "A9. Marital status",
-  a10_highest_education_completed: "A10. Highest education completed",
+type GroupedOptions = GroupBase<Option>;
+
+type PathOption = {
+  label: string;
+  value: string;
+  description: string;
+  className: string;
 };
 
-const formatKeyToLabel = (key: string) => LABELS[key] ?? key.replace(/_/g, " ");
+const TOP_BREAK_OPTIONS: Option[] = [
+  { value: "A3_LGA", label: "A3. LGA / Ward" },
+  { value: "A6_Consent", label: "A6. Consent" },
+  { value: "A7_Sex", label: "A7. Sex" },
+  { value: "A9_MaritalStatus", label: "A9. Marital status" },
+  { value: "A10_Education", label: "A10. Highest education" },
+  { value: "A12_EnumeratorObservation", label: "A12. Enumerator observation" },
+];
 
-// Sidebreak groups → JSON key mapping (single select)
-const SIDEBREAK_GROUPS: { group: string; items: { key: string; label: string }[] }[] = [
+const SIDE_BREAK_GROUPS: GroupedOptions[] = [
   {
-    group: "SECTION B – PROGRAM EXPOSURE / PARTICIPATION",
-    items: [
-      { key: "b1_are_you_aware_of_ogstep", label: "B1 – Awareness of OGSTEP" },
-      { key: "b2_did_you_participate_in_ogstep", label: "B2 – Participation in OGSTEP" },
-      { key: "b4_type_of_support_received", label: "B4 – Type of support received" },
-      { key: "b6_have_you_participated_in_any_other_training_support_program_in_the_last_3_years", label: "B6 – Participated in other programs" },
-      { key: "b7_if_yes_specify_program_name", label: "B7 – Program name" },
+    label: "Section B – Program Exposure & Participation",
+    options: [
+      { value: "B1_Awareness", label: "B1. Awareness of OGSTEP" },
+      { value: "B2_Participation", label: "B2. Participated in OGSTEP" },
+      { value: "B4_SupportType", label: "B4. Support type received" },
+      { value: "B6_OtherPrograms", label: "B6. Joined other programs" },
+      { value: "B7_ProgramName", label: "B7. Program name" },
     ],
   },
   {
-    group: "SECTION C – TVET / SKILLS DEVELOPMENT",
-    items: [
-      { key: "c1_did_you_complete_ogstep_training", label: "C1 – Completed OGSTEP training" },
-      { key: "c2_type_of_ogstep_training", label: "C2 – Type of OGSTEP training" },
-      { key: "c3_did_you_complete_any_non_ogstep_training_in_last_3_years", label: "C3 – Completed any non-OGSTEP training" },
-      { key: "c4_current_employment_status", label: "C4 – Current employment status" },
-      { key: "c7_is_your_job_related_to_your_training", label: "C7 – Job related to training" },
-      { key: "c8_main_barriers_to_finding_work", label: "C8 – Barriers to finding work" },
+    label: "Section C – TVET / Skills",
+    options: [
+      { value: "C1_OGSTEPTrainingCompleted", label: "C1. Completed OGSTEP training" },
+      { value: "C2_TrainingType", label: "C2. Type of OGSTEP training" },
+      { value: "C3_NonOGSTEPTraining", label: "C3. Non-OGSTEP training" },
+      { value: "C4_EmploymentStatus", label: "C4. Employment status" },
+      { value: "C7_JobRelated", label: "C7. Job related to training" },
+      { value: "C8_Barriers", label: "C8. Barriers to finding work" },
     ],
   },
   {
-    group: "SECTION D – AGRICULTURE / VCDF FARMERS",
-    items: [
-      { key: "d1_do_you_currently_farm", label: "D1 – Currently farm" },
-      { key: "d2_type_of_enterprise", label: "D2 – Type of enterprise" },
-      { key: "d6_inputs_received_via_ogstep", label: "D6 – Inputs received via OGSTEP" },
-      { key: "d7_inputs_received_from_other_sources", label: "D7 – Inputs from other sources" },
-      { key: "d11_access_to_off_taker_contract", label: "D11 – Access to off-taker contract" },
+    label: "Section D – Agriculture",
+    options: [
+      { value: "D1_CurrentlyFarm", label: "D1. Currently farming" },
+      { value: "D2_EnterpriseType", label: "D2. Enterprise type" },
+      { value: "D6_OGSTEPInputs", label: "D6. Inputs received via OGSTEP" },
+      { value: "D7_OtherInputs", label: "D7. Inputs from other sources" },
+      { value: "D11_OffTaker", label: "D11. Off-taker contracts" },
     ],
   },
   {
-    group: "SECTION E – SMEs / STARTUPS",
-    items: [
-      { key: "e1_own_or_manage_a_business", label: "E1 – Own/manage business" },
-      { key: "e2_business_sector", label: "E2 – Business sector" },
-      { key: "e6_received_ogstep_finance_support", label: "E6 – Received OGSTEP finance/support" },
-      { key: "e7_received_other_support", label: "E7 – Received other support" },
-      { key: "e8_adopted_new_technology_since_support", label: "E8 – Adopted new technology" },
-      { key: "e9_main_constraints_to_growth", label: "E9 – Main constraints to growth" },
+    label: "Section E – SMEs / Startups",
+    options: [
+      { value: "E1_OwnBusiness", label: "E1. Own business" },
+      { value: "E2_Sector", label: "E2. Business sector" },
+      { value: "E6_OGSTEPFinance", label: "E6. Received OGSTEP finance" },
+      { value: "E7_OtherSupport", label: "E7. Received other support" },
+      { value: "E8_NewTechnology", label: "E8. Adopted new technology" },
+      { value: "E9_Constraints", label: "E9. Constraints to growth" },
     ],
   },
   {
-    group: "SECTION F – HOUSEHOLD & FOOD SECURITY",
-    items: [
-      { key: "f1_did_you_worry_that_your_household_would_not_have_enough_food", label: "F1 – Worry not enough food" },
-      { key: "f2_did_you_or_any_household_member_have_to_eat_smaller_meals_than_you_felt_you_needed_because_there_wasnt_enough_food", label: "F2 – Smaller meals" },
-      { key: "f3_did_you_or_any_household_member_eat_fewer_meals_in_a_day_because_there_wasnt_enough_food", label: "F3 – Fewer meals" },
-      { key: "f4_did_you_or_any_household_member_go_to_sleep_hungry_because_there_wasnt_enough_food", label: "F4 – Sleep hungry" },
-      { key: "f5_did_you_or_any_household_member_go_a_whole_day_and_night_without_eating_because_there_wasnt_enough_food", label: "F5 – Whole day without eating" },
-      { key: "f6_compared_to_before_ogstep_has_your_household_food_situation_improved_stayed_the_same_or_worsened", label: "F6 – Household food situation" },
+    label: "Section F – Household & Food Security",
+    options: [
+      { value: "F1_WorryFood", label: "F1. Worried about food" },
+      { value: "F2_SmallerMeals", label: "F2. Took smaller meals" },
+      { value: "F3_FewerMeals", label: "F3. Fewer meals" },
+      { value: "F4_SleptHungry", label: "F4. Slept hungry" },
+      { value: "F5_NoFood", label: "F5. Whole day without food" },
+      { value: "F6_FoodSituation", label: "F6. Food situation change" },
     ],
   },
   {
-    group: "SECTION G – GENDER & YOUTH EMPOWERMENT",
-    items: [
-      { key: "g1_who_decides_income_use", label: "G1 – Who decides income use" },
-      { key: "g2_have_your_own_savings_credit", label: "G2 – Have own savings/credit" },
-      { key: "g3_member_of_mens_womens_or_youth_group", label: "G3 – Member of group" },
-      { key: "g4_compared_to_before_ogstep_ability_to_influence_decisions", label: "G4 – Influence on decisions" },
+    label: "Section G – Gender & Youth Empowerment",
+    options: [
+      { value: "G1_IncomeDecisions", label: "G1. Who decides income" },
+      { value: "G2_SavingsCredit", label: "G2. Has savings/credit" },
+      { value: "G3_GroupMember", label: "G3. Group membership" },
+      { value: "G4_Influence", label: "G4. Influence compared to before" },
     ],
   },
   {
-    group: "SECTION H – PERCEPTIONS & SUSTAINABILITY",
-    items: [
-      { key: "h1_satisfaction_with_ogstep", label: "H1 – Satisfaction" },
-      { key: "h2_trust_in_implementing_institutions", label: "H2 – Trust" },
-      { key: "h3_can_you_continue_activities_without_external_support", label: "H3 – Continue without support" },
-      { key: "h4_biggest_risks_to_sustaining_benefits", label: "H4 – Risks to sustain benefits" },
+    label: "Section H – Perceptions & Sustainability",
+    options: [
+      { value: "H1_Satisfaction", label: "H1. Satisfaction with OGSTEP" },
+      { value: "H2_Trust", label: "H2. Trust in institutions" },
+      { value: "H3_ContinueWithoutSupport", label: "H3. Continue without support" },
+      { value: "H4_Risks", label: "H4. Risks to sustain benefits" },
     ],
   },
 ];
 
-type StatType = "counts" | "rowpct" | "colpct" | "totalpct";
+const DISPLAY_MODES: { label: string; value: DisplayMode; description: string }[] = [
+  { label: "Count", value: "count", description: "Raw respondent counts" },
+  { label: "Row %", value: "rowPercent", description: "Percentage within each response option" },
+  { label: "Column %", value: "columnPercent", description: "Percentage within each banner" },
+  { label: "Total %", value: "totalPercent", description: "Share of total interviews" },
+];
 
-const Analysis: React.FC = () => {
-  // Keep data hook in case you use it elsewhere on the page
-  useDashboardData();
+const PATH_OPTIONS: PathOption[] = [
+  {
+    value: "treatment",
+    label: "Treatment path",
+    description: "Respondents that followed the treatment (blue) route",
+    className: "border-blue-200 bg-blue-50 text-blue-800",
+  },
+  {
+    value: "control",
+    label: "Control path",
+    description: "Respondents that followed the control (green) route",
+    className: "border-green-200 bg-green-50 text-green-800",
+  },
+  {
+    value: "common",
+    label: "Common modules",
+    description: "Questions asked of all respondents (purple)",
+    className: "border-purple-200 bg-purple-50 text-purple-800",
+  },
+  {
+    value: "validation",
+    label: "Validation checks",
+    description: "Enumerator validations (yellow)",
+    className: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+];
 
-  const { data: schema, isLoading, isError, refetch, isFetching } = useQuery<AnalysisSchema, Error>({
-    queryKey: ["analysis-schema"],
-    queryFn: () => getAnalysisSchema(undefined),
-    staleTime: 10 * 60 * 1000,
-  });
+const selectStyles: StylesConfig<Option, true, GroupBase<Option>> = {
+  control: (provided) => ({
+    ...provided,
+    borderRadius: "0.75rem",
+    borderColor: "#e5e7eb",
+    boxShadow: "none",
+    padding: "2px 4px",
+    minHeight: "48px",
+  }),
+  multiValue: (provided) => ({
+    ...provided,
+    borderRadius: "9999px",
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isFocused ? "#f1f5f9" : "white",
+    color: "#0f172a",
+  }),
+};
 
-  // selections
-  const [selectedTopBreaks, setSelectedTopBreaks] = useState<string[]>(["a3_select_the_lga"]);
-  const [selectedSidebreak, setSelectedSidebreak] = useState<string | null>(null);
-  const [stat, setStat] = useState<StatType>("counts");
-  const [analyzeKey, setAnalyzeKey] = useState(0);
-  const [sidebreakOpen, setSidebreakOpen] = useState(true);
+const Analysis = () => {
+  const [topBreakSelection, setTopBreakSelection] = useState<Option[]>([TOP_BREAK_OPTIONS[2]]);
+  const [sideBreakSelection, setSideBreakSelection] = useState<Option[]>([
+    SIDE_BREAK_GROUPS[0].options[1],
+  ]);
+  const [mode, setMode] = useState<DisplayMode>("count");
+  const [selectedPaths, setSelectedPaths] = useState<string[]>(PATH_OPTIONS.map((item) => item.value));
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
 
-  const allVariables = useMemo(() => schema?.fields?.map((f) => f.name) ?? [], [schema]);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
-  const sidebreakOptions: SidebreakOption[] = useMemo(
-    () => SIDEBREAK_GROUPS.flatMap(({ group, items }) => items.map(({ key, label }) => ({ key, label, group }))),
-    []
-  );
+  const sideBreakOptions = useMemo(() => SIDE_BREAK_GROUPS, []);
 
-  const onAnalyze = () => {
-    if (!selectedSidebreak || selectedTopBreaks.length === 0) {
-      alert("Please select at least one Top break and one Sidebreak variable.");
+  const handleTogglePath = (value: string) => {
+    setSelectedPaths((prev) => {
+      const exists = prev.includes(value);
+      if (exists) {
+        if (prev.length === 1) {
+          return prev; // keep at least one path selected
+        }
+        return prev.filter((item) => item !== value);
+      }
+      return [...prev, value];
+    });
+  };
+
+  const handleGenerate = async () => {
+    if (topBreakSelection.length === 0 || sideBreakSelection.length === 0) {
+      setError("Select at least one top break and one side break variable.");
       return;
     }
 
-    setAnalyzeKey((n) => n + 1);
-    setSidebreakOpen(false);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateAnalysis({
+        topBreaks: topBreakSelection.map((item) => item.value),
+        sideBreaks: sideBreakSelection.map((item) => item.value),
+        mode,
+        paths: selectedPaths,
+      });
+      setAnalysis(response);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Unable to generate analysis at this time.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  const handleReset = () => {
+    setTopBreakSelection([TOP_BREAK_OPTIONS[2]]);
+    setSideBreakSelection([SIDE_BREAK_GROUPS[0].options[1]]);
+    setMode("count");
+    setSelectedPaths(PATH_OPTIONS.map((item) => item.value));
+    setAnalysis(null);
+    setError(null);
+  };
+
+  const handleExportExcel = () => {
+    if (!tableContainerRef.current) {
+      return;
+    }
+
+    const tableElements = tableContainerRef.current.querySelectorAll("table");
+    if (!tableElements.length) {
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    tableElements.forEach((table, index) => {
+      const worksheet = XLSX.utils.table_to_sheet(table);
+      XLSX.utils.book_append_sheet(workbook, worksheet, `Table_${index + 1}`);
+    });
+    const timestamp = new Date().toISOString().split("T")[0];
+    XLSX.writeFile(workbook, `ogstep-analysis-${timestamp}.xlsx`);
+  };
+
+  const handleExportPdf = async () => {
+    if (!tableContainerRef.current) {
+      return;
+    }
+
+    const canvas = await html2canvas(tableContainerRef.current, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+    });
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth - 48;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    pdf.addImage(imgData, "PNG", 24, 36, imgWidth, Math.min(imgHeight, pageHeight - 72));
+    const timestamp = new Date().toISOString().split("T")[0];
+    pdf.save(`ogstep-analysis-${timestamp}.pdf`);
+  };
+
+  const chartConfig = useMemo(() => {
+    if (!analysis?.chart) {
+      return null;
+    }
+
+    return {
+      data: {
+        labels: analysis.chart.labels,
+        datasets: analysis.chart.datasets.map((dataset) => ({
+          ...dataset,
+          borderRadius: 6,
+        })),
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: "bottom" as const,
+          },
+          tooltip: {
+            callbacks: {
+              label: (context: { dataset: { label: string }; formattedValue: string }) => {
+                return `${context.dataset.label}: ${context.formattedValue}`;
+              },
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: (value: number | string) => `${value}`,
+            },
+          },
+        },
+      },
+    };
+  }, [analysis]);
+
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-3 md:p-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Analysis</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="gap-2"
-        >
-          <RefreshCcw className={"h-4 w-4 " + (isFetching ? "animate-spin" : "")} />
-          Refresh schema
-        </Button>
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 lg:p-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">OGSTEP Impact Analysis</h1>
+          <p className="text-sm text-muted-foreground">
+            Slice post-survey outcomes by treatment and control pathways to surface actionable insights for
+            stakeholders.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleReset} className="gap-2">
+            <RefreshCcw className="h-4 w-4" /> Reset
+          </Button>
+          <Button onClick={handleGenerate} disabled={isLoading} className="gap-2">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+            Generate table
+          </Button>
+        </div>
       </div>
 
-      {isLoading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading variables…
-        </div>
-      )}
-      {isError && (
-        <div className="flex items-center gap-2 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4" /> Failed to load analysis schema
-        </div>
-      )}
-
-      {/* Section 1: Top break (multiselect) */}
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Top break</CardTitle>
+        <CardHeader>
+          <CardTitle>Break configuration</CardTitle>
+          <CardDescription>Choose the banners (top breaks) and row segments (side breaks) to crosstab.</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {CURATED_TOP_BREAKS.map((key) => {
-              const active = selectedTopBreaks.includes(key);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() =>
-                    setSelectedTopBreaks((prev) =>
-                      active ? prev.filter((k) => k !== key) : [...prev, key]
-                    )
-                  }
-                  className={
-                    "rounded-full border px-3 py-1 text-sm " +
-                    (active
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-background hover:bg-muted")
-                  }
-                >
-                  {formatKeyToLabel(key)}
-                </button>
-              );
-            })}
+        <CardContent className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Top breaks (columns)</h3>
+                <Badge variant="secondary">Section A</Badge>
+              </div>
+              <Select<Option, true, GroupBase<Option>>
+                closeMenuOnSelect={false}
+                components={animatedComponents}
+                isMulti
+                options={TOP_BREAK_OPTIONS}
+                value={topBreakSelection}
+                styles={selectStyles}
+                onChange={(values) => setTopBreakSelection((values as Option[]) ?? [])}
+                placeholder="Choose respondent attributes"
+              />
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Side breaks (rows)</h3>
+                <Badge variant="secondary">Sections B – H</Badge>
+              </div>
+              <Select<Option, true, GroupBase<Option>>
+                closeMenuOnSelect={false}
+                components={animatedComponents}
+                isMulti
+                options={sideBreakOptions}
+                value={sideBreakSelection}
+                styles={selectStyles}
+                onChange={(values) => setSideBreakSelection((values as Option[]) ?? [])}
+                placeholder="Choose outcome indicators"
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Display mode</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {DISPLAY_MODES.map((option) => {
+                  const active = mode === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setMode(option.value)}
+                      className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
+                        active ? "border-primary bg-primary/10 text-primary" : "border-border bg-background hover:bg-muted"
+                      }`}
+                    >
+                      <div className="font-medium">{option.label}</div>
+                      <div className="text-xs text-muted-foreground">{option.description}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium">Path filters</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {PATH_OPTIONS.map((path) => {
+                  const active = selectedPaths.includes(path.value);
+                  return (
+                    <button
+                      key={path.value}
+                      type="button"
+                      onClick={() => handleTogglePath(path.value)}
+                      className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
+                        active ? `${path.className} ring-2 ring-offset-2 ring-offset-background` : "border-border bg-background"
+                      }`}
+                    >
+                      <div className="font-medium">{path.label}</div>
+                      <div className="text-xs text-muted-foreground">{path.description}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Section 2: Sidebreaks (single-select, vertically listed, grouped) */}
-      <Collapsible open={sidebreakOpen} onOpenChange={setSidebreakOpen}>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base">Sidebreaks</CardTitle>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Toggle sidebreaks">
-                <ChevronDown className={`h-4 w-4 transition-transform ${sidebreakOpen ? "rotate-180" : ""}`} />
-              </Button>
-            </CollapsibleTrigger>
-          </CardHeader>
-          <CollapsibleContent asChild>
-            <CardContent className="space-y-4">
-              <SidebreakChips
-                options={sidebreakOptions}
-                value={selectedSidebreak}
-                onChange={setSelectedSidebreak}
-              />
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-
-      {/* Measure dropdown (small) + Analyze */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-card/60 p-4">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Measure</span>
-          <select
-            value={stat}
-            onChange={(e) => setStat(e.target.value as StatType)}
-            className="w-40 rounded-md border border-input bg-background px-2 py-1 text-sm"
-          >
-            <option value="counts">Counts</option>
-            <option value="rowpct">Row %</option>
-            <option value="colpct">Column %</option>
-            <option value="totalpct">Total %</option>
-          </select>
+      {error && (
+        <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          <AlertCircle className="mt-0.5 h-4 w-4" />
+          <span>{error}</span>
         </div>
+      )}
 
-        <Button
-          className="ml-auto"
-          disabled={!selectedSidebreak || selectedTopBreaks.length === 0}
-          onClick={onAnalyze}
-        >
-          Analyze
-        </Button>
-      </div>
+      {analysis && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold">Results</h2>
+              <p className="text-sm text-muted-foreground">
+                {analysis.metadata.rowCount.toLocaleString()} interviews included. Filters: {analysis.metadata.appliedFilters.join(", ")}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2" onClick={handleExportPdf}>
+                <Download className="h-4 w-4" /> Export PDF
+              </Button>
+              <Button variant="outline" className="gap-2" onClick={handleExportExcel}>
+                <Download className="h-4 w-4" /> Export Excel
+              </Button>
+            </div>
+          </div>
 
-      {/* Results: one block per selected Top break (WRAPPED IN ACCORDION) */}
-      <Accordion type="multiple" className="space-y-4">
-        {selectedTopBreaks.map((tb) => (
-          <TopBreakAccordion
-            key={`${tb}-${analyzeKey}`}
-            topbreak={tb}
-            allVariables={allVariables}
-            formatLabel={formatKeyToLabel}
-            variable={selectedSidebreak}
-            statExternal={stat}
-            analyzeKey={analyzeKey}
-            hideControls
-          />
-        ))}
-      </Accordion>
+          {analysis.insights.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Summary insights</CardTitle>
+                <CardDescription>
+                  Auto-generated storylines to brief decision makers on OGSTEP impact.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="list-disc space-y-2 pl-5 text-sm">
+                  {analysis.insights.map((insight, index) => (
+                    <li key={index}>{insight}</li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {chartConfig && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Visual comparison</CardTitle>
+                <CardDescription>
+                  {analysis.chart?.sideBreak} split by treatment pathway.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Bar data={chartConfig.data} options={chartConfig.options} />
+              </CardContent>
+            </Card>
+          )}
+
+          <div ref={tableContainerRef} className="space-y-6">
+            {analysis.tables.map((table) => (
+              <Card key={table.sideBreak} className="overflow-hidden">
+                <CardHeader>
+                  <CardTitle>{table.title}</CardTitle>
+                  <CardDescription>
+                    Displaying {table.mode === "count" ? "counts" : table.mode.replace(/([A-Z])/g, " $1").toLowerCase()}.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div
+                    className="overflow-x-auto rounded-lg border"
+                    dangerouslySetInnerHTML={{ __html: table.html }}
+                  />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
