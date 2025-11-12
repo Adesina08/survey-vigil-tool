@@ -27,19 +27,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 const toRecordArray = (value: unknown): Record<string, unknown>[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
+  if (!Array.isArray(value)) return [];
   return value.filter(isRecord);
 };
 
 const aliasKey = (key: string): string => {
   const normalised = normaliseHeaderKey(key);
-  if (!normalised) {
-    return key;
-  }
-
+  if (!normalised) return key;
   const canonical = headerAliasLookup[normalised];
   return canonical ?? key;
 };
@@ -55,91 +49,55 @@ const applyAliases = (rows: Record<string, unknown>[]) =>
   });
 
 const parseNumeric = (value: unknown): number | null => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
+  if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim().length > 0) {
     const cleaned = value.replace(/[₦,]/g, "");
     const parsed = Number.parseFloat(cleaned);
     return Number.isFinite(parsed) ? parsed : null;
   }
-
   return null;
 };
 
 const normaliseConsent = (value: unknown): string | undefined => {
   const text = String(value ?? "").trim().toLowerCase();
   if (!text) return undefined;
-
-  if (text.startsWith("y") || text === "approved" || text === "true") {
-    return "Yes";
-  }
-
-  if (text.startsWith("n")) {
-    return "No";
-  }
-
+  if (text.startsWith("y") || text === "approved" || text === "true") return "Yes";
+  if (text.startsWith("n")) return "No";
   return undefined;
 };
 
 const normaliseSex = (value: unknown): string | undefined => {
   const text = String(value ?? "").trim().toLowerCase();
   if (!text) return undefined;
-
-  if (text.startsWith("m")) {
-    return "Male";
-  }
-
-  if (text.startsWith("f")) {
-    return "Female";
-  }
-
+  if (text.startsWith("m")) return "Male";
+  if (text.startsWith("f")) return "Female";
   return undefined;
 };
 
 const ensureString = (value: unknown) => {
-  if (value === undefined || value === null) {
-    return value;
-  }
+  if (value === undefined || value === null) return value;
   return String(value);
 };
 
 const deriveInterviewDuration = (row: Record<string, unknown>) => {
   const existing = parseNumeric(row["Interview Duration (minutes)"] ?? row["Interview Length (mins)"]);
-  if (typeof existing === "number") {
-    return existing;
-  }
-
+  if (typeof existing === "number") return existing;
   const start = row.start ?? row.starttime;
   const end = row.end ?? row.endtime;
-  if (typeof start !== "string" || typeof end !== "string") {
-    return null;
-  }
-
+  if (typeof start !== "string" || typeof end !== "string") return null;
   const startDate = new Date(start);
   const endDate = new Date(end);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
-    return null;
-  }
-
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) return null;
   return Math.round((endDate.getTime() - startDate.getTime()) / 60000);
 };
 
 const normaliseRows = (rows: Record<string, unknown>[]) =>
   rows.map((row) => {
     const normalised: Record<string, unknown> = { ...row };
-
     const consent = normaliseConsent(normalised["A6. Consent to participate"]);
-    if (consent) {
-      normalised["A6. Consent to participate"] = consent;
-    }
-
+    if (consent) normalised["A6. Consent to participate"] = consent;
     const sex = normaliseSex(normalised["A7. Sex"]);
-    if (sex) {
-      normalised["A7. Sex"] = sex;
-    }
-
+    if (sex) normalised["A7. Sex"] = sex;
     const numericKeys = [
       "A8. Age",
       "latitude",
@@ -152,41 +110,24 @@ const normaliseRows = (rows: Record<string, unknown>[]) =>
       "E5.1. Monthly revenue",
       "E5.2. Monthly cost",
     ];
-
     numericKeys.forEach((key) => {
-      if (!(key in normalised)) {
-        return;
-      }
+      if (!(key in normalised)) return;
       const parsed = parseNumeric(normalised[key]);
       normalised[key] = parsed ?? null;
     });
-
     const derivedDuration = deriveInterviewDuration(normalised);
-    if (typeof derivedDuration === "number") {
-      normalised["Interview Duration (minutes)"] = derivedDuration;
-    }
-
-    if (!normalised.State || String(normalised.State).trim().length === 0) {
-      normalised.State = "Ogun State";
-    }
-
+    if (typeof derivedDuration === "number") normalised["Interview Duration (minutes)"] = derivedDuration;
+    if (!normalised.State || String(normalised.State).trim().length === 0) normalised.State = "Ogun State";
     if ("Respondent phone number" in normalised) {
       normalised["Respondent phone number"] = ensureString(normalised["Respondent phone number"]);
     }
-
     return normalised;
   });
 
 export const buildDashboardFromPayload = (payload: AppsScriptPayload): DashboardData => {
   const rawRows = Array.isArray(payload) ? payload : (payload.rows as unknown);
-
-  if (!Array.isArray(rawRows)) {
-    throw new Error("Apps Script payload missing rows array.");
-  }
-
+  if (!Array.isArray(rawRows)) throw new Error("Apps Script payload missing rows array.");
   const rows = normaliseRows(applyAliases(toRecordArray(rawRows)));
-  const submissions = mapSheetRowsToSubmissions(rows, { defaultState: "Ogun State" });
-
   const stateTargets = !Array.isArray(payload)
     ? mapSheetRowsToStateTargets(toRecordArray(payload.stateTargets))
     : [];
@@ -196,9 +137,7 @@ export const buildDashboardFromPayload = (payload: AppsScriptPayload): Dashboard
   const stateGenderTargets = !Array.isArray(payload)
     ? mapSheetRowsToStateGenderTargets(toRecordArray(payload.stateGenderTargets))
     : [];
-
   const mapMetadata = extractMapMetadataFromPayload(payload);
-
   return buildDashboardData({
     submissions,
     stateTargets,
@@ -209,30 +148,34 @@ export const buildDashboardFromPayload = (payload: AppsScriptPayload): Dashboard
   });
 };
 
-export async function loadDashboardData(): Promise<DashboardData> {
-  const payload = await fetchAppsScript();
-  const dashboard = buildDashboardFromPayload(payload);
-  saveCache(payload);
-  return dashboard;
+// New function to fetch sectioned dashboard data
+export async function loadDashboardData(
+  sections: string,
+  options: { mapLimit?: number; prodLimit?: number; analysisLimit?: number } = {},
+): Promise<Partial<DashboardData>> {
+  const { mapLimit = 5000, prodLimit = 1000, analysisLimit = 1000 } = options;
+  const query = new URLSearchParams({ sections });
+  if (sections.includes("map")) query.set("mapLimit", mapLimit.toString());
+  if (sections.includes("productivity")) query.set("prodLimit", prodLimit.toString());
+  if (sections.includes("analysis")) query.set("analysisLimit", analysisLimit.toString());
+  const response = await fetch(`/api/dashboard?${query.toString()}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to fetch dashboard data");
+  }
+  const data = await response.json();
+  // Cache the sectioned data
+  saveCache(data, sections);
+  return data;
 }
 
-const formatCacheTime = (iso?: string) => {
-  if (!iso) {
-    return null;
-  }
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed.toLocaleString();
-};
-
 export async function loadDashboardDataWithCache(
+  sections: string = "summary,quota",
+  options: { mapLimit?: number; prodLimit?: number; analysisLimit?: number } = {},
   setStatus?: (status: string) => void,
-): Promise<DashboardData> {
+): Promise<Partial<DashboardData>> {
   const updateStatus = typeof setStatus === "function" ? setStatus : () => {};
-  const { data: cached, when } = readCache<AppsScriptPayload>();
-
+  const { data: cached, when } = readCache<Partial<DashboardData>>(sections);
   if (cached && when) {
     const formatted = formatCacheTime(when);
     updateStatus(
@@ -241,41 +184,43 @@ export async function loadDashboardDataWithCache(
   } else if (!cached) {
     updateStatus("Loading…");
   }
-
   try {
-    const dashboard = await loadDashboardData();
+    const dashboard = await loadDashboardData(sections, options);
     const refreshedAt = new Date();
     const formattedRefresh = refreshedAt.toLocaleString();
     updateStatus(`Last refreshed: ${formattedRefresh}`);
     return dashboard;
   } catch (error) {
     if (cached) {
-      const fallback = buildDashboardFromPayload(cached);
       const formatted = formatCacheTime(when);
       updateStatus(
         formatted
           ? `Offline or server error. Showing cached data from ${formatted}`
           : "Offline or server error. Showing cached data",
       );
-      return fallback;
+      return cached;
     }
-
     updateStatus("Refresh failed");
     throw error instanceof Error ? error : new Error(String(error));
   }
 }
 
-export const getCachedDashboardData = (): { dashboard?: DashboardData; cachedAt?: string } => {
-  const { data, when } = readCache<AppsScriptPayload>();
-  if (!data) {
-    return {};
-  }
+export async function loadFullDashboardData(): Promise<DashboardData> {
+  const payload = await fetchAppsScript();
+  const dashboard = buildDashboardFromPayload(payload);
+  saveCache(payload);
+  return dashboard;
+}
 
-  try {
-    const dashboard = buildDashboardFromPayload(data);
-    return { dashboard, cachedAt: when };
-  } catch (error) {
-    console.warn("Failed to hydrate dashboard from cache", error);
-    return {};
-  }
+export const getCachedDashboardData = (sections?: string): { dashboard?: Partial<DashboardData>; cachedAt?: string } => {
+  const { data, when } = readCache<Partial<DashboardData>>(sections);
+  if (!data) return {};
+  return { dashboard: data, cachedAt: when };
+};
+
+const formatCacheTime = (iso?: string) => {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleString();
 };
