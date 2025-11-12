@@ -59,8 +59,8 @@ export async function generateAnalysis(request: AnalysisRequest): Promise<Analys
     throw new Error(message || "Unable to generate analysis table");
   }
 
-  const payload = (await response.json()) as AnalysisResponse;
-  return payload;
+  const analysisResponse = (await response.json()) as AnalysisResponse;
+  return analysisResponse;
 }
 
 export function toggleSelection(
