@@ -21,13 +21,18 @@ interface ErrorBreakdownProps {
   data: ErrorData[];
 }
 
+const shouldOmitErrorType = (errorType: string) =>
+  /^QC[\s_-]*(?:FLAG|WARN)[\s_-]*COUNT$/i.test(errorType.trim());
+
 export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
   const [sortConfig, setSortConfig] = useState<{
     key: keyof ErrorData;
     direction: "asc" | "desc";
   }>({ key: "count", direction: "desc" });
 
-  const sortedData = [...data].sort((a, b) => {
+  const filteredData = data.filter((item) => !shouldOmitErrorType(item.errorType));
+
+  const sortedData = [...filteredData].sort((a, b) => {
     if (sortConfig.direction === "asc") {
       return a[sortConfig.key] > b[sortConfig.key] ? 1 : -1;
     }
@@ -42,7 +47,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
     });
   };
 
-  const totalErrors = data.reduce((sum, item) => sum + item.count, 0);
+  const totalErrors = filteredData.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">

@@ -11,6 +11,7 @@ export const formatErrorLabel = (label: string): string => {
   }
 
   return label
+    .replace(/^QC[\s_-]*(?:FLAG|WARN)[\s_-]*/i, "")
     .replace(/_/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")

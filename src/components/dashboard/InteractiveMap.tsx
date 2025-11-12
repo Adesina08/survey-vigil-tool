@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Download, Eye, EyeOff, MapPin } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -140,6 +141,8 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
   const [selectedLga, setSelectedLga] = useState("all");
   const [colorMode, setColorMode] = useState<ColorMode>("path");
+  const [showLgaLabels, setShowLgaLabels] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
@@ -148,6 +151,10 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
   const [geoJsonFeatures, setGeoJsonFeatures] = useState<
     Feature<Geometry, Record<string, unknown>>[]
   >([]);
+
+  const handleToggleLabels = () => {
+    setShowLgaLabels((previous) => !previous);
+  };
 
   useEffect(() => {
     if (selectedLga === "all") {
@@ -182,6 +189,89 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
       });
   }, [submissions, selectedErrorType, selectedInterviewer, selectedLga]);
 
+  const handleExportMap = useCallback(() => {
+    if (isExporting) {
+      return;
+    }
+
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      console.warn("Map export is only available in the browser context.");
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const headers = [
+        "Submission ID",
+        "Interviewer",
+        "LGA",
+        "State",
+        "Latitude",
+        "Longitude",
+        "Status",
+        "Path",
+        "Timestamp",
+        "Error Types",
+      ];
+
+      const rows = filteredSubmissions.map((submission) => {
+        const errorSummary = submission.errorTypes
+          .map((type) => formatErrorLabel(type))
+          .filter((label) => label.length > 0)
+          .join("; ");
+
+        return [
+          submission.id,
+          submission.interviewerId,
+          submission.lga,
+          submission.state,
+          submission.lat,
+          submission.lng,
+          submission.status === "approved" ? "Approved" : "Not Approved",
+          submission.ogstepPath === "treatment"
+            ? "Treatment"
+            : submission.ogstepPath === "control"
+            ? "Control"
+            : "Unknown",
+          submission.timestamp,
+          errorSummary,
+        ];
+      });
+
+      const csvLines = [headers.join(",")].concat(
+        rows.map((row) =>
+          row
+            .map((value) => {
+              const stringValue = value === null || value === undefined ? "" : String(value);
+              return /[",\n\r]/.test(stringValue)
+                ? `"${stringValue.replace(/"/g, '""')}"`
+                : stringValue;
+            })
+            .join(","),
+        ),
+      );
+
+      const blob = new Blob([`\uFEFF${csvLines.join("\n")}`], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      anchor.href = url;
+      anchor.download = `ogun-lga-map-${timestamp}.csv`;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (error) {
+      console.error("Failed to export map data", error);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [filteredSubmissions, isExporting]);
+
   useEffect(() => {
     if (!mapRef.current && mapContainerRef.current) {
       mapRef.current = L.map(mapContainerRef.current, {
@@ -193,6 +283,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        crossOrigin: true,
       }).addTo(mapRef.current);
 
       setTimeout(() => {
@@ -307,6 +398,15 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
   useEffect(() => {
     if (!mapRef.current) return;
 
+    if (!showLgaLabels) {
+      if (labelLayerRef.current) {
+        labelLayerRef.current.clearLayers();
+        labelLayerRef.current.remove();
+        labelLayerRef.current = null;
+      }
+      return;
+    }
+
     if (!labelLayerRef.current) {
       labelLayerRef.current = L.layerGroup().addTo(mapRef.current);
     }
@@ -359,7 +459,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
       const avgLng = data.lng / data.count;
       addLabel(lga, [avgLat, avgLng]);
     });
-  }, [filteredSubmissions, geoJsonFeatures]);
+  }, [filteredSubmissions, geoJsonFeatures, showLgaLabels]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -445,9 +545,11 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
                 </div>
               ))}
             </div>
-            <div className="flex flex-col gap-3 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
-              <div>Showing {filteredSubmissions.length.toLocaleString()} submissions</div>
-              <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-4 text-sm text-muted-foreground md:flex-row md:items-center md:gap-6">
+              <div className="flex flex-1 justify-start">
+                <span>Showing {filteredSubmissions.length.toLocaleString()} submissions</span>
+              </div>
+              <div className="flex flex-1 flex-col items-center gap-3 md:flex-row md:justify-center">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Color mode</span>
                 <ToggleGroup
                   type="single"
@@ -468,6 +570,20 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, lgas }: 
                     Path
                   </ToggleGroupItem>
                 </ToggleGroup>
+              </div>
+              <div className="flex flex-1 flex-col items-center gap-2 md:flex-row md:justify-end">
+                <Button onClick={handleExportMap} disabled={isExporting} size="sm" className="w-full md:w-auto">
+                  <Download className="mr-2 h-4 w-4" /> {isExporting ? "Exporting…" : "Export Map"}
+                </Button>
+                <Button
+                  onClick={handleToggleLabels}
+                  variant="outline"
+                  size="sm"
+                  className="w-full md:w-auto"
+                >
+                  {showLgaLabels ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                  {showLgaLabels ? "Hide LGA Labels" : "Show LGA Labels"}
+                </Button>
               </div>
             </div>
           </div>
