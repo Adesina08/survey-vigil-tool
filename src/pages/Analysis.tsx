@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Loader2, RefreshCcw } from "lucide-react";
+import { AlertCircle, ChevronDown, Loader2, RefreshCcw } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Accordion } from "@/components/ui/accordion";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 import TopBreakAccordion from "@/components/TopBreakAccordion";
 import SidebreakChips, { SidebreakOption } from "@/components/SidebreakChips";
@@ -122,6 +123,7 @@ const Analysis: React.FC = () => {
   const [selectedSidebreak, setSelectedSidebreak] = useState<string | null>(null);
   const [stat, setStat] = useState<StatType>("counts");
   const [analyzeKey, setAnalyzeKey] = useState(0);
+  const [sidebreakOpen, setSidebreakOpen] = useState(true);
 
   const allVariables = useMemo(() => schema?.fields?.map((f) => f.name) ?? [], [schema]);
 
@@ -130,7 +132,15 @@ const Analysis: React.FC = () => {
     []
   );
 
-  const onAnalyze = () => setAnalyzeKey((n) => n + 1);
+  const onAnalyze = () => {
+    if (!selectedSidebreak || selectedTopBreaks.length === 0) {
+      alert("Please select at least one Top break and one Sidebreak variable.");
+      return;
+    }
+
+    setAnalyzeKey((n) => n + 1);
+    setSidebreakOpen(false);
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-3 md:p-6">
@@ -192,42 +202,53 @@ const Analysis: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Section 2: Sidebreaks (single-select, horizontal, grouped) */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Sidebreaks</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <SidebreakChips
-            options={sidebreakOptions}
-            value={selectedSidebreak}
-            onChange={setSelectedSidebreak}
-          />
+      {/* Section 2: Sidebreaks (single-select, vertically listed, grouped) */}
+      <Collapsible open={sidebreakOpen} onOpenChange={setSidebreakOpen}>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-base">Sidebreaks</CardTitle>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Toggle sidebreaks">
+                <ChevronDown className={`h-4 w-4 transition-transform ${sidebreakOpen ? "rotate-180" : ""}`} />
+              </Button>
+            </CollapsibleTrigger>
+          </CardHeader>
+          <CollapsibleContent asChild>
+            <CardContent className="space-y-4">
+              <SidebreakChips
+                options={sidebreakOptions}
+                value={selectedSidebreak}
+                onChange={setSelectedSidebreak}
+              />
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
-          {/* Measure dropdown (small) + Analyze */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Measure:</span>
-            <select
-              value={stat}
-              onChange={(e) => setStat(e.target.value as StatType)}
-              className="w-40 rounded-md border border-input bg-background px-2 py-1 text-sm"
-            >
-              <option value="counts">Counts</option>
-              <option value="rowpct">Row %</option>
-              <option value="colpct">Column %</option>
-              <option value="totalpct">Total %</option>
-            </select>
+      {/* Measure dropdown (small) + Analyze */}
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-card/60 p-4">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Measure</span>
+          <select
+            value={stat}
+            onChange={(e) => setStat(e.target.value as StatType)}
+            className="w-40 rounded-md border border-input bg-background px-2 py-1 text-sm"
+          >
+            <option value="counts">Counts</option>
+            <option value="rowpct">Row %</option>
+            <option value="colpct">Column %</option>
+            <option value="totalpct">Total %</option>
+          </select>
+        </div>
 
-            <Button
-              className="ml-auto"
-              disabled={!selectedSidebreak || selectedTopBreaks.length === 0}
-              onClick={onAnalyze}
-            >
-              Analyze
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        <Button
+          className="ml-auto"
+          disabled={!selectedSidebreak || selectedTopBreaks.length === 0}
+          onClick={onAnalyze}
+        >
+          Analyze
+        </Button>
+      </div>
 
       {/* Results: one block per selected Top break (WRAPPED IN ACCORDION) */}
       <Accordion type="multiple" className="space-y-4">

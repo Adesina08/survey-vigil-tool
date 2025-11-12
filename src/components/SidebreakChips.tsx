@@ -13,7 +13,7 @@ interface SidebreakChipsProps {
   onChange: (key: string) => void;
 }
 
-/** Horizontal, scrollable, single-select chip list grouped by sections */
+/** Vertical, single-select list grouped by sections */
 const SidebreakChips: React.FC<SidebreakChipsProps> = ({ options, value, onChange }) => {
   const groups = options.reduce<Record<string, SidebreakOption[]>>((acc, opt) => {
     if (!acc[opt.group]) acc[opt.group] = [];
@@ -22,34 +22,32 @@ const SidebreakChips: React.FC<SidebreakChipsProps> = ({ options, value, onChang
   }, {});
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {Object.entries(groups).map(([group, items]) => (
-        <div key={group} className="space-y-2">
+        <div key={group} className="space-y-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {group}
           </div>
-          <div className="relative">
-            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 pr-2">
-              {items.map((opt) => {
-                const active = value === opt.key;
-                return (
-                  <button
-                    type="button"
-                    key={opt.key}
-                    onClick={() => onChange(opt.key)}
-                    className={cn(
-                      "whitespace-nowrap rounded-full border px-3 py-1 text-xs transition",
-                      active
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-background hover:bg-muted"
-                    )}
-                    title={opt.label}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="flex flex-col gap-2">
+            {items.map((opt) => {
+              const active = value === opt.key;
+              return (
+                <button
+                  type="button"
+                  key={opt.key}
+                  onClick={() => onChange(opt.key)}
+                  className={cn(
+                    "w-full rounded-md border px-3 py-2 text-left text-sm transition",
+                    active
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-background hover:bg-muted"
+                  )}
+                  title={opt.label}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       ))}
