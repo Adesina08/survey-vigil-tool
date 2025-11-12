@@ -68,8 +68,8 @@ Simply open [Lovable](https://lovable.dev/projects/e281e3e3-daa2-46dd-b066-99dee
 
 Set the Google Apps Script Web App URL that returns JSON as the single data source for the dashboard:
 
-- **Local development (Vite)**: add `VITE_APPS_SCRIPT_URL=...` to your `.env` file.
-- **Netlify / serverless functions**: set `APPS_SCRIPT_URL=...` (the server also falls back to `VITE_APPS_SCRIPT_URL`).
+- **Recommended**: add `APPS_SCRIPT_URL=...` to your `.env` file. The Vite build now exposes `APPS_` prefixed variables to the browser automatically, so the same entry works for both the frontend and the backend proxy.
+- **Optional**: if you prefer, you can still set `VITE_APPS_SCRIPT_URL=...` for the browser or `APPS_SCRIPT_URL=...` for the server individually. Either variable name is read everywhere in the app.
 
 The app now proxies requests through `/api/apps-script` by default when running in the browser to avoid
 Apps Script CORS header conflicts. If you need the frontend to talk to the Apps Script endpoint directly
