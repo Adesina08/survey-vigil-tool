@@ -120,10 +120,15 @@ const fetchAndParse = async (url: string): Promise<AppsScriptPayload> => {
   }
 };
 
-export async function fetchAppsScript(): Promise<AppsScriptPayload> {
-  if (!candidateUrls.length) {
-    throw new Error("APPS_SCRIPT_URL is not set");
-  }
+export async function fetchAppsScript(fields: string = "rows", rowLimit: number = 1000): Promise<AppsScriptPayload> {
+  const query = new URLSearchParams({ fields, rowLimit: rowLimit.toString() });
+  const url = import.meta.env.VITE_APPS_SCRIPT_DIRECT_FETCH === "true"
+    ? import.meta.env.VITE_APPS_SCRIPT_URL
+    : `/api/apps-script?${query.toString()}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("Failed to fetch Apps Script data");
+  return response.json();
+}
 
   let lastError: unknown;
 
