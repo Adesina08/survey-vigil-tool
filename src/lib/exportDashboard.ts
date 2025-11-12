@@ -24,13 +24,15 @@ interface DashboardExcelExporter {
 
 const ARRAY_DELIMITER = "; ";
 
-const toSheetValue = (value: unknown): string | number | boolean | null => {
+const toSheetValue = (
+  value: unknown,
+): string | number | boolean | Date | null => {
   if (value === null || value === undefined) {
     return null;
   }
 
   if (value instanceof Date) {
-    return value.toISOString();
+    return value;
   }
 
   if (typeof value === "number") {
@@ -127,7 +129,7 @@ const loadSheetJS = async (): Promise<SheetJS> => {
 const createSheetData = (
   headers: string[],
   rows: DashboardExportRow[],
-): Array<Array<string | number | boolean | null>> => {
+): Array<Array<string | number | boolean | Date | null>> => {
   const headerRow = headers.map((header) => header ?? "");
   const bodyRows = rows.map((row) =>
     headers.map((header) => toSheetValue((row as Record<string, unknown>)[header])),
@@ -135,7 +137,7 @@ const createSheetData = (
   return [headerRow, ...bodyRows];
 };
 
-const triggerCsvDownload = async (
+const triggerWorkbookDownload = async (
   fileName: string,
   sheetName: string,
   headers: string[],
@@ -155,12 +157,12 @@ const triggerCsvDownload = async (
 
     XLSX.utils.book_append_sheet(workbook, worksheet, sanitisedSheetName);
     XLSX.writeFile(workbook, fileName, {
-      bookType: "csv",
-      compression: false,
+      bookType: "xlsx",
+      compression: true,
       sheet: sanitisedSheetName,
     });
   } catch (error) {
-    console.error("Failed to export CSV file", error);
+    console.error("Failed to export Excel file", error);
   }
 };
 
@@ -191,7 +193,7 @@ const formatCurrentDateLabel = () => {
 };
 
 const createExportFileName = (label: string) =>
-  `OGSTEP_IMPACT_SURVEY_${label}_${formatCurrentDateLabel()}.csv`;
+  `OGSTEP_IMPACT_SURVEY_${label}_${formatCurrentDateLabel()}.xlsx`;
 
 const createSheetLabel = (label: string) =>
   sanitizeSheetName(
@@ -223,7 +225,7 @@ export const createDashboardExcelExporter = ({
     const fileName = createExportFileName(label);
     const sheetLabel = createSheetLabel(label);
 
-    void triggerCsvDownload(fileName, sheetLabel, headersToUse, trimmed);
+    void triggerWorkbookDownload(fileName, sheetLabel, headersToUse, trimmed);
   };
 
   const downloadErrorBreakdown = () => {
@@ -237,7 +239,7 @@ export const createDashboardExcelExporter = ({
     const fileName = createExportFileName("Error Flags");
     const sheetLabel = createSheetLabel("Error Flags");
 
-    void triggerCsvDownload(fileName, sheetLabel, headers, rowsForExport);
+    void triggerWorkbookDownload(fileName, sheetLabel, headers, rowsForExport);
   };
 
   return {

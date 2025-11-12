@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { ExportBar } from "@/components/dashboard/ExportBar";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ const Index = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedLga, setSelectedLga] = useState<string | null>(null);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     setStatusMessage("Refreshing…");
     try {
@@ -49,7 +49,7 @@ const Index = () => {
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [refetch]);
 
   const handleFilterChange = (filterType: string, value: string) => {
     if (filterType === "lga") {
@@ -79,6 +79,16 @@ const Index = () => {
       setSelectedLga(null);
     }
   }, [dashboardData, selectedLga]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void handleRefresh();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [handleRefresh]);
 
   useEffect(() => {
     if (!dashboardData || isLoading || isFetching) {
