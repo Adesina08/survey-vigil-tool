@@ -1,99 +1,32 @@
-import { APP_VERSION } from "@/lib/appVersion";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { join } from "path";
 
-const CACHE_KEY = "appsScript.lastGoodPayload";
-const CACHE_TIME_KEY = "appsScript.lastRefreshIso";
-const CACHE_VERSION_KEY = "appsScript.appVersion";
+const CACHE_DIR = join(process.cwd(), ".cache");
+const CACHE_FILE = (key: string = "default") => join(CACHE_DIR, `cache-${key.replace(/[^a-z0-9]/gi, "_")}.json`);
 
-const getStorage = (): Storage | undefined => {
-  if (typeof window === "undefined") {
-    return undefined;
-  }
-
+export function readCache<T>(cacheKey: string = "default"): { data?: T; when?: string } {
+  const file = CACHE_FILE(cacheKey);
+  if (!existsSync(file)) return {};
   try {
-    return window.localStorage;
+    const content = readFileSync(file, "utf-8");
+    const parsed = JSON.parse(content);
+    if (!parsed.data || !parsed.when) return {};
+    return { data: parsed.data as T, when: parsed.when };
   } catch (error) {
-    console.warn("Local storage unavailable", error);
-    return undefined;
+    console.warn("Failed to read cache", error);
+    return {};
   }
-};
+}
 
-const storage = getStorage();
-
-export function clearCache() {
-  if (!storage) {
-    return;
+export function saveCache<T>(data: T, cacheKey: string = "default") {
+  const file = CACHE_FILE(cacheKey);
+  try {
+    writeFileSync(file, JSON.stringify({ data, when: new Date().toISOString() }), "utf-8");
+  } catch (error) {
+    console.warn("Failed to save cache", error);
   }
-
-  storage.removeItem(CACHE_KEY);
-  storage.removeItem(CACHE_TIME_KEY);
-  storage.removeItem(CACHE_VERSION_KEY);
 }
 
 export function ensureCacheVersion() {
-  if (!storage) {
-    return;
-  }
-
-  const storedVersion = storage.getItem(CACHE_VERSION_KEY);
-  if (storedVersion && storedVersion !== APP_VERSION) {
-    clearCache();
-    try {
-      storage.setItem(CACHE_VERSION_KEY, APP_VERSION);
-    } catch (error) {
-      console.warn("Failed to persist app version", error);
-    }
-    if (typeof window !== "undefined" && typeof window.location?.reload === "function") {
-      window.location.reload();
-    }
-    return;
-  }
-
-  if (!storedVersion) {
-    try {
-      storage.setItem(CACHE_VERSION_KEY, APP_VERSION);
-    } catch (error) {
-      console.warn("Failed to persist app version", error);
-    }
-  }
-}
-
-export function saveCache(payload: unknown) {
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(CACHE_KEY, JSON.stringify(payload));
-    storage.setItem(CACHE_TIME_KEY, new Date().toISOString());
-    storage.setItem(CACHE_VERSION_KEY, APP_VERSION);
-  } catch (error) {
-    console.warn("Failed to save Apps Script cache", error);
-  }
-}
-
-export function readCache<T = unknown>(): { data?: T; when?: string } {
-  if (!storage) {
-    return {};
-  }
-
-  const storedVersion = storage.getItem(CACHE_VERSION_KEY);
-  if (storedVersion && storedVersion !== APP_VERSION) {
-    clearCache();
-    return {};
-  }
-
-  const raw = storage.getItem(CACHE_KEY);
-  const when = storage.getItem(CACHE_TIME_KEY) ?? undefined;
-
-  if (!raw) {
-    return {};
-  }
-
-  try {
-    return { data: JSON.parse(raw) as T, when };
-  } catch (error) {
-    console.warn("Failed to read Apps Script cache", error);
-    clearCache();
-    return {};
-  }
+  // Add version checking if needed
 }
