@@ -38,6 +38,15 @@ import {
 import { exportAnalysisToExcel } from "@/lib/exportAnalysis";
 
 interface TopBreakAccordionProps {
+  /** optional externally controlled variable key (sidebreak) */
+  variable?: string | null;
+  /** optional externally controlled statistic */
+  statExternal?: "counts" | "rowpct" | "colpct" | "totalpct";
+  /** when this value changes, it triggers (re)analysis */
+  analyzeKey?: number;
+  /** hide internal controls (use external variable/stat) */
+  hideControls?: boolean;
+
   topbreak: string;
   allVariables: string[];
   formatLabel: (key: string) => string;
@@ -122,9 +131,9 @@ const TopBreakAccordion = ({ topbreak, allVariables, formatLabel }: TopBreakAcco
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<AnalysisTableResponse | null>(null);
   const cacheRef = useRef<Map<string, AnalysisTableResponse>>(new Map());
-  const debouncedVariable = useDebouncedValue(selectedVariable, 400);
+  const debouncedVariable = useDebouncedValue(effectiveVariable, 400);
 
-  const cacheKey = useMemo(() => `${topbreak}::${debouncedVariable || ""}::${stat}`, [topbreak, debouncedVariable, stat]);
+  const cacheKey = useMemo(() => `${topbreak}::${debouncedVariable || ""}::${effectiveStat}::${analyzeKey ?? 0}`,[topbreak, debouncedVariable, effectiveStat, analyzeKey]);
 
   useEffect(() => {
     if (!debouncedVariable) {
@@ -207,6 +216,7 @@ const TopBreakAccordion = ({ topbreak, allVariables, formatLabel }: TopBreakAcco
                 </SelectContent>
               </Select>
             </div>
+          )}
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Statistic</span>
@@ -223,7 +233,9 @@ const TopBreakAccordion = ({ topbreak, allVariables, formatLabel }: TopBreakAcco
                 </SelectContent>
               </Select>
             </div>
+          )}
           </div>
+          )}
 
           {loading && (
             <div className="space-y-3">
@@ -231,12 +243,14 @@ const TopBreakAccordion = ({ topbreak, allVariables, formatLabel }: TopBreakAcco
               <Skeleton className="h-72 w-full" />
             </div>
           )}
+          )}
 
           {error && (
             <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="mt-0.5 h-4 w-4" />
               <span>{error}</span>
             </div>
+          )}
           )}
 
           {!loading && !error && response && (
@@ -253,6 +267,7 @@ const TopBreakAccordion = ({ topbreak, allVariables, formatLabel }: TopBreakAcco
                   Download Excel
                 </Button>
               </div>
+          )}
               
               <Card>
                 <CardContent className="prose max-w-none overflow-x-auto py-4" dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
@@ -267,8 +282,10 @@ const TopBreakAccordion = ({ topbreak, allVariables, formatLabel }: TopBreakAcco
                         <Badge variant="secondary">Histogram</Badge>
                         <span className="text-muted-foreground">Distribution across {formatLabel(topbreak)}</span>
                       </div>
+          )}
                       <AnalysisChart spec={response.chart.histogram} />
                     </div>
+          )}
                   ) : null}
                 </CardContent>
               </Card>
@@ -284,13 +301,16 @@ const TopBreakAccordion = ({ topbreak, allVariables, formatLabel }: TopBreakAcco
                   <span key={note}>{note}</span>
                 ))}
               </div>
+          )}
             </div>
+          )}
           )}
 
           {!loading && !error && !response && (
             <div className="rounded-md border border-dashed border-border/60 bg-muted/10 p-6 text-sm text-muted-foreground">
               Select a variable to generate a cross-tabulation for {formatLabel(topbreak)}.
             </div>
+          )}
           )}
         </div>
       </AccordionContent>
