@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
+import os
 import random
 from datetime import datetime
-from typing import Dict, Iterable, List
+from typing import Dict, Iterable, List, Optional
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 import numpy as np
 import pandas as pd
@@ -366,6 +370,51 @@ def build_insights(chart_payload: Dict[str, object] | None, mode: str) -> List[s
 
 
 SURVEY_DATAFRAME = create_mock_dataframe()
+DEFAULT_DATASET_URL = os.getenv("ANALYSIS_DATASET_URL")
+_DATAFRAME_CACHE: Dict[str, pd.DataFrame] = {}
+
+
+def load_dataframe(dataset_url: Optional[str]) -> pd.DataFrame:
+    effective_url = (dataset_url or DEFAULT_DATASET_URL or "").strip()
+    if not effective_url:
+        return SURVEY_DATAFRAME.copy()
+
+    cached = _DATAFRAME_CACHE.get(effective_url)
+    if cached is not None:
+        return cached.copy()
+
+    try:
+        req = urlrequest.Request(effective_url, headers={"Accept": "application/json"})
+        with urlrequest.urlopen(req, timeout=30) as response:
+            payload_bytes = response.read()
+        payload = json.loads(payload_bytes.decode("utf-8"))
+    except urlerror.HTTPError as exc:
+        raise RuntimeError(f"Dataset request failed with status {exc.code}") from exc
+    except urlerror.URLError as exc:
+        raise RuntimeError("Unable to reach dataset URL") from exc
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise RuntimeError("Dataset URL did not return valid JSON") from exc
+
+    if isinstance(payload, dict):
+        rows = payload.get("analysisRows") or payload.get("rows")
+        if rows is None:
+            raise RuntimeError("Dataset JSON must include an 'analysisRows' or 'rows' field")
+    elif isinstance(payload, list):
+        rows = payload
+    else:
+        raise RuntimeError("Dataset JSON must be a list of rows or an object containing them")
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        _DATAFRAME_CACHE[effective_url] = df
+        return df
+
+    for column, order in ORDINAL_COLUMNS.items():
+        if column in df.columns:
+            df[column] = pd.Categorical(df[column], categories=order, ordered=True)
+
+    _DATAFRAME_CACHE[effective_url] = df
+    return df.copy()
 
 
 @app.route("/generate_table", methods=["POST"])
@@ -375,13 +424,22 @@ def generate_table():
     side_breaks = payload.get("sideBreaks", [])
     mode = payload.get("mode", "count")
     selected_paths = payload.get("paths", list(PATH_LABELS.keys()))
+    dataset_url = payload.get("datasetUrl")
 
     if not side_breaks:
         side_breaks = ["B2_Participation"]
     if not top_breaks:
         top_breaks = ["A7_Sex"]
 
-    filtered_df = SURVEY_DATAFRAME[SURVEY_DATAFRAME["survey_path"].isin(selected_paths)]
+    try:
+        dataframe = load_dataframe(dataset_url)
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if "survey_path" not in dataframe.columns:
+        return jsonify({"error": "Dataset must include a 'survey_path' column"}), 400
+
+    filtered_df = dataframe[dataframe["survey_path"].isin(selected_paths)]
 
     tables = []
     for side in side_breaks:

@@ -184,7 +184,6 @@ const Analysis = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
-
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const sideBreakOptions = useMemo(() => SIDE_BREAK_GROUPS, []);
