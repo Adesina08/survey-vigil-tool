@@ -302,6 +302,13 @@ const incrementMap = (map: Map<string, number>, key: string, amount = 1) => {
 
 const createEmptyPathCounts = (): PathCounts => ({ treatment: 0, control: 0, unknown: 0 });
 
+const shouldIgnoreErrorType = (code: string): boolean => {
+  if (!code) {
+    return false;
+  }
+  return /^QC[\s_]*(?:FLAG|WARN)[\s_]*COUNT$/i.test(code.trim());
+};
+
 const determineOgstepPath = (response?: string | null): OgstepPath => {
   if (!response) {
     return "unknown";
@@ -587,10 +594,10 @@ export const buildDashboardData = ({
         qualityIndicatorKeys.concat(
           manualErrorFlags
             .map((flag) => (typeof flag === "string" ? flag : String(flag ?? "")))
-            .filter((flag) => flag.length > 0),
+            .filter((flag) => flag.length > 0 && !shouldIgnoreErrorType(flag)),
         ),
       ),
-    );
+    ).filter((flag) => !shouldIgnoreErrorType(flag));
     const { response: ogstepResponse, path: ogstepPath } = extractOgstepDetails(row);
 
     const lat = getCoordinate(row, "lat");
@@ -617,7 +624,9 @@ export const buildDashboardData = ({
     if (interviewerId && interviewerId.toLowerCase() !== "unknown") {
       interviewerSet.add(interviewerId);
     }
-    errorFlags.forEach((flag) => errorTypeSet.add(flag));
+    errorFlags
+      .filter((flag) => !shouldIgnoreErrorType(flag))
+      .forEach((flag) => errorTypeSet.add(flag));
 
     incrementMap(totalsByState, state);
     incrementMap(totalsByInterviewer, interviewerId);
@@ -655,13 +664,16 @@ export const buildDashboardData = ({
     }
 
     Object.entries(qualityIndicatorCounts).forEach(([errorType, value]) => {
+      if (shouldIgnoreErrorType(errorType)) {
+        return;
+      }
       errorCounts[errorType] = getNumber(errorCounts[errorType]) + value;
       interviewerError[errorType] = getNumber(interviewerError[errorType]) + value;
     });
 
     manualErrorFlags
       .map((flag) => (typeof flag === "string" ? flag : String(flag ?? "")))
-      .filter((flag) => flag.length > 0)
+      .filter((flag) => flag.length > 0 && !shouldIgnoreErrorType(flag))
       .forEach((errorType) => {
         errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
         interviewerError[errorType] = getNumber(interviewerError[errorType]) + 1;
@@ -696,7 +708,7 @@ export const buildDashboardData = ({
         interviewerLabel,
         lga: lga!,
         state,
-        errorTypes: errorFlags,
+        errorTypes: errorFlags.filter((flag) => !shouldIgnoreErrorType(flag)),
         timestamp: timestampLabel,
         status: approvalStatus === "Approved" ? "approved" : "not_approved",
         sortKey,
@@ -838,13 +850,20 @@ export const buildDashboardData = ({
   const finalErrorCounts: Record<string, number> = { ...errorCounts };
 
   Object.entries(rowErrorCounts).forEach(([code, count]) => {
+    if (shouldIgnoreErrorType(code)) {
+      return;
+    }
     finalErrorCounts[code] = (finalErrorCounts[code] ?? 0) + count;
   });
 
-  Object.keys(finalErrorCounts).forEach((code) => errorTypeSet.add(code));
+  const cleanedErrorCounts = Object.fromEntries(
+    Object.entries(finalErrorCounts).filter(([code]) => !shouldIgnoreErrorType(code)),
+  );
 
-  const totalErrorEvents = Object.values(finalErrorCounts).reduce((sum, value) => sum + value, 0);
-  const errorBreakdown: ErrorBreakdownRow[] = Object.entries(finalErrorCounts)
+  Object.keys(cleanedErrorCounts).forEach((code) => errorTypeSet.add(code));
+
+  const totalErrorEvents = Object.values(cleanedErrorCounts).reduce((sum, value) => sum + value, 0);
+  const errorBreakdown: ErrorBreakdownRow[] = Object.entries(cleanedErrorCounts)
     .sort((a, b) => b[1] - a[1])
     .map(([label, count]) => ({
       errorType: label,
