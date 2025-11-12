@@ -35,6 +35,8 @@ export const useDashboardData = (
     initialData,
     initialDataUpdatedAt: initialUpdatedAt,
     staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: true,
     refetchOnWindowFocus: false,
     retry: 1,
   });
