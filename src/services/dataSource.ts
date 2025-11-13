@@ -103,7 +103,12 @@ const fetchAndParse = async (url: string): Promise<AppsScriptPayload> => {
 };
 
 export async function fetchAppsScript(fields: string = "", rowLimit: number = 1000): Promise<AppsScriptPayload> {
-  if (!candidateUrls.length) throw new Error("APPS_SCRIPT_URL is not set");
+  if (!candidateUrls.length || !candidateUrls[0]) {
+    throw new Error(
+      "The VITE_APPS_SCRIPT_URL environment variable is not set. " +
+        "Please configure it in your Netlify environment."
+    );
+  }
   const query = new URLSearchParams();
   if (fields) {
     query.set("fields", fields);
