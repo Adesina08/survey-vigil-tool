@@ -1,3 +1,4 @@
+import localforage from "localforage";
 import type { AppsScriptPayload } from "./dataSource";
 
 const STORAGE_KEY = "apps-script-payload";
@@ -7,33 +8,25 @@ export interface StoredAppsScriptPayload {
   storedAt: string;
 }
 
-const isBrowser = typeof window !== "undefined" && typeof window.localStorage !== "undefined";
-
-export function saveAppsScriptPayload(payload: AppsScriptPayload) {
-  if (!isBrowser) {
-    return;
-  }
+export async function saveAppsScriptPayload(payload: AppsScriptPayload) {
   try {
     const entry: StoredAppsScriptPayload = {
       payload,
       storedAt: new Date().toISOString(),
     };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entry));
+    await localforage.setItem(STORAGE_KEY, entry);
   } catch (error) {
     console.warn("Failed to persist Apps Script payload", error);
   }
 }
 
-export function readAppsScriptPayload(): StoredAppsScriptPayload | undefined {
-  if (!isBrowser) {
-    return undefined;
-  }
+export async function readAppsScriptPayload(): Promise<StoredAppsScriptPayload | undefined> {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = await localforage.getItem(STORAGE_KEY);
     if (!raw) {
       return undefined;
     }
-    const parsed = JSON.parse(raw) as Partial<StoredAppsScriptPayload>;
+    const parsed = raw as Partial<StoredAppsScriptPayload>;
     if (!parsed || typeof parsed !== "object" || !parsed.payload) {
       return undefined;
     }
@@ -45,12 +38,9 @@ export function readAppsScriptPayload(): StoredAppsScriptPayload | undefined {
   }
 }
 
-export function clearAppsScriptPayload() {
-  if (!isBrowser) {
-    return;
-  }
+export async function clearAppsScriptPayload() {
   try {
-    window.localStorage.removeItem(STORAGE_KEY);
+    await localforage.removeItem(STORAGE_KEY);
   } catch (error) {
     console.warn("Failed to clear Apps Script payload", error);
   }

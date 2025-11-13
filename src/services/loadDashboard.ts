@@ -156,7 +156,7 @@ export async function loadDashboardData(
   _options: { mapLimit?: number; prodLimit?: number; analysisLimit?: number } = {},
 ): Promise<Partial<DashboardData>> {
   const dashboard = await loadFullDashboardData();
-  saveCache(dashboard, sections);
+  await saveCache(dashboard, sections);
   return dashboard;
 }
 
@@ -166,7 +166,7 @@ export async function loadDashboardDataWithCache(
   setStatus?: (status: string) => void,
 ): Promise<Partial<DashboardData>> {
   const updateStatus = typeof setStatus === "function" ? setStatus : () => {};
-  const { data: cached, when } = readCache<Partial<DashboardData>>(sections);
+  const { data: cached, when } = await readCache<Partial<DashboardData>>(sections);
   if (cached && when) {
     const formatted = formatCacheTime(when);
     updateStatus(
@@ -201,7 +201,7 @@ export async function loadFullDashboardData(): Promise<DashboardData> {
     const payload = await fetchAppsScript();
     return buildDashboardFromPayload(payload);
   } catch (error) {
-    const stored = readAppsScriptPayload();
+    const stored = await readAppsScriptPayload();
     if (stored) {
       return buildDashboardFromPayload(stored.payload);
     }
@@ -209,8 +209,8 @@ export async function loadFullDashboardData(): Promise<DashboardData> {
   }
 }
 
-export const getCachedDashboardData = (sections?: string): { dashboard?: Partial<DashboardData>; cachedAt?: string } => {
-  const { data, when } = readCache<Partial<DashboardData>>(sections);
+export async function getCachedDashboardData(sections?: string): Promise<{ dashboard?: Partial<DashboardData>; cachedAt?: string }> {
+  const { data, when } = await readCache<Partial<DashboardData>>(sections);
   if (!data) return {};
   return { dashboard: data, cachedAt: when };
 };

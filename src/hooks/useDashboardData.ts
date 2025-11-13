@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { DashboardData } from "@/lib/dashboardData";
 import { ensureCacheVersion } from "@/services/cache";
@@ -19,17 +19,23 @@ export const useDashboardData = ({
   prodLimit,
   analysisLimit,
 }: UseDashboardDataOptions = {}) => {
+  const [initialData, setInitialData] = useState<Partial<DashboardData> | undefined>(undefined);
+  const [initialUpdatedAt, setInitialUpdatedAt] = useState<number | undefined>(undefined);
+
   useEffect(() => {
     ensureCacheVersion();
-  }, []);
-
-  const cached = useMemo(() => getCachedDashboardData(sections), [sections]);
-  const initialData = cached.dashboard;
-  let initialUpdatedAt: number | undefined;
-  if (cached.cachedAt) {
-    const parsed = new Date(cached.cachedAt);
-    initialUpdatedAt = Number.isNaN(parsed.getTime()) ? undefined : parsed.getTime();
-  }
+    const loadCachedData = async () => {
+      const cached = await getCachedDashboardData(sections);
+      if (cached.dashboard) {
+        setInitialData(cached.dashboard);
+      }
+      if (cached.cachedAt) {
+        const parsed = new Date(cached.cachedAt);
+        setInitialUpdatedAt(Number.isNaN(parsed.getTime()) ? undefined : parsed.getTime());
+      }
+    };
+    loadCachedData();
+  }, [sections]);
 
   return useQuery<Partial<DashboardData>, Error>({
     queryKey: ["dashboard-data", sections, { mapLimit, prodLimit, analysisLimit }],
