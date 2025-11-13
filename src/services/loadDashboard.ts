@@ -129,6 +129,7 @@ export const buildDashboardFromPayload = (payload: AppsScriptPayload): Dashboard
   const rawRows = Array.isArray(payload) ? payload : (payload.rows as unknown);
   if (!Array.isArray(rawRows)) throw new Error("Apps Script payload missing rows array.");
   const rows = normaliseRows(applyAliases(toRecordArray(rawRows)));
+  const submissions = mapSheetRowsToSubmissions(rows, { defaultState: "Ogun State" });
   const stateTargets = !Array.isArray(payload)
     ? mapSheetRowsToStateTargets(toRecordArray(payload.stateTargets))
     : [];
