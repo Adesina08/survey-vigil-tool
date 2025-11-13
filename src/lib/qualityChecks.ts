@@ -7,7 +7,7 @@ import type {
   Position,
 } from "geojson";
 
-import type { ErrorType, SheetSubmissionRow } from "@/data/sampleData";
+import type { ErrorType, SheetSubmissionRow } from "@/types/sheets";
 
 const EARTH_RADIUS_METERS = 6371e3;
 const DEFAULT_CLUSTER_RADIUS_METERS = 5;

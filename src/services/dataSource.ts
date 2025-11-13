@@ -1,3 +1,5 @@
+import { saveAppsScriptPayload } from "./appsScriptStorage";
+
 const toEnvString = (value: unknown) => {
   if (typeof value === "string") return value;
   if (value === undefined || value === null) return "";
@@ -107,7 +109,9 @@ export async function fetchAppsScript(fields: string = "", rowLimit: number = 10
   let lastError: unknown;
   for (const url of urls) {
     try {
-      return await fetchAndParse(url);
+      const payload = await fetchAndParse(url);
+      saveAppsScriptPayload(payload);
+      return payload;
     } catch (error) {
       lastError = error;
     }

@@ -7,7 +7,7 @@ import type {
   SheetStateGenderTargetRow,
   SheetStateTargetRow,
   SheetSubmissionRow,
-} from "@/data/sampleData";
+} from "@/types/sheets";
 
 type NormalisedRow = Map<string, unknown>;
 
