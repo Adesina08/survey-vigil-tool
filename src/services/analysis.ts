@@ -39,13 +39,8 @@ export interface AnalysisResponse {
 }
 
 const API_BASE_URL = import.meta.env.VITE_ANALYSIS_API ?? "http://localhost:8000";
-const DATASET_URL = import.meta.env.VITE_ANALYSIS_DATASET_URL?.trim();
-
 export async function generateAnalysis(request: AnalysisRequest): Promise<AnalysisResponse> {
-  const payload = {
-    ...request,
-    ...(DATASET_URL ? { datasetUrl: DATASET_URL } : {}),
-  };
+  const payload = { ...request };
   const response = await fetch(`${API_BASE_URL}/generate_table`, {
     method: "POST",
     headers: {
