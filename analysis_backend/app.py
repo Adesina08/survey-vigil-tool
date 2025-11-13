@@ -4,7 +4,7 @@ import json
 import os
 import random
 from datetime import datetime
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -370,50 +370,71 @@ def build_insights(chart_payload: Dict[str, object] | None, mode: str) -> List[s
 
 
 SURVEY_DATAFRAME = create_mock_dataframe()
-DEFAULT_DATASET_URL = os.getenv("ANALYSIS_DATASET_URL")
+APPS_SCRIPT_URL = (
+    os.getenv("APPS_SCRIPT_URL")
+    or os.getenv("VITE_APPS_SCRIPT_URL")
+    or ""
+).strip()
 _DATAFRAME_CACHE: Dict[str, pd.DataFrame] = {}
 
 
-def load_dataframe(dataset_url: Optional[str]) -> pd.DataFrame:
-    effective_url = (dataset_url or DEFAULT_DATASET_URL or "").strip()
-    if not effective_url:
-        return SURVEY_DATAFRAME.copy()
-
-    cached = _DATAFRAME_CACHE.get(effective_url)
-    if cached is not None:
-        return cached.copy()
+def _fetch_apps_script_rows() -> List[Dict[str, Any]]:
+    if not APPS_SCRIPT_URL:
+        raise RuntimeError("APPS_SCRIPT_URL is not configured")
 
     try:
-        req = urlrequest.Request(effective_url, headers={"Accept": "application/json"})
+        req = urlrequest.Request(APPS_SCRIPT_URL, headers={"Accept": "application/json"})
         with urlrequest.urlopen(req, timeout=30) as response:
             payload_bytes = response.read()
         payload = json.loads(payload_bytes.decode("utf-8"))
     except urlerror.HTTPError as exc:
-        raise RuntimeError(f"Dataset request failed with status {exc.code}") from exc
+        raise RuntimeError(f"Apps Script request failed with status {exc.code}") from exc
     except urlerror.URLError as exc:
-        raise RuntimeError("Unable to reach dataset URL") from exc
+        raise RuntimeError("Unable to reach Apps Script URL") from exc
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise RuntimeError("Dataset URL did not return valid JSON") from exc
+        raise RuntimeError("Apps Script did not return valid JSON") from exc
 
     if isinstance(payload, dict):
-        rows = payload.get("analysisRows") or payload.get("rows")
+        rows = payload.get("rows") or payload.get("data") or payload.get("analysisRows")
         if rows is None:
-            raise RuntimeError("Dataset JSON must include an 'analysisRows' or 'rows' field")
+            raise RuntimeError("Apps Script JSON must include a 'rows' array")
     elif isinstance(payload, list):
         rows = payload
     else:
-        raise RuntimeError("Dataset JSON must be a list of rows or an object containing them")
+        raise RuntimeError("Apps Script JSON must be a list of rows or an object containing them")
 
-    df = pd.DataFrame(rows)
+    if not isinstance(rows, list):
+        raise RuntimeError("Apps Script JSON rows must be a list")
+
+    structured_rows: List[Dict[str, Any]] = []
+    for row in rows:
+        if isinstance(row, dict):
+            structured_rows.append(row)
+    if not structured_rows:
+        raise RuntimeError("Apps Script response did not include any row objects")
+    return structured_rows
+
+
+def load_dataframe() -> pd.DataFrame:
+    cache_key = APPS_SCRIPT_URL or "mock"
+    cached = _DATAFRAME_CACHE.get(cache_key)
+    if cached is not None:
+        return cached.copy()
+
+    if not APPS_SCRIPT_URL:
+        df = SURVEY_DATAFRAME.copy()
+    else:
+        rows = _fetch_apps_script_rows()
+        df = pd.DataFrame(rows)
+
     if df.empty:
-        _DATAFRAME_CACHE[effective_url] = df
-        return df
+        raise RuntimeError("Apps Script returned no rows")
 
     for column, order in ORDINAL_COLUMNS.items():
         if column in df.columns:
             df[column] = pd.Categorical(df[column], categories=order, ordered=True)
 
-    _DATAFRAME_CACHE[effective_url] = df
+    _DATAFRAME_CACHE[cache_key] = df
     return df.copy()
 
 
@@ -424,15 +445,13 @@ def generate_table():
     side_breaks = payload.get("sideBreaks", [])
     mode = payload.get("mode", "count")
     selected_paths = payload.get("paths", list(PATH_LABELS.keys()))
-    dataset_url = payload.get("datasetUrl")
-
     if not side_breaks:
         side_breaks = ["B2_Participation"]
     if not top_breaks:
         top_breaks = ["A7_Sex"]
 
     try:
-        dataframe = load_dataframe(dataset_url)
+        dataframe = load_dataframe()
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 400
 

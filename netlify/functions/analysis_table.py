@@ -28,8 +28,7 @@ DEFAULT_STAT = "rowpct"
 
 _ALLOWED_STATS = {"counts", "rowpct", "colpct", "totalpct"}
 
-_DATA_CACHE: Dict[str, Any] = {"df": None, "fields": None, "source": None}
-_DEFAULT_DATASET_URL = os.environ.get("ANALYSIS_DATASET_URL")
+_DATA_CACHE: Dict[str, Any] = {"df": None, "fields": None}
 
 
 def _json_response(payload: Any, status: int = 200) -> Dict[str, Any]:
@@ -77,31 +76,6 @@ def _fetch_dashboard_payload() -> Dict[str, Any]:
         raise RuntimeError("Unable to reach dashboard endpoint") from exc
 
 
-def _fetch_dataset_payload(dataset_url: str) -> Dict[str, Any]:
-    req = request.Request(dataset_url, headers={"Accept": "application/json"})
-    try:
-        with request.urlopen(req, timeout=30) as response:
-            data = response.read().decode("utf-8")
-            payload = json.loads(data)
-    except error.HTTPError as exc:
-        raise RuntimeError(f"Dataset request failed with status {exc.code}") from exc
-    except error.URLError as exc:
-        raise RuntimeError("Unable to reach dataset URL") from exc
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("Dataset URL did not return valid JSON") from exc
-
-    if isinstance(payload, dict):
-        rows = payload.get("analysisRows") or payload.get("rows")
-        if rows is None:
-            raise RuntimeError("Dataset JSON must include an 'analysisRows' or 'rows' field")
-        return {"rows": rows}
-
-    if isinstance(payload, list):
-        return {"rows": payload}
-
-    raise RuntimeError("Dataset JSON must be a list or an object containing the rows")
-
-
 def _normalize_value(value: Any):
     if isinstance(value, str):
         stripped = value.strip()
@@ -111,23 +85,17 @@ def _normalize_value(value: Any):
     return value
 
 
-def _load_dataset(*, force: bool = False, dataset_url: Optional[str] = None) -> pd.DataFrame:
-    effective_url = (dataset_url or _DEFAULT_DATASET_URL or "").strip()
-    cache_source = _DATA_CACHE.get("source")
-    if not force and _DATA_CACHE.get("df") is not None and cache_source == effective_url:
+def _load_dataset(*, force: bool = False) -> pd.DataFrame:
+    if not force and _DATA_CACHE.get("df") is not None:
         return _DATA_CACHE["df"].copy()
 
-    if effective_url:
-        payload = _fetch_dataset_payload(effective_url)
-    else:
-        payload = _fetch_dashboard_payload()
+    payload = _fetch_dashboard_payload()
     rows = payload.get("analysisRows") or payload.get("rows") or []
     df = pd.DataFrame(rows)
     if not df.empty:
         df = df.applymap(_normalize_value)
     _DATA_CACHE["df"] = df
     _DATA_CACHE["fields"] = _infer_fields(df)
-    _DATA_CACHE["source"] = effective_url
     return df.copy()
 
 
@@ -430,9 +398,8 @@ def _build_single_categorical(df: pd.DataFrame, variable: str, *, limit: int, dr
 
 
 def _schema_response(params: Dict[str, str]) -> Dict[str, Any]:
-    dataset_url = params.get("datasetUrl")
     try:
-        df = _load_dataset(dataset_url=dataset_url)
+        df = _load_dataset()
     except RuntimeError as exc:
         return _json_response({"error": str(exc)}, status=400)
     fields = _DATA_CACHE.get("fields") or _infer_fields(df)
@@ -469,9 +436,8 @@ def _parse_bool(value: Optional[str], default: bool) -> bool:
 
 
 def _table_response(params: Dict[str, str]) -> Dict[str, Any]:
-    dataset_url = params.get("datasetUrl")
     try:
-        df = _load_dataset(dataset_url=dataset_url)
+        df = _load_dataset()
     except RuntimeError as exc:
         return _json_response({"error": str(exc)}, status=400)
     if df.empty:
