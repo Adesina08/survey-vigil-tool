@@ -104,8 +104,19 @@ const fetchAndParse = async (url: string): Promise<AppsScriptPayload> => {
 
 export async function fetchAppsScript(fields: string = "", rowLimit: number = 1000): Promise<AppsScriptPayload> {
   if (!candidateUrls.length) throw new Error("APPS_SCRIPT_URL is not set");
-  const query = fields ? new URLSearchParams({ fields, rowLimit: rowLimit.toString() }) : new URLSearchParams();
-  const urls = candidateUrls.map((url) => (url === relativeProxyUrl && query.toString() ? `${url}?${query.toString()}` : url));
+  const query = new URLSearchParams();
+  if (fields) {
+    query.set("fields", fields);
+  }
+  if (Number.isFinite(rowLimit)) {
+    query.set("rowLimit", rowLimit.toString());
+  }
+  const queryString = query.toString();
+  const urls = candidateUrls.map((url) => {
+    if (!queryString) return url;
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}${queryString}`;
+  });
   let lastError: unknown;
   for (const url of urls) {
     try {
