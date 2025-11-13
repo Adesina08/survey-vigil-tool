@@ -9,6 +9,7 @@ import {
 import { buildDashboardData, type DashboardData } from "@/lib/dashboardData";
 import { extractMapMetadataFromPayload } from "@/lib/mapMetadata";
 import { fetchAppsScript, type AppsScriptPayload } from "./dataSource";
+import { readAppsScriptPayload } from "./appsScriptStorage";
 import { readCache, saveCache } from "./cache";
 
 const ADDITIONAL_HEADER_ALIASES: Record<string, string> = {
@@ -151,22 +152,11 @@ export const buildDashboardFromPayload = (payload: AppsScriptPayload): Dashboard
 // New function to fetch sectioned dashboard data
 export async function loadDashboardData(
   sections: string,
-  options: { mapLimit?: number; prodLimit?: number; analysisLimit?: number } = {},
+  _options: { mapLimit?: number; prodLimit?: number; analysisLimit?: number } = {},
 ): Promise<Partial<DashboardData>> {
-  const { mapLimit = 5000, prodLimit = 1000, analysisLimit = 1000 } = options;
-  const query = new URLSearchParams({ sections });
-  if (sections.includes("map")) query.set("mapLimit", mapLimit.toString());
-  if (sections.includes("productivity")) query.set("prodLimit", prodLimit.toString());
-  if (sections.includes("analysis")) query.set("analysisLimit", analysisLimit.toString());
-  const response = await fetch(`/api/dashboard?${query.toString()}`);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to fetch dashboard data");
-  }
-  const data = await response.json();
-  // Cache the sectioned data
-  saveCache(data, sections);
-  return data;
+  const dashboard = await loadFullDashboardData();
+  saveCache(dashboard, sections);
+  return dashboard;
 }
 
 export async function loadDashboardDataWithCache(
@@ -206,10 +196,16 @@ export async function loadDashboardDataWithCache(
 }
 
 export async function loadFullDashboardData(): Promise<DashboardData> {
-  const payload = await fetchAppsScript();
-  const dashboard = buildDashboardFromPayload(payload);
-  saveCache(payload);
-  return dashboard;
+  try {
+    const payload = await fetchAppsScript();
+    return buildDashboardFromPayload(payload);
+  } catch (error) {
+    const stored = readAppsScriptPayload();
+    if (stored) {
+      return buildDashboardFromPayload(stored.payload);
+    }
+    throw error instanceof Error ? error : new Error(String(error));
+  }
 }
 
 export const getCachedDashboardData = (sections?: string): { dashboard?: Partial<DashboardData>; cachedAt?: string } => {

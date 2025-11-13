@@ -1,13 +1,9 @@
-import {
-  sheetSubmissions,
-  sheetStateTargets,
-  sheetStateAgeTargets,
-  sheetStateGenderTargets,
-  type SheetSubmissionRow,
-  type SheetStateTargetRow,
-  type SheetStateAgeTargetRow,
-  type SheetStateGenderTargetRow,
-} from "@/data/sampleData";
+import type {
+  SheetSubmissionRow,
+  SheetStateTargetRow,
+  SheetStateAgeTargetRow,
+  SheetStateGenderTargetRow,
+} from "@/types/sheets";
 import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks";
 import { normaliseHeaderKey } from "./googleSheets";
 import { getSubmissionMetrics, type Row as MetricRow } from "@/utils/metrics";
@@ -1038,14 +1034,3 @@ export const buildDashboardData = ({
   };
 };
 
-export const dashboardData = buildDashboardData({
-  submissions: sheetSubmissions,
-  stateTargets: sheetStateTargets,
-  stateAgeTargets: sheetStateAgeTargets,
-  stateGenderTargets: sheetStateGenderTargets,
-  mapMetadata: {
-    title: null,
-    subtitle: null,
-    exportFilenamePrefix: "ogun-lga-map",
-  },
-});
