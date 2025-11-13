@@ -126,7 +126,7 @@ export async function fetchAppsScript(fields: string = "", rowLimit: number = 10
   for (const url of urls) {
     try {
       const payload = await fetchAndParse(url);
-      await saveAppsScriptPayload(payload);
+      // saveAppsScriptPayload(payload);
       return payload;
     } catch (error) {
       lastError = error;

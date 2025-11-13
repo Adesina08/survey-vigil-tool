@@ -156,7 +156,7 @@ export async function loadDashboardData(
   _options: { mapLimit?: number; prodLimit?: number; analysisLimit?: number } = {},
 ): Promise<Partial<DashboardData>> {
   const dashboard = await loadFullDashboardData();
-  await saveCache(dashboard, sections);
+  // saveCache(dashboard, sections);
   return dashboard;
 }
 
