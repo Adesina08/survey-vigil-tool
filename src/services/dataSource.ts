@@ -102,11 +102,27 @@ const getInterviewerId = (row: RawRow): string =>
       "A1. Enumerator ID",
       "Interviewer ID",
       "Enumerator ID",
+      "Interviewer number",
       "username",
       "interviewer_id",
       "enumerator_id",
+      "submitted_by",
     ]) ?? "Unknown"
   ).trim() || "Unknown";
+
+const getInterviewerName = (row: RawRow): string =>
+  (
+    getFirstTextValue(row, [
+      "Interviewer name",
+      "Interviewer Name",
+      "Enumerator name",
+      "Enumerator Name",
+      "A1. Enumerator ID",
+      "Interviewer number",
+      "username",
+      "submitted_by",
+    ]) ?? getInterviewerId(row)
+  ).trim() || getInterviewerId(row);
 
 const getOgstepResponse = (row: RawRow): string | null =>
   getFirstTextValue(row, [
@@ -359,6 +375,7 @@ const buildMapSubmissions = (rows: RawRow[]): DashboardData["mapSubmissions"] =>
     }
 
     const interviewerId = getInterviewerId(row);
+    const interviewerName = getInterviewerName(row);
     const ogstepResponse = getOgstepResponse(row);
     const ogstepPath = determineOgstepPath(ogstepResponse);
     const approval = isApprovedRow(row) ? "approved" : "not_approved";
@@ -378,13 +395,17 @@ const buildMapSubmissions = (rows: RawRow[]): DashboardData["mapSubmissions"] =>
       toStringValue(row["_index"]).trim() ||
       `${lat},${lng}`;
 
+    const interviewerLabel = interviewerName && interviewerName !== interviewerId
+      ? `${interviewerName} (${interviewerId})`
+      : interviewerId;
+
     submissions.push({
       id: submissionId,
       lat,
       lng,
       interviewerId,
-      interviewerName: interviewerId,
-      interviewerLabel: interviewerId,
+      interviewerName,
+      interviewerLabel,
       lga: getLga(row),
       state: getState(row),
       errorTypes,
@@ -399,43 +420,53 @@ const buildMapSubmissions = (rows: RawRow[]): DashboardData["mapSubmissions"] =>
   return submissions;
 };
 
+interface AchievementAccumulator {
+  total: number;
+  approved: number;
+  notApproved: number;
+  treatmentPathCount: number;
+  controlPathCount: number;
+  unknownPathCount: number;
+}
+
+const createAchievementAccumulator = (): AchievementAccumulator => ({
+  total: 0,
+  approved: 0,
+  notApproved: 0,
+  treatmentPathCount: 0,
+  controlPathCount: 0,
+  unknownPathCount: 0,
+});
+
+const incrementAchievement = (
+  accumulator: AchievementAccumulator,
+  approved: boolean,
+  path: OgstepPath,
+) => {
+  accumulator.total += 1;
+  if (approved) {
+    accumulator.approved += 1;
+  } else {
+    accumulator.notApproved += 1;
+  }
+
+  if (path === "treatment") {
+    accumulator.treatmentPathCount += 1;
+  } else if (path === "control") {
+    accumulator.controlPathCount += 1;
+  } else {
+    accumulator.unknownPathCount += 1;
+  }
+};
+
 const buildAchievementsByState = (rows: RawRow[]) => {
-  const map = new Map<
-    string,
-    {
-      total: number;
-      approved: number;
-      notApproved: number;
-      treatmentPathCount: number;
-      controlPathCount: number;
-      unknownPathCount: number;
-    }
-  >();
+  const map = new Map<string, AchievementAccumulator>();
 
   rows.forEach((row) => {
     const state = getState(row);
+    const entry = map.get(state) ?? createAchievementAccumulator();
     const ogstepPath = determineOgstepPath(getOgstepResponse(row));
-    const entry =
-      map.get(state) ?? {
-        total: 0,
-        approved: 0,
-        notApproved: 0,
-        treatmentPathCount: 0,
-        controlPathCount: 0,
-        unknownPathCount: 0,
-      };
-
-    entry.total += 1;
-    if (isApprovedRow(row)) {
-      entry.approved += 1;
-    } else {
-      entry.notApproved += 1;
-    }
-
-    if (ogstepPath === "treatment") entry.treatmentPathCount += 1;
-    else if (ogstepPath === "control") entry.controlPathCount += 1;
-    else entry.unknownPathCount += 1;
-
+    incrementAchievement(entry, isApprovedRow(row), ogstepPath);
     map.set(state, entry);
   });
 
@@ -445,12 +476,120 @@ const buildAchievementsByState = (rows: RawRow[]) => {
       total: value.total,
       approved: value.approved,
       notApproved: value.notApproved,
-      percentageApproved: value.total > 0 ? Number(((value.approved / value.total) * 100).toFixed(1)) : 0,
+      percentageApproved:
+        value.total > 0 ? Number(((value.approved / value.total) * 100).toFixed(1)) : 0,
       treatmentPathCount: value.treatmentPathCount,
       controlPathCount: value.controlPathCount,
       unknownPathCount: value.unknownPathCount,
     }))
     .sort((a, b) => a.state.localeCompare(b.state));
+};
+
+const buildAchievementsByInterviewer = (rows: RawRow[]) => {
+  const map = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      accumulator: AchievementAccumulator;
+    }
+  >();
+
+  rows.forEach((row) => {
+    const interviewerId = getInterviewerId(row);
+    if (!interviewerId) {
+      return;
+    }
+    const interviewerName = getInterviewerName(row);
+    const ogstepPath = determineOgstepPath(getOgstepResponse(row));
+    const entry =
+      map.get(interviewerId) ?? {
+        id: interviewerId,
+        name: interviewerName,
+        accumulator: createAchievementAccumulator(),
+      };
+
+    incrementAchievement(entry.accumulator, isApprovedRow(row), ogstepPath);
+    entry.name = interviewerName;
+    map.set(interviewerId, entry);
+  });
+
+  return Array.from(map.values())
+    .map(({ id, name, accumulator }) => {
+      const displayLabel = name && name !== id ? `${name} (${id})` : id;
+      return {
+        interviewerId: id,
+        interviewerName: name || id,
+        displayLabel,
+        total: accumulator.total,
+        approved: accumulator.approved,
+        notApproved: accumulator.notApproved,
+        percentageApproved:
+          accumulator.total > 0
+            ? Number(((accumulator.approved / accumulator.total) * 100).toFixed(1))
+            : 0,
+        treatmentPathCount: accumulator.treatmentPathCount,
+        controlPathCount: accumulator.controlPathCount,
+        unknownPathCount: accumulator.unknownPathCount,
+      };
+    })
+    .filter((row) => row.interviewerId.toLowerCase() !== "unknown")
+    .sort((a, b) => {
+      if (b.approved !== a.approved) return b.approved - a.approved;
+      if (b.total !== a.total) return b.total - a.total;
+      return a.interviewerId.localeCompare(b.interviewerId);
+    });
+};
+
+const buildAchievementsByLGA = (rows: RawRow[]) => {
+  const map = new Map<
+    string,
+    {
+      state: string;
+      lga: string;
+      accumulator: AchievementAccumulator;
+    }
+  >();
+
+  rows.forEach((row) => {
+    const lga = getLga(row);
+    if (!lga) return;
+    const state = getState(row);
+    const key = `${state}|${lga}`;
+    const ogstepPath = determineOgstepPath(getOgstepResponse(row));
+    const entry =
+      map.get(key) ?? {
+        state,
+        lga,
+        accumulator: createAchievementAccumulator(),
+      };
+
+    incrementAchievement(entry.accumulator, isApprovedRow(row), ogstepPath);
+    entry.state = state;
+    entry.lga = lga;
+    map.set(key, entry);
+  });
+
+  return Array.from(map.values())
+    .map(({ state, lga, accumulator }) => ({
+      state,
+      lga,
+      total: accumulator.total,
+      approved: accumulator.approved,
+      notApproved: accumulator.notApproved,
+      percentageApproved:
+        accumulator.total > 0
+          ? Number(((accumulator.approved / accumulator.total) * 100).toFixed(1))
+          : 0,
+      treatmentPathCount: accumulator.treatmentPathCount,
+      controlPathCount: accumulator.controlPathCount,
+      unknownPathCount: accumulator.unknownPathCount,
+    }))
+    .sort((a, b) => {
+      const stateCompare = a.state.localeCompare(b.state);
+      if (stateCompare !== 0) return stateCompare;
+      return a.lga.localeCompare(b.lga);
+    });
 };
 
 const buildFilters = (rows: RawRow[], errorTypes: string[]) => {
@@ -468,11 +607,15 @@ const buildFilters = (rows: RawRow[], errorTypes: string[]) => {
       return;
     }
 
+    const interviewerName = getInterviewerName(row);
     if (!interviewers.has(interviewerId)) {
+      const label = interviewerName && interviewerName !== interviewerId
+        ? `${interviewerName} (${interviewerId})`
+        : interviewerId;
       interviewers.set(interviewerId, {
         id: interviewerId,
-        name: interviewerId,
-        label: interviewerId,
+        name: interviewerName,
+        label,
       });
     }
   });
@@ -514,6 +657,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   const { errorTypes, errorCounts } = collectErrorInfo(submissions);
   const errorBreakdown = buildErrorBreakdown(errorCounts);
   const achievementsByState = buildAchievementsByState(submissions);
+  const achievementsByInterviewer = buildAchievementsByInterviewer(submissions);
+  const achievementsByLGA = buildAchievementsByLGA(submissions);
   const filters = buildFilters(submissions, errorTypes);
   const lastUpdatedInfo = computeLastUpdated(submissions);
 
@@ -570,8 +715,8 @@ export async function fetchDashboardData(): Promise<DashboardData> {
     errorBreakdown,
     achievements: {
       byState: achievementsByState,
-      byInterviewer: [],
-      byLGA: [],
+      byInterviewer: achievementsByInterviewer,
+      byLGA: achievementsByLGA,
     },
     filters,
     lastUpdated: lastUpdatedInfo.label,
