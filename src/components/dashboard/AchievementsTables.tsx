@@ -55,6 +55,10 @@ interface AchievementsTablesProps {
 }
 
 export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: AchievementsTablesProps) {
+  // Add defensive checks to ensure arrays are valid
+  const safeByInterviewer = Array.isArray(byInterviewer) ? byInterviewer : [];
+  const safeByLGA = Array.isArray(byLGA) ? byLGA : [];
+
   const handleExport = (type: string) => {
     console.log(`Exporting ${type} achievements...`);
   };
@@ -71,14 +75,17 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
   >(
     data: T[],
   ) => {
-    return data.reduce(
+    // Ensure data is always a valid array
+    const safeData = Array.isArray(data) ? data : [];
+    
+    return safeData.reduce(
       (acc, row) => ({
-        total: acc.total + row.total,
-        approved: acc.approved + row.approved,
-        notApproved: acc.notApproved + row.notApproved,
-        treatmentPathCount: acc.treatmentPathCount + (row.treatmentPathCount ?? 0),
-        controlPathCount: acc.controlPathCount + (row.controlPathCount ?? 0),
-        unknownPathCount: acc.unknownPathCount + (row.unknownPathCount ?? 0),
+        total: acc.total + (row?.total ?? 0),
+        approved: acc.approved + (row?.approved ?? 0),
+        notApproved: acc.notApproved + (row?.notApproved ?? 0),
+        treatmentPathCount: acc.treatmentPathCount + (row?.treatmentPathCount ?? 0),
+        controlPathCount: acc.controlPathCount + (row?.controlPathCount ?? 0),
+        unknownPathCount: acc.unknownPathCount + (row?.unknownPathCount ?? 0),
       }),
       {
         total: 0,
@@ -91,8 +98,8 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
     );
   };
 
-  const interviewerTotals = calculateTotals(byInterviewer);
-  const lgaTotals = calculateTotals(byLGA);
+  const interviewerTotals = calculateTotals(safeByInterviewer);
+  const lgaTotals = calculateTotals(safeByLGA);
 
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
@@ -146,29 +153,37 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {byInterviewer.map((row) => (
-                      <TableRow key={row.interviewerId}>
-                        <TableCell className="sticky left-0 z-10 bg-background font-semibold">
-                          {row.interviewerId}
-                        </TableCell>
-                        <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-success">
-                          {row.approved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {row.notApproved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {renderPathCell(row.treatmentPathCount, "treatment")}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {renderPathCell(row.controlPathCount, "control")}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatPercentage(row.percentageApproved)}
+                    {safeByInterviewer.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          No interviewer data available
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      safeByInterviewer.map((row) => (
+                        <TableRow key={row?.interviewerId ?? `interviewer-${Math.random()}`}>
+                          <TableCell className="sticky left-0 z-10 bg-background font-semibold">
+                            {row?.interviewerId ?? "Unknown"}
+                          </TableCell>
+                          <TableCell className="text-right">{(row?.total ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-success">
+                            {(row?.approved ?? 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right text-destructive">
+                            {(row?.notApproved ?? 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row?.treatmentPathCount ?? 0, "treatment")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row?.controlPathCount ?? 0, "control")}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatPercentage(row?.percentageApproved ?? 0)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                   <TableFooter>
                     <TableRow>
@@ -223,29 +238,37 @@ export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: 
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {byLGA.map((row) => (
-                      <TableRow key={`${row.state}-${row.lga}`}>
-                        <TableCell className="sticky left-0 z-10 bg-background font-medium">
-                          {row.lga}
-                        </TableCell>
-                        <TableCell className="text-right">{row.total.toLocaleString()}</TableCell>
-                        <TableCell className="text-right text-success">
-                          {row.approved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right text-destructive">
-                          {row.notApproved.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {renderPathCell(row.treatmentPathCount, "treatment")}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {renderPathCell(row.controlPathCount, "control")}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatPercentage(row.percentageApproved)}
+                    {safeByLGA.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                          No LGA data available
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      safeByLGA.map((row, idx) => (
+                        <TableRow key={`${row?.state ?? 'unknown'}-${row?.lga ?? idx}`}>
+                          <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                            {row?.lga ?? "Unknown"}
+                          </TableCell>
+                          <TableCell className="text-right">{(row?.total ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-success">
+                            {(row?.approved ?? 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right text-destructive">
+                            {(row?.notApproved ?? 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row?.treatmentPathCount ?? 0, "treatment")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row?.controlPathCount ?? 0, "control")}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatPercentage(row?.percentageApproved ?? 0)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                   <TableFooter>
                     <TableRow>
