@@ -46,7 +46,7 @@ function parseGvizJson(text: string): Record<string, unknown>[] {
  * Fetch all rows from the single Google Sheet tab.
  * This is the raw source for all dashboard data.
  */
-export async function fetchAllSurveyRows(): Promise<Record<string, unknown>[]> {
+export async function fetchFromGoogleSheets(): Promise<Record<string, unknown>[]> {
   if (!SHEET_ID) {
     throw new Error("VITE_GOOGLE_SHEET_ID environment variable is not set");
   }

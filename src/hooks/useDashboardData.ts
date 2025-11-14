@@ -1,7 +1,7 @@
 // src/hooks/useDashboardData.ts
 import { useQuery } from "@tanstack/react-query";
 import { fetchDashboardData } from "@/services/dataSource";
-import type { DashboardData } from "@/lib/dashboardData";
+import type { DashboardData } from "@/types/dashboard";
 
 export function useDashboardData() {
   return useQuery<DashboardData>({

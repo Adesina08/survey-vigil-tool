@@ -1,4 +1,4 @@
-import type { DashboardData } from "@/lib/dashboardData";
+import type { DashboardData } from "@/types/dashboard";
 import { fetchDashboardData } from "./dataSource";
 
 interface LoadOptions {

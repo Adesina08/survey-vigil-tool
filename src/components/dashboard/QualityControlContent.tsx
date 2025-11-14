@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { DashboardData } from "@/lib/dashboardData";
+import type { DashboardData } from "@/types/dashboard";
 import { determineApprovalStatus } from "@/utils/approval";
 import { extractErrorCodes, extractQualityIndicatorCounts } from "@/utils/errors";
 import { FilterControls } from "./FilterControls";
