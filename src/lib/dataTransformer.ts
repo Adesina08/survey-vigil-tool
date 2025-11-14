@@ -414,4 +414,4 @@ export function transformGoogleSheetsData(rawData: RawSurveyRow[], overallTarget
     summary: calculateSummary(rawData, overallTarget),
     analysisRows: rawData,
   };
-}dataTransformer.ts
+}
