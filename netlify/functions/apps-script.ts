@@ -39,44 +39,14 @@ export const handler: Handler = async (event) => {
       for (const field of fields) {
         if (field in payload) {
           // For rows, limit and trim heavy fields
-          if (field === "rows") {
-            const rowLimit = Number(qs.rowLimit ?? 1000);
-            response[field] = payload[field]
-              .slice(0, rowLimit)
-              .map(
-                ({
-                  _id,
-                  _uuid,
-                  _submission_time,
-                  A3_select_the_LGA,
-                  A7_Sex,
-                  A8_Age,
-                  _A5_GPS_Coordinates_latitude,
-                  _A5_GPS_Coordinates_longitude,
-                  Approval,
-                  QC_Issues,
-                  username,
-                  C5_Monthly_income,
-                  E1_Own_or_manage_a_business,
-                }) => ({
-                  id: _id,
-                  uuid: _uuid,
-                  submissionTime: _submission_time,
-                  lga: A3_select_the_LGA,
-                  sex: A7_Sex,
-                  age: A8_Age,
-                  lat: _A5_GPS_Coordinates_latitude,
-                  lng: _A5_GPS_Coordinates_longitude,
-                  approval: Approval,
-                  qcIssues: QC_Issues,
-                  username,
-                  monthlyIncome: C5_Monthly_income,
-                  ownsBusiness: E1_Own_or_manage_a_business,
-                }),
-              );
-          } else {
-            response[field] = payload[field];
-          }
+    if (field === "rows") {
+      const rowLimit = Number(qs.rowLimit ?? 1000);
+      // Just pass through the rows from Apps Script, limited for size
+      response[field] = (payload[field] as any[]).slice(0, rowLimit);
+    } else {
+      response[field] = payload[field];
+    }
+
         }
       }
       return jsonResponse(200, response);
