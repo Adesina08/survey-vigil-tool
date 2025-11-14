@@ -10,14 +10,22 @@ interface ProgressChartsProps {
 }
 
 export function ProgressCharts({ quotaProgress, statusBreakdown }: ProgressChartsProps) {
+  const safeQuotaProgress = Number.isFinite(quotaProgress) ? Math.max(quotaProgress, 0) : 0;
+  const cappedQuotaProgress = Math.min(safeQuotaProgress, 100);
+
+  const safeStatus = {
+    approved: Math.max(statusBreakdown?.approved ?? 0, 0),
+    notApproved: Math.max(statusBreakdown?.notApproved ?? 0, 0),
+  };
+
   const quotaData = [
-    { name: "Achieved", value: quotaProgress },
-    { name: "Remaining", value: Math.max(100 - quotaProgress, 0) },
+    { name: "Achieved", value: cappedQuotaProgress },
+    { name: "Remaining", value: Math.max(100 - cappedQuotaProgress, 0) },
   ];
 
   const statusData = [
-    { name: "Approved", value: statusBreakdown.approved },
-    { name: "Not Approved", value: statusBreakdown.notApproved },
+    { name: "Approved", value: safeStatus.approved },
+    { name: "Not Approved", value: safeStatus.notApproved },
   ];
 
   const QUOTA_COLORS = ["hsl(var(--primary))", "hsl(var(--muted))"];
