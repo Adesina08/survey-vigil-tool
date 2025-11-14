@@ -28,9 +28,9 @@ interface QuotaTrackerGenderRow extends QuotaTrackerRow {
 }
 
 interface QuotaTrackerProps {
-  byLGA: QuotaTrackerRow[];
-  byLGAAge: QuotaTrackerAgeRow[];
-  byLGAGender: QuotaTrackerGenderRow[];
+  quotaByLGA: QuotaTrackerRow[];
+  quotaByLGAAge: QuotaTrackerAgeRow[];
+  quotaByLGAGender: QuotaTrackerGenderRow[];
 }
 
 type SheetJS = {
@@ -81,7 +81,11 @@ const loadSheetJS = async (): Promise<SheetJS> => {
   });
 };
 
-export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps) {
+export function QuotaTracker({
+  quotaByLGA = [],
+  quotaByLGAAge = [],
+  quotaByLGAGender = [],
+}: QuotaTrackerProps) {
   const handleExport = async () => {
     try {
       const XLSX = await loadSheetJS();
@@ -89,7 +93,7 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
       const workbook = XLSX.utils.book_new();
 
       const lgaSheet = XLSX.utils.json_to_sheet(
-        byLGA.map((row) => ({
+        quotaByLGA.map((row) => ({
           State: row.state,
           LGA: row.lga,
           Target: row.target,
@@ -100,7 +104,7 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
       XLSX.utils.book_append_sheet(workbook, lgaSheet, "By LGA");
 
       const ageSheet = XLSX.utils.json_to_sheet(
-        byLGAAge.map((row) => ({
+        quotaByLGAAge.map((row) => ({
           State: row.state,
           LGA: row.lga,
           "Age Group": row.ageGroup,
@@ -112,7 +116,7 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
       XLSX.utils.book_append_sheet(workbook, ageSheet, "By LGA & Age");
 
       const genderSheet = XLSX.utils.json_to_sheet(
-        byLGAGender.map((row) => ({
+        quotaByLGAGender.map((row) => ({
           State: row.state,
           LGA: row.lga,
           Gender: row.gender,
@@ -165,7 +169,7 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {byLGA.map((row) => (
+                  {quotaByLGA.map((row) => (
                     <TableRow key={`${row.state}-${row.lga}`}>
                       <TableCell className="sticky left-0 z-10 bg-background font-medium">
                         {row.state}
@@ -197,7 +201,7 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {byLGAAge.map((row, idx) => (
+                  {quotaByLGAAge.map((row, idx) => (
                     <TableRow key={`${row.state}-${row.lga}-${row.ageGroup}-${idx}`}>
                       <TableCell className="sticky left-0 z-10 bg-background font-medium">
                         {row.state}
@@ -230,7 +234,7 @@ export function QuotaTracker({ byLGA, byLGAAge, byLGAGender }: QuotaTrackerProps
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {byLGAGender.map((row, idx) => (
+                  {quotaByLGAGender.map((row, idx) => (
                     <TableRow key={`${row.state}-${row.lga}-${row.gender}-${idx}`}>
                       <TableCell className="sticky left-0 z-10 bg-background font-medium">
                         {row.state}
