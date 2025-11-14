@@ -389,7 +389,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       />
       <SummaryCards summary={summary} />
       <div className="grid gap-6 md:grid-cols-[2fr_1fr]">
-        <ProgressCharts summary={summary} />
+        <ProgressCharts quotaProgress={quotaProgress} statusBreakdown={statusBreakdown} />
         <QuotaTracker
           quotaByLGA={filteredQuotaByLGA}
           quotaByLGAAge={filteredQuotaByLGAAge}
