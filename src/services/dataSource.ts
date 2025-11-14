@@ -5,23 +5,50 @@ import type { AnalysisRow, DashboardData, ErrorBreakdownRow } from "@/lib/dashbo
 
 type RawRow = Record<string, unknown>;
 
+type OgstepPath = "treatment" | "control" | "unknown";
+
 const DEFAULT_STATE = "Ogun State";
 
-const asNumber = (value: unknown): number => {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : 0;
+const toNumber = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
 };
 
-const asString = (value: unknown): string =>
+const toNumberOrNull = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const toStringValue = (value: unknown): string =>
   value === undefined || value === null ? "" : String(value);
 
 const getFirstTextValue = (row: RawRow, keys: string[]): string | null => {
   for (const key of keys) {
     const value = row[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
     }
   }
+
   return null;
 };
 
@@ -31,36 +58,53 @@ const getLga = (row: RawRow): string =>
       "A3. select the LGA",
       "A3. Select the LGA",
       "A3. select the lga",
+      "A3. Select the lga",
+      "A3. Select The Lga",
       "lga",
       "LGA",
     ]) ?? ""
   ).trim();
 
 const getState = (row: RawRow): string => {
-  const value = asString(row["State"]);
-  return value.trim().length > 0 ? value.trim() : DEFAULT_STATE;
+  const value = toStringValue(row["State"]).trim();
+  return value.length > 0 ? value : DEFAULT_STATE;
 };
 
-const getApproval = (row: RawRow): string => asString(row["Approval"]).trim();
+const getApproval = (row: RawRow): string => toStringValue(row["Approval"]).trim();
 
-const getSex = (row: RawRow): string => asString(row["A7. Sex"]).trim();
+const isApprovedRow = (row: RawRow): boolean => getApproval(row).toLowerCase() === "approved";
 
-const getAge = (row: RawRow): number => asNumber(row["A8. Age"]);
+const getSex = (row: RawRow): string => toStringValue(row["A7. Sex"]).trim();
 
-const getLat = (row: RawRow): number =>
-  asNumber(row["_A5. GPS Coordinates_latitude"] ?? row["Latitude"]);
+const getAge = (row: RawRow): number => toNumber(row["A8. Age"]);
 
-const getLng = (row: RawRow): number =>
-  asNumber(row["_A5. GPS Coordinates_longitude"] ?? row["Longitude"]);
+const getLat = (row: RawRow): number | null =>
+  toNumberOrNull(
+    row["_A5. GPS Coordinates_latitude"] ??
+      row["A5. GPS Coordinates_latitude"] ??
+      row.Latitude ??
+      row.latitude ??
+      row.lat,
+  );
+
+const getLng = (row: RawRow): number | null =>
+  toNumberOrNull(
+    row["_A5. GPS Coordinates_longitude"] ??
+      row["A5. GPS Coordinates_longitude"] ??
+      row.Longitude ??
+      row.longitude ??
+      row.lng,
+  );
 
 const getInterviewerId = (row: RawRow): string =>
   (
     getFirstTextValue(row, [
       "A1. Enumerator ID",
       "Interviewer ID",
+      "Enumerator ID",
+      "username",
       "interviewer_id",
       "enumerator_id",
-      "username",
     ]) ?? "Unknown"
   ).trim() || "Unknown";
 
@@ -73,8 +117,6 @@ const getOgstepResponse = (row: RawRow): string | null =>
     "ogstep_participation",
     "ogstep_response",
   ]);
-
-type OgstepPath = "treatment" | "control" | "unknown";
 
 const determineOgstepPath = (response: string | null): OgstepPath => {
   if (!response) return "unknown";
@@ -99,15 +141,20 @@ const directionKeys = [
 const getDirections = (row: RawRow): string | null => {
   for (const key of directionKeys) {
     const value = row[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        return trimmed;
+      }
     }
   }
 
   for (const [key, value] of Object.entries(row)) {
     if (!key.toLowerCase().includes("direction")) continue;
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
     }
   }
 
@@ -116,7 +163,7 @@ const getDirections = (row: RawRow): string | null => {
 
 const parseTimestamp = (row: RawRow): Date | null => {
   const candidates: Array<string | null | undefined> = [
-    asString(row["_submission_time"]).trim() || null,
+    toStringValue(row["_submission_time"]).trim() || null,
   ];
 
   const submissionDate = getFirstTextValue(row, ["Submission Date", "submission_date"]);
@@ -173,7 +220,7 @@ const collectErrorInfo = (rows: RawRow[]) => {
       if (!key.startsWith("QC_FLAG_") && !key.startsWith("QC_WARN_")) {
         return;
       }
-      const numeric = asNumber(value);
+      const numeric = toNumber(value);
       if (numeric > 0) {
         set.add(key);
         counts.set(key, (counts.get(key) ?? 0) + numeric);
@@ -210,25 +257,28 @@ const buildQuotaByLGA = (rows: RawRow[]) => {
     if (!map.has(key)) {
       map.set(key, { state, lga, achieved: 0 });
     }
-    const entry = map.get(key)!;
-    if (getApproval(row).toLowerCase() === "approved") {
+    if (isApprovedRow(row)) {
+      const entry = map.get(key)!;
       entry.achieved += 1;
     }
   });
 
   return Array.from(map.values())
-    .map(({ state, lga, achieved }) => ({
-      state,
-      lga,
-      target: 0,
-      achieved,
-      balance: 0,
-    }))
+    .map(({ state, lga, achieved }) => {
+      const target = 0;
+      return {
+        state,
+        lga,
+        target,
+        achieved,
+        balance: Math.max(target - achieved, 0),
+      };
+    })
     .sort((a, b) => a.lga.localeCompare(b.lga));
 };
 
 const ageBand = (age: number): string => {
-  if (!Number.isFinite(age)) return "Unknown";
+  if (!Number.isFinite(age) || age <= 0) return "Unknown";
   if (age < 18) return "<18";
   if (age <= 24) return "18–24";
   if (age <= 35) return "25–35";
@@ -248,20 +298,23 @@ const buildQuotaByLGAAge = (rows: RawRow[]) => {
     if (!map.has(key)) {
       map.set(key, { state, lga, ageGroup: group, achieved: 0 });
     }
-    const entry = map.get(key)!;
-    if (getApproval(row).toLowerCase() === "approved") {
+    if (isApprovedRow(row)) {
+      const entry = map.get(key)!;
       entry.achieved += 1;
     }
   });
 
-  return Array.from(map.values()).map(({ state, lga, ageGroup, achieved }) => ({
-    state,
-    lga,
-    ageGroup,
-    target: 0,
-    achieved,
-    balance: 0,
-  }));
+  return Array.from(map.values()).map(({ state, lga, ageGroup, achieved }) => {
+    const target = 0;
+    return {
+      state,
+      lga,
+      ageGroup,
+      target,
+      achieved,
+      balance: Math.max(target - achieved, 0),
+    };
+  });
 };
 
 const buildQuotaByLGAGender = (rows: RawRow[]) => {
@@ -276,20 +329,23 @@ const buildQuotaByLGAGender = (rows: RawRow[]) => {
     if (!map.has(key)) {
       map.set(key, { state, lga, gender, achieved: 0 });
     }
-    const entry = map.get(key)!;
-    if (getApproval(row).toLowerCase() === "approved") {
+    if (isApprovedRow(row)) {
+      const entry = map.get(key)!;
       entry.achieved += 1;
     }
   });
 
-  return Array.from(map.values()).map(({ state, lga, gender, achieved }) => ({
-    state,
-    lga,
-    gender,
-    target: 0,
-    achieved,
-    balance: 0,
-  }));
+  return Array.from(map.values()).map(({ state, lga, gender, achieved }) => {
+    const target = 0;
+    return {
+      state,
+      lga,
+      gender,
+      target,
+      achieved,
+      balance: Math.max(target - achieved, 0),
+    };
+  });
 };
 
 const buildMapSubmissions = (rows: RawRow[]): DashboardData["mapSubmissions"] => {
@@ -298,23 +354,29 @@ const buildMapSubmissions = (rows: RawRow[]): DashboardData["mapSubmissions"] =>
   rows.forEach((row) => {
     const lat = getLat(row);
     const lng = getLng(row);
-    if (!lat || !lng) {
+    if (lat === null || lng === null || !Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
       return;
     }
 
     const interviewerId = getInterviewerId(row);
     const ogstepResponse = getOgstepResponse(row);
     const ogstepPath = determineOgstepPath(ogstepResponse);
-    const approval = getApproval(row).toLowerCase() === "approved" ? "approved" : "not_approved";
+    const approval = isApprovedRow(row) ? "approved" : "not_approved";
     const timestamp = parseTimestamp(row);
 
     const errorTypes = Object.entries(row)
-      .filter(([key, value]) => (key.startsWith("QC_FLAG_") || key.startsWith("QC_WARN_")) && asNumber(value) > 0)
+      .filter(
+        ([key, value]) =>
+          (key.startsWith("QC_FLAG_") || key.startsWith("QC_WARN_")) && toNumber(value) > 0,
+      )
       .map(([key]) => key)
       .sort();
 
     const submissionId =
-      asString(row["_uuid"]).trim() || asString(row["_id"]).trim() || asString(row["_index"]).trim() || `${lat},${lng}`;
+      toStringValue(row["_uuid"]).trim() ||
+      toStringValue(row["_id"]).trim() ||
+      toStringValue(row["_index"]).trim() ||
+      `${lat},${lng}`;
 
     submissions.push({
       id: submissionId,
@@ -352,24 +414,19 @@ const buildAchievementsByState = (rows: RawRow[]) => {
 
   rows.forEach((row) => {
     const state = getState(row);
-    const approval = getApproval(row).toLowerCase() === "approved";
-    const ogstepResponse = getOgstepResponse(row);
-    const ogstepPath = determineOgstepPath(ogstepResponse);
-
-    if (!map.has(state)) {
-      map.set(state, {
+    const ogstepPath = determineOgstepPath(getOgstepResponse(row));
+    const entry =
+      map.get(state) ?? {
         total: 0,
         approved: 0,
         notApproved: 0,
         treatmentPathCount: 0,
         controlPathCount: 0,
         unknownPathCount: 0,
-      });
-    }
+      };
 
-    const entry = map.get(state)!;
     entry.total += 1;
-    if (approval) {
+    if (isApprovedRow(row)) {
       entry.approved += 1;
     } else {
       entry.notApproved += 1;
@@ -378,18 +435,22 @@ const buildAchievementsByState = (rows: RawRow[]) => {
     if (ogstepPath === "treatment") entry.treatmentPathCount += 1;
     else if (ogstepPath === "control") entry.controlPathCount += 1;
     else entry.unknownPathCount += 1;
+
+    map.set(state, entry);
   });
 
-  return Array.from(map.entries()).map(([state, value]) => ({
-    state,
-    total: value.total,
-    approved: value.approved,
-    notApproved: value.notApproved,
-    percentageApproved: value.total > 0 ? Number(((value.approved / value.total) * 100).toFixed(1)) : 0,
-    treatmentPathCount: value.treatmentPathCount,
-    controlPathCount: value.controlPathCount,
-    unknownPathCount: value.unknownPathCount,
-  }));
+  return Array.from(map.entries())
+    .map(([state, value]) => ({
+      state,
+      total: value.total,
+      approved: value.approved,
+      notApproved: value.notApproved,
+      percentageApproved: value.total > 0 ? Number(((value.approved / value.total) * 100).toFixed(1)) : 0,
+      treatmentPathCount: value.treatmentPathCount,
+      controlPathCount: value.controlPathCount,
+      unknownPathCount: value.unknownPathCount,
+    }))
+    .sort((a, b) => a.state.localeCompare(b.state));
 };
 
 const buildFilters = (rows: RawRow[], errorTypes: string[]) => {
@@ -443,11 +504,7 @@ const computeLastUpdated = (rows: RawRow[]): { label: string; summaryValue: stri
   };
 };
 
-/**
- * Main entry: this replaces the old Apps Script /api/apps-script-based loader.
- * Everything now comes from the single Google Sheet.
- */
-export async function fetchDashboardData(): Promise<DashboardData & { lgas: string[] }> {
+export async function fetchDashboardData(): Promise<DashboardData> {
   const submissions = (await fetchAllSurveyRows()) as AnalysisRow[];
 
   const quotaByLGA = buildQuotaByLGA(submissions);
@@ -461,7 +518,7 @@ export async function fetchDashboardData(): Promise<DashboardData & { lgas: stri
   const lastUpdatedInfo = computeLastUpdated(submissions);
 
   const totalSubmissions = submissions.length;
-  const approvedSubmissions = submissions.filter((row) => getApproval(row).toLowerCase() === "approved").length;
+  const approvedSubmissions = submissions.filter(isApprovedRow).length;
   const notApprovedSubmissions = totalSubmissions - approvedSubmissions;
 
   const overallTarget = quotaByLGA.reduce((sum, row) => sum + row.target, 0);
@@ -496,7 +553,7 @@ export async function fetchDashboardData(): Promise<DashboardData & { lgas: stri
 
   const quotaProgress = overallTarget > 0 ? Number(((approvedSubmissions / overallTarget) * 100).toFixed(1)) : 0;
 
-  const dashboardData = {
+  const dashboardData: DashboardData = {
     summary,
     statusBreakdown: {
       approved: approvedSubmissions,
@@ -520,7 +577,7 @@ export async function fetchDashboardData(): Promise<DashboardData & { lgas: stri
     lastUpdated: lastUpdatedInfo.label,
     analysisRows: submissions,
     lgas: filters.lgas,
-  } satisfies DashboardData & { lgas: string[] };
+  };
 
   return dashboardData;
 }

@@ -58,7 +58,7 @@ const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
 };
 
 interface QualityControlContentProps {
-  dashboardData: Partial<DashboardData> & { lgas?: string[] };
+  dashboardData: DashboardData;
   selectedLga: string | null;
   onFilterChange: (filterType: string, value: string) => void;
 }
@@ -74,7 +74,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
   // Filter analysis rows by selectedLga
   const filteredAnalysisRows = useMemo(() => {
-    const rows = (dashboardData.submissions || []) as NormalisedRow[];
+    const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
     if (!selectedLga) return rows;
 
     return rows.filter((row) => {
@@ -89,7 +89,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
         ]) ?? "";
       return matchesSelectedLga(lgaValue, selectedLga);
     });
-  }, [dashboardData.submissions, selectedLga]);
+  }, [dashboardData.analysisRows, selectedLga]);
 
   const {
     summary,

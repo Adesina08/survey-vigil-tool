@@ -4,7 +4,7 @@ import { fetchDashboardData } from "@/services/dataSource";
 import type { DashboardData } from "@/lib/dashboardData";
 
 export function useDashboardData() {
-  return useQuery<DashboardData & { lgas: string[] }>({
+  return useQuery<DashboardData>({
     queryKey: ["dashboard-data"],
     queryFn: () => fetchDashboardData(),
     refetchInterval: 30_000,
