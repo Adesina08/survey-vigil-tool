@@ -5,6 +5,7 @@ import { loadAppsScriptPayload } from "../../server/dashboard";
 const jsonResponse = (statusCode: number, payload: unknown) => {
   const body = JSON.stringify(payload);
   const MAX_BYTES = 5_500_000; // Netlify limit ~6.29 MB, use 5.5 MB for safety
+
   if (body.length > MAX_BYTES) {
     console.error("apps-script payload too large:", body.length, "bytes");
     return {
@@ -17,6 +18,7 @@ const jsonResponse = (statusCode: number, payload: unknown) => {
       }),
     };
   }
+
   return {
     statusCode,
     headers: { "Content-Type": "application/json" },
@@ -28,35 +30,42 @@ export const handler: Handler = async (event) => {
   try {
     // Get query parameters (e.g., ?fields=rows,stateTargets&rowLimit=500)
     const qs = event.queryStringParameters || {};
-    const fields = (qs.fields ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+    const fields = (qs.fields ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    // Load the raw Apps Script payload
+    // Load the raw Apps Script payload (full object from Apps Script)
     const payload = await loadAppsScriptPayload();
 
     // If specific fields are requested, return only those
     if (fields.length > 0) {
       const response: any = {};
+
       for (const field of fields) {
         if (field in payload) {
-          // For rows, limit and trim heavy fields
-    if (field === "rows") {
-      const rowLimit = Number(qs.rowLimit ?? 1000);
-      // Just pass through the rows from Apps Script, limited for size
-      response[field] = (payload[field] as any[]).slice(0, rowLimit);
-    } else {
-      response[field] = payload[field];
-    }
-
+          // For rows, just limit the count – DO NOT remap keys
+          if (field === "rows") {
+            const rowLimit = Number(qs.rowLimit ?? 1000);
+            const rows = Array.isArray(payload[field])
+              ? (payload[field] as unknown[])
+              : [];
+            // Pass through the raw rows from Apps Script, just limiting the count
+            response[field] = rows.slice(0, rowLimit);
+          } else {
+            response[field] = (payload as any)[field];
+          }
         }
       }
+
       return jsonResponse(200, response);
     }
 
-    // Default: return a small summary
+    // Default: return a small summary if no fields were requested
     const summary = {
-      rowsCount: payload.rows?.length ?? 0,
-      stateTargetsCount: payload.stateTargets?.length ?? 0,
-      hasSettings: !!payload.settings,
+      rowsCount: (payload as any).rows?.length ?? 0,
+      stateTargetsCount: (payload as any).stateTargets?.length ?? 0,
+      hasSettings: !!(payload as any).settings,
     };
 
     return jsonResponse(200, summary);
