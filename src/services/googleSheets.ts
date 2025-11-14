@@ -77,7 +77,9 @@ const parseGvizJson = (text: string): Record<string, unknown>[] => {
 
 export async function fetchAllSurveyRows(): Promise<Record<string, unknown>[]> {
   if (!SHEET_ID) {
-    throw new Error("VITE_GOOGLE_SHEET_ID is not set");
+    throw new Error(
+      "Required environment variable VITE_GOOGLE_SHEET_ID is not set. See the README's troubleshooting section for details.",
+    );
   }
 
   const url =
@@ -86,7 +88,15 @@ export async function fetchAllSurveyRows(): Promise<Record<string, unknown>[]> {
 
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to fetch Google Sheet (HTTP ${response.status})`);
+    if (response.status >= 400 && response.status < 500) {
+      throw new Error(
+        `Failed to fetch Google Sheet data due to a client-side error (HTTP ${response.status}). Please check that the VITE_GOOGLE_SHEET_ID and VITE_GOOGLE_SHEET_NAME in your .env file are correct and that the sheet is publicly accessible.`,
+      );
+    }
+
+    throw new Error(
+      `Failed to fetch Google Sheet data due to a server-side error (HTTP ${response.status}). Please try again later.`,
+    );
   }
 
   const text = await response.text();
