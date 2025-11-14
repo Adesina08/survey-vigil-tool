@@ -397,7 +397,12 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
         />
       </div>
       <div className="grid gap-6 md:grid-cols-[3fr_2fr]">
-        <InteractiveMap submissions={filteredMapSubmissions} />
+        <InteractiveMap
+          submissions={filteredMapSubmissions}
+          interviewers={dashboardData.filters?.interviewers || []}
+          errorTypes={dashboardData.filters?.errorTypes || []}
+          metadata={dashboardData.mapMetadata}
+        />
         <UserProductivity
           data={productivity}
           errorTypes={errorTypes.length > 0 ? errorTypes : dashboardData.filters?.errorTypes || []}

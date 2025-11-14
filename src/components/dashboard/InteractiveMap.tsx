@@ -14,7 +14,7 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { formatErrorLabel } from "@/lib/utils";
-import type { NormalizedMapMetadata } from "@/lib/mapMetadata";
+import { normalizeMapMetadata, type NormalizedMapMetadata } from "@/lib/mapMetadata";
 import ogunLgaGeoJsonUrl from "@/assets/ogun-lga.geojson?url";
 
 const defaultIconPrototype = L.Icon.Default.prototype as unknown as {
@@ -51,9 +51,9 @@ interface InterviewerOption {
 
 interface InteractiveMapProps {
   submissions: Submission[];
-  interviewers: InterviewerOption[];
-  errorTypes: string[];
-  metadata: NormalizedMapMetadata;
+  interviewers?: InterviewerOption[];
+  errorTypes?: string[];
+  metadata?: NormalizedMapMetadata;
 }
 
 type ColorMode = "path" | "approval";
@@ -268,7 +268,13 @@ const createPopupHtml = (submission: Submission): string => {
   `;
 };
 
-export function InteractiveMap({ submissions, interviewers, errorTypes, metadata }: InteractiveMapProps) {
+export function InteractiveMap({
+  submissions,
+  interviewers = [],
+  errorTypes = [],
+  metadata,
+}: InteractiveMapProps) {
+  const normalizedMetadata = metadata ?? normalizeMapMetadata();
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
   const [selectedLga, setSelectedLga] = useState("all");
@@ -425,7 +431,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
 
     try {
       const dataUrl = await renderNodeToPng(mapElement);
-      const sanitizedPrefix = sanitizeFilePrefix(metadata.exportFilenamePrefix);
+      const sanitizedPrefix = sanitizeFilePrefix(normalizedMetadata.exportFilenamePrefix);
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 
       const anchor = document.createElement("a");
@@ -440,7 +446,7 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
     } finally {
       setIsExporting(false);
     }
-  }, [isExporting, metadata.exportFilenamePrefix]);
+  }, [isExporting, normalizedMetadata.exportFilenamePrefix]);
 
   useEffect(() => {
     if (!mapRef.current && mapContainerRef.current) {
@@ -678,9 +684,10 @@ export function InteractiveMap({ submissions, interviewers, errorTypes, metadata
   }, [filteredSubmissions.length]);
 
   const totalRecords = baseSubmissions.length;
-  const trimmedMetadataTitle = typeof metadata.title === "string" ? metadata.title.trim() : "";
+  const trimmedMetadataTitle =
+    typeof normalizedMetadata.title === "string" ? normalizedMetadata.title.trim() : "";
   const trimmedMetadataSubtitle =
-    typeof metadata.subtitle === "string" ? metadata.subtitle.trim() : "";
+    typeof normalizedMetadata.subtitle === "string" ? normalizedMetadata.subtitle.trim() : "";
   const headerSubtitle =
     trimmedMetadataSubtitle.length > 0
       ? trimmedMetadataSubtitle
