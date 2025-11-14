@@ -64,25 +64,30 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/e281e3e3-daa2-46dd-b066-99dee0aa1b39) and click on Share -> Publish.
 
-## Configuring the Apps Script data source
+## Configuring the Google Sheets Data Source
 
-Set the Google Apps Script Web App URL that returns JSON as the single data source for the dashboard:
+This dashboard now loads data directly from a Google Sheet using the Google Visualization API. To configure the data source, you'll need to create a `.env` file in the root of the project and add the following environment variables:
 
-- **Recommended**: add `APPS_SCRIPT_URL=...` to your `.env` file. The Vite build now exposes `APPS_` prefixed variables to the browser automatically, so the same entry works for both the frontend and the backend proxy.
-- **Optional**: if you prefer, you can still set `VITE_APPS_SCRIPT_URL=...` for the browser or `APPS_SCRIPT_URL=...` for the server individually. Either variable name is read everywhere in the app.
+- `VITE_GOOGLE_SHEET_ID`: The ID of the Google Sheet to use as the data source.
+- `VITE_GOOGLE_SHEET_NAME`: The name of the sheet (tab) to use within the Google Sheet.
 
-The app now proxies requests through `/api/apps-script` by default when running in the browser to avoid
-Apps Script CORS header conflicts. If you need the frontend to talk to the Apps Script endpoint directly
-(for example when hosting the build on a static file server without the proxy), set
-`VITE_APPS_SCRIPT_DIRECT_FETCH=true` in your environment.
+See the `.env.example` file for the format.
 
-Example entry for your environment file:
+### Troubleshooting
 
-```
-APPS_SCRIPT_URL=https://script.google.com/macros/s/AKfycby1wbXX8cW4Z17E4ype83OebSYFYSzP5-Q-XEKhONXzhuADaCLKeiWwg6H7BMzMRm4g/exec
-```
+**How to get the Google Sheet ID and Name:**
 
-Deploy the Apps Script as a Web App with "Anyone with the link" access so the backend can retrieve the JSON payload.
+1.  Open your Google Sheet in the browser.
+2.  The URL will look something like this: `https://docs.google.com/spreadsheets/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ/edit#gid=123456789`
+3.  The **Sheet ID** is the long string of characters between `/d/` and `/edit`. In the example above, it's `1aBcDeFgHiJkLmNoPqRsTuVwXyZ`.
+4.  The **Sheet Name** is the name of the tab at the bottom of the page. If you haven't renamed it, it's probably "Form Responses 1".
+
+**"Failed to fetch Google Sheet" error:**
+
+If you see an error message in the dashboard that says "Failed to fetch Google Sheet," it's likely due to one of the following reasons:
+
+- The `VITE_GOOGLE_SHEET_ID` or `VITE_GOOGLE_SHEET_NAME` in your `.env` file is incorrect.
+- The Google Sheet is not publicly accessible. To fix this, click the "Share" button in the top right of the Google Sheet, and in the "General access" section, select "Anyone with the link."
 
 ## Can I connect a custom domain to my Lovable project?
 

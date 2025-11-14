@@ -85,7 +85,13 @@ const Index = () => {
 
   const errorMessage = error?.message ?? "An unexpected error occurred while connecting to the dashboard service.";
 
-  if (isError || !dashboardData?.summary) {
+  const hasRequiredData =
+    dashboardData &&
+    dashboardData.summary &&
+    Array.isArray(dashboardData.analysisRows) &&
+    Array.isArray(dashboardData.errorBreakdown);
+
+  if (isError || !hasRequiredData) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4 sm:px-6">
         <div className="w-full max-w-md rounded-lg border bg-card p-6 text-center">
