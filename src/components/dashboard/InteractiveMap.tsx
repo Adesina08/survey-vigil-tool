@@ -103,13 +103,16 @@ const createCustomIcon = (submission: Submission, mode: ColorMode) => {
   });
 };
 
-const escapeHtml = (value: string) =>
-  value
+const escapeHtml = (value: unknown) => {
+  const text = value == null ? "" : String(value);
+
+  return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+};
 
 const sanitizeFilePrefix = (value: string) =>
   value
@@ -501,8 +504,8 @@ export function InteractiveMap({
 
         const layer = L.geoJSON(geoJson);
         const bounds = layer.getBounds();
-        if (bounds.isValid()) {
-          mapRef.current!.fitBounds(bounds, { padding: [32, 32] });
+        if (bounds.isValid() && mapRef.current) {
+          mapRef.current.fitBounds(bounds, { padding: [32, 32] });
         }
         layer.remove();
       } catch (error) {
