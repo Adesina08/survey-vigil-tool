@@ -4,9 +4,10 @@ const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID;
 const SHEET_NAME = import.meta.env.VITE_GOOGLE_SHEET_NAME ?? "Form Responses 1";
 
 /**
- * Extract JSON payload from Google's gviz response format:
- * /*O_o*/
- * google.visualization.Query.setResponse({...});
+ * Extract JSON payload from Google's gviz response format.
+ *
+ * Example wrapper:
+ *   google.visualization.Query.setResponse({...});
  */
 function extractJsonPayload(text: string): unknown {
   const start = text.indexOf("{");
@@ -17,6 +18,7 @@ function extractJsonPayload(text: string): unknown {
   const jsonStr = text.slice(start, end + 1);
   return JSON.parse(jsonStr);
 }
+
 
 /**
  * Parse gviz JSON into array of row objects keyed by column labels
