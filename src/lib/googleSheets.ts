@@ -11,7 +11,15 @@ import type {
 
 type NormalisedRow = Map<string, unknown>;
 
-export const normaliseHeaderKey = (key: string): string => {
+export const normaliseHeaderKey = (rawKey: unknown): string => {
+  // Coerce anything to a string safely
+  const key =
+    typeof rawKey === "string"
+      ? rawKey
+      : rawKey == null
+        ? ""
+        : String(rawKey);
+
   const withoutHtml = key.replace(/<[^>]*>/g, "");
   const trimmed = withoutHtml.trim();
   if (!trimmed) {
@@ -32,6 +40,7 @@ export const normaliseHeaderKey = (key: string): string => {
   const normalised = withoutLeading.replace(/_+$/, "");
   return normalised || trimmed;
 };
+
 
 export const HEADER_ALIASES: Record<string, string> = {
   state: "State",
