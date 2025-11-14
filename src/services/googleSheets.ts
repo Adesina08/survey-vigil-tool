@@ -61,5 +61,38 @@ export async function fetchAllSurveyRows(): Promise<Record<string, unknown>[]> {
   }
 
   const text = await response.text();
-  return parseGvizJson(text);
+  const rows = parseGvizJson(text);
+
+  console.group("📊 Google Sheets Data Debug");
+  console.log("Total rows fetched:", rows.length);
+
+  if (rows.length > 0) {
+    const firstRow = rows[0];
+    console.log("Column headers found:", Object.keys(firstRow));
+    console.log("First row sample:", {
+      "A1. Enumerator ID": firstRow["A1. Enumerator ID"],
+      "A3. select the LGA": firstRow["A3. select the LGA"],
+      "B2. Did you participate in OGSTEP?": firstRow["B2. Did you participate in OGSTEP?"],
+      Approval: firstRow["Approval"],
+      "QC Status": firstRow["QC Status"],
+      _id: firstRow["_id"],
+      State: firstRow["State"],
+    });
+
+    const qcFlagColumns = Object.keys(firstRow).filter(
+      (key) => key.startsWith("QC_FLAG") || key.startsWith("QC_WARN"),
+    );
+    console.log("QC Flag columns found:", qcFlagColumns);
+
+    const approvalValues = rows.slice(0, 5).map((r) => ({
+      Approval: r["Approval"],
+      "QC Status": r["QC Status"],
+      "A6. Consent to participate": r["A6. Consent to participate"],
+    }));
+    console.log("Sample approval data (first 5 rows):", approvalValues);
+  }
+
+  console.groupEnd();
+
+  return rows;
 }
