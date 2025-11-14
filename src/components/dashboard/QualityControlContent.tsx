@@ -384,7 +384,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     <div className="space-y-8">
       <FilterControls
         selectedLga={selectedLga}
-        availableLgas={dashboardData.lgas || []}
+        lgas={dashboardData.lgas || []}
         onFilterChange={onFilterChange}
       />
       <SummaryCards summary={summary} />
