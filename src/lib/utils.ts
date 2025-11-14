@@ -5,7 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const formatErrorLabel = (label: string): string => {
+export const formatErrorLabel = (rawLabel: unknown): string => {
+  if (rawLabel == null) {
+    return "";
+  }
+
+  const label = String(rawLabel);
+
   if (!label) {
     return "";
   }
