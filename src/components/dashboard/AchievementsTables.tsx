@@ -49,13 +49,14 @@ interface LGAAchievement {
 }
 
 interface AchievementsTablesProps {
-  byState: StateAchievement[];
+  byState?: StateAchievement[];
   byInterviewer: InterviewerAchievement[];
   byLGA: LGAAchievement[];
 }
 
-export function AchievementsTables({ byState: _byState, byInterviewer, byLGA }: AchievementsTablesProps) {
+export function AchievementsTables({ byState = [], byInterviewer, byLGA }: AchievementsTablesProps) {
   // Add defensive checks to ensure arrays are valid
+  const safeByState = Array.isArray(byState) ? byState : [];
   const safeByInterviewer = Array.isArray(byInterviewer) ? byInterviewer : [];
   const safeByLGA = Array.isArray(byLGA) ? byLGA : [];
 
