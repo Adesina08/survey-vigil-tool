@@ -87,11 +87,23 @@ const combineDateAndTime = (dateValue?: string, timeValue?: string): Date | unde
   return Number.isNaN(withZone.getTime()) ? undefined : withZone;
 };
 
-const normalizePhone = (value?: string | null): string | undefined => {
-  if (!value) {
+const normalizePhone = (value?: string | number | null): string | undefined => {
+  if (value === null || value === undefined) {
     return undefined;
   }
-  const digits = value.replace(/[^0-9+]/g, "");
+
+  const stringValue =
+    typeof value === "string"
+      ? value
+      : typeof value === "number"
+        ? value.toString()
+        : String(value ?? "");
+
+  if (!stringValue) {
+    return undefined;
+  }
+
+  const digits = stringValue.replace(/[^0-9+]/g, "");
   return digits.length > 0 ? digits : undefined;
 };
 
