@@ -2,7 +2,7 @@ import type { DashboardData } from "@/lib/dashboardData";
 import { QualityControlContent } from "@/components/dashboard/QualityControlContent";
 
 interface QualityControlProps {
-  dashboardData: (DashboardData & { lgas: string[] }) | undefined;
+  dashboardData: DashboardData | undefined;
   onFilterChange: (filterType: string, value: string) => void;
   selectedLga: string | null;
 }

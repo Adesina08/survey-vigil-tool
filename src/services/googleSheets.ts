@@ -1,45 +1,80 @@
 // src/services/googleSheets.ts
 
-const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID;
-const SHEET_NAME = import.meta.env.VITE_GOOGLE_SHEET_NAME ?? "Form Responses 1";
+const rawSheetId = import.meta.env.VITE_GOOGLE_SHEET_ID;
+const rawSheetName = import.meta.env.VITE_GOOGLE_SHEET_NAME;
 
-// Extract the JSON payload from the Google "gviz" response:
-//  /*O_o*/
-//  google.visualization.Query.setResponse({...});
-function extractJsonPayload(text: string): unknown {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
+const SHEET_ID = typeof rawSheetId === "string" ? rawSheetId.trim() : "";
+const SHEET_NAME =
+  typeof rawSheetName === "string" && rawSheetName.trim().length > 0
+    ? rawSheetName.trim()
+    : "Form Responses 1";
+
+interface GvizColumn {
+  label?: string | null;
+  id?: string | null;
+}
+
+interface GvizCell {
+  v?: unknown;
+}
+
+interface GvizRow {
+  c?: GvizCell[] | null;
+}
+
+interface GvizTable {
+  cols?: GvizColumn[] | null;
+  rows?: GvizRow[] | null;
+}
+
+interface GvizResponse {
+  table?: GvizTable | null;
+}
+
+const extractJsonPayload = (text: string): string => {
+  const match = text.match(/google\.visualization\.Query\.setResponse\((.*)\);?/s);
+  if (match && typeof match[1] === "string" && match[1].trim().length > 0) {
+    return match[1];
+  }
+
+  const firstBrace = text.indexOf("{");
+  const lastBrace = text.lastIndexOf("}");
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
     throw new Error("Unexpected Google Sheets response format");
   }
-  const jsonStr = text.slice(start, end + 1);
-  return JSON.parse(jsonStr) as unknown;
-}
 
-// Turn gviz JSON into an array of row objects keyed by column label
-function parseGvizJson(text: string): Record<string, unknown>[] {
-  const payload = extractJsonPayload(text) as Record<string, unknown>;
-  const table = (payload.table ?? {}) as Record<string, unknown>;
-  const cols = (table.cols ?? []) as Array<{ label?: string; id?: string }>;
-  const rows = (table.rows ?? []) as Array<{ c?: Array<{ v?: unknown }> }>;
+  return text.slice(firstBrace, lastBrace + 1);
+};
 
-  const headers = cols.map((col) => (col.label || col.id || "").toString());
+const normaliseHeader = (column: GvizColumn | undefined, index: number): string => {
+  const label = column?.label ?? column?.id ?? "";
+  const trimmed = typeof label === "string" ? label.trim() : "";
+  return trimmed.length > 0 ? trimmed : `column_${index}`;
+};
+
+const parseGvizJson = (text: string): Record<string, unknown>[] => {
+  const payloadText = extractJsonPayload(text);
+  const payload = JSON.parse(payloadText) as GvizResponse;
+  const table = payload.table ?? {};
+
+  const columns = Array.isArray(table.cols) ? table.cols : [];
+  const headers = columns.map((column, index) => normaliseHeader(column ?? undefined, index));
+
+  const rows = Array.isArray(table.rows) ? table.rows : [];
 
   return rows.map((row) => {
-    const obj: Record<string, unknown> = {};
-    const cells = row.c ?? [];
-    headers.forEach((header, idx) => {
-      const cell = cells[idx];
-      obj[header] = cell?.v ?? "";
-    });
-    return obj;
-  });
-}
+    const cells = Array.isArray(row.c) ? row.c : [];
+    const record: Record<string, unknown> = {};
 
-/**
- * Fetch ALL rows from the *single* data sheet.
- * This is the raw source for submissions, quotas, QC, map, etc.
- */
+    headers.forEach((header, index) => {
+      const cell = cells[index];
+      record[header] = cell?.v ?? "";
+    });
+
+    return record;
+  });
+};
+
 export async function fetchAllSurveyRows(): Promise<Record<string, unknown>[]> {
   if (!SHEET_ID) {
     throw new Error("VITE_GOOGLE_SHEET_ID is not set");
@@ -57,3 +92,5 @@ export async function fetchAllSurveyRows(): Promise<Record<string, unknown>[]> {
   const text = await response.text();
   return parseGvizJson(text);
 }
+
+export type { GvizResponse };
