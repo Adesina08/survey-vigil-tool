@@ -524,13 +524,22 @@ export const buildDashboardData = ({
   analysisRows,
   mapMetadata,
 }: DashboardDataInput): DashboardData => {
+  const safeSubmissions = Array.isArray(submissions) && submissions.length > 0 ? submissions : [];
+
+  console.log("🔍 Building dashboard with submissions:", safeSubmissions.length);
+
+  if (safeSubmissions.length === 0) {
+    console.warn("⚠️ No submissions data available - returning empty dashboard");
+    return createEmptyDashboardData();
+  }
+
   const metricsRows: MetricRow[] = Array.isArray(analysisRows)
     ? (analysisRows as MetricRow[])
-    : (submissions as unknown as MetricRow[]);
+    : (safeSubmissions as unknown as MetricRow[]);
   const requireGpsForApproval = false;
   const metrics = getSubmissionMetrics(metricsRows, requireGpsForApproval);
 
-  const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(submissions);
+  const processedSubmissions: ProcessedSubmissionRow[] = applyQualityChecks(safeSubmissions);
   const totalSubmissions = metrics.total;
   const normalizedMapMetadata = normalizeMapMetadata(mapMetadata);
 
@@ -852,7 +861,7 @@ export const buildDashboardData = ({
     })
     .filter((row) => row.interviewerId.toLowerCase() !== "unknown");
 
-  const userProductivity = buildUserProductivity(submissions);
+  const userProductivity = buildUserProductivity(safeSubmissions);
 
   const rowErrorCounts = getErrorBreakdown(metricsRows);
   const finalErrorCounts: Record<string, number> = { ...errorCounts };
@@ -897,8 +906,8 @@ export const buildDashboardData = ({
     };
   });
 
-  const achievementsByInterviewer: AchievementByInterviewerRow[] = [...totalsByInterviewer.entries()].map(
-    ([interviewerId, total]) => {
+  const achievementsByInterviewer: AchievementByInterviewerRow[] = [...totalsByInterviewer.entries()]
+    .map(([interviewerId, total]) => {
       const approved = approvedByInterviewer.get(interviewerId) ?? 0;
       const notApproved = notApprovedByInterviewer.get(interviewerId) ?? (total - approved);
       const name = interviewerNames.get(interviewerId) ?? "";
@@ -912,13 +921,15 @@ export const buildDashboardData = ({
         total,
         approved,
         notApproved,
-        percentageApproved: total > 0 ? (approved / total) * 100 : 0,
+        percentageApproved: total > 0 ? Number(((approved / total) * 100).toFixed(1)) : 0,
         treatmentPathCount: pathCounts.treatment,
         controlPathCount: pathCounts.control,
         unknownPathCount: pathCounts.unknown,
       };
-    }
-  ).filter((row) => row.interviewerId.toLowerCase() !== "unknown");
+    })
+    .filter((row) => row.interviewerId.toLowerCase() !== "unknown");
+
+  console.log("✅ Achievements by interviewer:", achievementsByInterviewer.length);
 
   const achievementsByLGA: AchievementByLGARow[] = [...totalsByLGA.entries()].map(([key, total]) => {
     const [state, lga] = key.split("|");
@@ -928,17 +939,19 @@ export const buildDashboardData = ({
     const pathCounts = ogstepByLGA.get(key) ?? createEmptyPathCounts();
 
     return {
-      lga,
-      state,
+      lga: lga ?? "Unknown",
+      state: state ?? "Unknown",
       total: computedTotal,
       approved,
       notApproved,
-      percentageApproved: computedTotal > 0 ? (approved / computedTotal) * 100 : 0,
+      percentageApproved: computedTotal > 0 ? Number(((approved / computedTotal) * 100).toFixed(1)) : 0,
       treatmentPathCount: pathCounts.treatment,
       controlPathCount: pathCounts.control,
       unknownPathCount: pathCounts.unknown,
     };
   });
+
+  console.log("✅ Achievements by LGA:", achievementsByLGA.length);
 
   const summary: SummaryData = {
     overallTarget,
@@ -975,7 +988,7 @@ export const buildDashboardData = ({
 
   const normalizedRows: AnalysisRow[] =
     analysisRows ??
-    submissions.map((row) => {
+    safeSubmissions.map((row) => {
       const normalized: AnalysisRow = {};
       Object.entries(row).forEach(([key, value]) => {
         if (typeof key !== "string" || key.length === 0) {
@@ -995,7 +1008,7 @@ export const buildDashboardData = ({
       return normalized;
     });
 
-  return {
+  const finalDashboard: DashboardData = {
     summary,
     statusBreakdown,
     quotaProgress: Number(quotaProgress.toFixed(1)),
@@ -1009,8 +1022,8 @@ export const buildDashboardData = ({
     errorBreakdown,
     achievements: {
       byState: achievementsByState,
-      byInterviewer: achievementsByInterviewer,
-      byLGA: achievementsByLGA,
+      byInterviewer: achievementsByInterviewer.length > 0 ? achievementsByInterviewer : [],
+      byLGA: achievementsByLGA.length > 0 ? achievementsByLGA : [],
     },
     lgas: Array.from(lgaSet)
       .filter((value) => value && value.toLowerCase() !== "unknown")
@@ -1036,5 +1049,55 @@ export const buildDashboardData = ({
     lastUpdated,
     analysisRows: normalizedRows,
   };
+ 
+  console.log("✅ Final dashboard data:", {
+    totalSubmissions: finalDashboard.summary.totalSubmissions,
+    byInterviewer: finalDashboard.achievements.byInterviewer.length,
+    byLGA: finalDashboard.achievements.byLGA.length,
+  });
+
+  return finalDashboard;
 };
+
+function createEmptyDashboardData(): DashboardData {
+  return {
+    summary: {
+      overallTarget: 0,
+      totalSubmissions: 0,
+      approvedSubmissions: 0,
+      approvalRate: 0,
+      notApprovedSubmissions: 0,
+      notApprovedRate: 0,
+      treatmentPathCount: 0,
+      controlPathCount: 0,
+      unknownPathCount: 0,
+    },
+    statusBreakdown: {
+      approved: 0,
+      notApproved: 0,
+    },
+    quotaProgress: 0,
+    quotaByLGA: [],
+    quotaByLGAAge: [],
+    quotaByLGAGender: [],
+    mapSubmissions: [],
+    mapMetadata: normalizeMapMetadata(),
+    userProductivity: [],
+    userProductivityDetailed: [],
+    errorBreakdown: [],
+    achievements: {
+      byState: [],
+      byInterviewer: [],
+      byLGA: [],
+    },
+    lgas: [],
+    filters: {
+      lgas: [],
+      interviewers: [],
+      errorTypes: [],
+    },
+    lastUpdated: "No data available",
+    analysisRows: [],
+  };
+}
 
