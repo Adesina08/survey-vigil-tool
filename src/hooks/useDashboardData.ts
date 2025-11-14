@@ -1,5 +1,5 @@
 // src/hooks/useDashboardData.ts
-import { useQuery } from "@tantml:react-query";
+import { useQuery } from "@tanstack/react-query";
 import { fetchDashboardData } from "@/services/dataSource";
 import type { DashboardData } from "@/lib/dashboardData";
 
