@@ -60,7 +60,7 @@ const getInterviewerName = (row: RawRow): string =>
 
 // ========== Quota builders ==========
 const buildQuotaByLGA = (rows: RawRow[]) => {
-  const map = new Map
+  const map = new Map<
     string,
     { state: string; lga: string; target: number; achieved: number }
   >();
@@ -86,9 +86,15 @@ const buildQuotaByLGA = (rows: RawRow[]) => {
 };
 
 const buildQuotaByLGAGender = (rows: RawRow[]) => {
-  const map = new Map
+  const map = new Map<
     string,
-    { state: string; lga: string; gender: string; target: number; achieved: number }
+    {
+      state: string;
+      lga: string;
+      gender: string;
+      target: number;
+      achieved: number;
+    }
   >();
 
   for (const row of rows) {
@@ -121,9 +127,15 @@ const buildQuotaByLGAAge = (rows: RawRow[]) => {
     return "50+";
   };
 
-  const map = new Map
+  const map = new Map<
     string,
-    { state: string; lga: string; ageGroup: string; target: number; achieved: number }
+    {
+      state: string;
+      lga: string;
+      ageGroup: string;
+      target: number;
+      achieved: number;
+    }
   >();
 
   for (const row of rows) {
@@ -230,7 +242,7 @@ const buildSummary = (
 const buildAchievementsByState = (
   rows: RawRow[]
 ): Array<{ state: string; total: number; approved: number; notApproved: number }> => {
-  const map = new Map
+  const map = new Map<
     string,
     { state: string; total: number; approved: number; notApproved: number }
   >();
@@ -261,7 +273,7 @@ const buildAchievementsByInterviewer = (
   approved: number;
   notApproved: number;
 }> => {
-  const map = new Map
+  const map = new Map<
     string,
     {
       interviewerId: string;
@@ -307,7 +319,7 @@ const buildAchievementsByLGA = (
   approved: number;
   notApproved: number;
 }> => {
-  const map = new Map
+  const map = new Map<
     string,
     {
       lga: string;
@@ -356,7 +368,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   const mapSubmissions = buildMapSubmissions(submissions);
   const summary = buildSummary(submissions, quotaByLGA);
   const errorTypes = inferErrorTypes(submissions);
-  
+
   const achievementsByState = buildAchievementsByState(submissions);
   const achievementsByInterviewer = buildAchievementsByInterviewer(submissions);
   const achievementsByLGA = buildAchievementsByLGA(submissions);
