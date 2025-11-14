@@ -1,6 +1,11 @@
+// src/services/googleSheets.ts
+
 const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID;
 const SHEET_NAME = import.meta.env.VITE_GOOGLE_SHEET_NAME ?? "Form Responses 1";
 
+// Extract the JSON payload from the Google "gviz" response:
+//  /*O_o*/
+//  google.visualization.Query.setResponse({...});
 function extractJsonPayload(text: string): unknown {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
@@ -11,25 +16,30 @@ function extractJsonPayload(text: string): unknown {
   return JSON.parse(jsonStr) as unknown;
 }
 
+// Turn gviz JSON into an array of row objects keyed by column label
 function parseGvizJson(text: string): Record<string, unknown>[] {
   const payload = extractJsonPayload(text) as Record<string, unknown>;
   const table = (payload.table ?? {}) as Record<string, unknown>;
-  const cols = ((table.cols as Array<Record<string, unknown>> | undefined) ?? []).map(
-    (col) => (col.label as string | undefined) ?? (col.id as string | undefined) ?? ""
-  );
-  const rows = (table.rows as Array<Record<string, unknown>> | undefined) ?? [];
+  const cols = (table.cols ?? []) as Array<{ label?: string; id?: string }>;
+  const rows = (table.rows ?? []) as Array<{ c?: Array<{ v?: unknown }> }>;
+
+  const headers = cols.map((col) => (col.label || col.id || "").toString());
 
   return rows.map((row) => {
-    const cells = (row.c as Array<Record<string, unknown> | null> | undefined) ?? [];
-    const entry: Record<string, unknown> = {};
-    cells.forEach((cell, index) => {
-      const header = cols[index] ?? `Column ${index + 1}`;
-      entry[header] = cell?.v ?? "";
+    const obj: Record<string, unknown> = {};
+    const cells = row.c ?? [];
+    headers.forEach((header, idx) => {
+      const cell = cells[idx];
+      obj[header] = cell?.v ?? "";
     });
-    return entry;
+    return obj;
   });
 }
 
+/**
+ * Fetch ALL rows from the *single* data sheet.
+ * This is the raw source for submissions, quotas, QC, map, etc.
+ */
 export async function fetchAllSurveyRows(): Promise<Record<string, unknown>[]> {
   if (!SHEET_ID) {
     throw new Error("VITE_GOOGLE_SHEET_ID is not set");
@@ -47,4 +57,3 @@ export async function fetchAllSurveyRows(): Promise<Record<string, unknown>[]> {
   const text = await response.text();
   return parseGvizJson(text);
 }
-

@@ -15,13 +15,13 @@ interface SummaryData {
 }
 
 interface SummaryCardsProps {
-  data: SummaryData;
+  summary: SummaryData;
 }
 
-export function SummaryCards({ data }: SummaryCardsProps) {
+export function SummaryCards({ summary }: SummaryCardsProps) {
   const formatNumber = (value: number) => value.toLocaleString();
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
-  const knownPathTotal = Math.max(data.treatmentPathCount + data.controlPathCount, 0);
+  const knownPathTotal = Math.max(summary.treatmentPathCount + summary.controlPathCount, 0);
 
   const formatPathHelper = (count: number) => {
     if (knownPathTotal === 0) {
@@ -35,48 +35,48 @@ export function SummaryCards({ data }: SummaryCardsProps) {
   const cards = [
     {
       title: "Target interviews",
-      value: formatNumber(data.overallTarget),
+      value: formatNumber(summary.overallTarget),
       icon: Target,
       variant: "default" as const,
-      helper: `Completion: ${formatPercentage(data.completionRate)}`,
+      helper: `Completion: ${formatPercentage(summary.completionRate)}`,
     },
     {
       title: "Total submissions",
-      value: formatNumber(data.totalSubmissions),
+      value: formatNumber(summary.totalSubmissions),
       icon: AlertCircle,
       variant: "default" as const,
       helper:
-        data.overallTarget > 0
-          ? `${((data.totalSubmissions / data.overallTarget) * 100).toFixed(1)}% of target volume`
+        summary.overallTarget > 0
+          ? `${((summary.totalSubmissions / summary.overallTarget) * 100).toFixed(1)}% of target volume`
           : undefined,
     },
     {
       title: "Approved interviews",
-      value: formatNumber(data.approvedSubmissions),
+      value: formatNumber(summary.approvedSubmissions),
       icon: CheckCircle,
       variant: "success" as const,
-      helper: `Approval rate: ${formatPercentage(data.approvalRate)}`,
+      helper: `Approval rate: ${formatPercentage(summary.approvalRate)}`,
     },
     {
       title: "Flagged interviews",
-      value: formatNumber(data.notApprovedSubmissions),
+      value: formatNumber(summary.notApprovedSubmissions),
       icon: XCircle,
       variant: "destructive" as const,
-      helper: `Flag rate: ${formatPercentage(data.notApprovedRate)}`,
+      helper: `Flag rate: ${formatPercentage(summary.notApprovedRate)}`,
     },
     {
       title: "Treatment path",
-      value: formatNumber(data.treatmentPathCount),
+      value: formatNumber(summary.treatmentPathCount),
       icon: Circle,
       variant: "treatment" as const,
-      helper: formatPathHelper(data.treatmentPathCount),
+      helper: formatPathHelper(summary.treatmentPathCount),
     },
     {
       title: "Control path",
-      value: formatNumber(data.controlPathCount),
+      value: formatNumber(summary.controlPathCount),
       icon: Circle,
       variant: "control" as const,
-      helper: formatPathHelper(data.controlPathCount),
+      helper: formatPathHelper(summary.controlPathCount),
     },
   ];
 

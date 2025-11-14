@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { ExportBar } from "@/components/dashboard/ExportBar";
 import { Button } from "@/components/ui/button";
@@ -7,37 +7,9 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import TabsQCAnalysis from "@/components/TabsQCAnalysis";
 import QualityControl from "./QualityControl";
 
-function filterByLga<T>(rows: T[], lga: string | null): T[] {
-  if (!lga || lga === "all" || lga === "All LGAs") {
-    return rows;
-  }
-
-  return rows.filter((row) => {
-    if (!row || typeof row !== "object") {
-      return false;
-    }
-
-    const record = row as Record<string, unknown>;
-    const candidate =
-      record["lga"] ??
-      record["a3_select_the_lga"] ??
-      record["A3. select the LGA"] ??
-      record["LGA"];
-
-    return candidate === lga;
-  });
-}
-
 const Index = () => {
   const [statusMessage, setStatusMessage] = useState("Loading…");
-  const {
-    data: dashboardData,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useDashboardData({ onStatusChange: setStatusMessage });
+  const { data: dashboardData, isLoading, isFetching, isError, error, refetch } = useDashboardData();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedLga, setSelectedLga] = useState<string | null>(null);
 
@@ -45,7 +17,13 @@ const Index = () => {
     setIsRefreshing(true);
     setStatusMessage("Refreshing…");
     try {
-      await refetch();
+      const result = await refetch();
+      if (!result.error) {
+        const updatedLabel = result.data?.lastUpdated ?? new Date().toLocaleString();
+        setStatusMessage(`Last refreshed: ${updatedLabel}`);
+      } else {
+        setStatusMessage("Refresh failed");
+      }
     } finally {
       setIsRefreshing(false);
     }
@@ -62,13 +40,17 @@ const Index = () => {
     console.log(`Filter changed: ${filterType} = ${value}`);
   };
 
-  const filteredMapSubmissions = useMemo(() => {
-    if (!dashboardData) {
-      return [];
+  useEffect(() => {
+    if (!dashboardData || isLoading || isFetching) {
+      return;
     }
 
-    return filterByLga(dashboardData.mapSubmissions, selectedLga);
-  }, [dashboardData, selectedLga]);
+    if (dashboardData.lastUpdated) {
+      setStatusMessage(`Last refreshed: ${dashboardData.lastUpdated}`);
+    } else {
+      setStatusMessage("Data loaded");
+    }
+  }, [dashboardData, isFetching, isLoading]);
 
   useEffect(() => {
     if (!selectedLga || !dashboardData) {
@@ -90,19 +72,6 @@ const Index = () => {
     };
   }, [handleRefresh]);
 
-  useEffect(() => {
-    if (!dashboardData || isLoading || isFetching) {
-      return;
-    }
-
-    setStatusMessage((previous) => {
-      if (/loading/i.test(previous) || /refreshing/i.test(previous)) {
-        return `Last refreshed: ${new Date().toLocaleString()}`;
-      }
-      return previous;
-    });
-  }, [dashboardData, isFetching, isLoading]);
-
   if (isLoading && !dashboardData) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -114,8 +83,7 @@ const Index = () => {
     );
   }
 
-  const errorMessage =
-    error?.message ?? "An unexpected error occurred while connecting to the dashboard service.";
+  const errorMessage = error?.message ?? "An unexpected error occurred while connecting to the dashboard service.";
 
   if (isError || !dashboardData?.summary) {
     return (
@@ -125,9 +93,7 @@ const Index = () => {
             <AlertCircle className="h-8 w-8 text-destructive" />
           </div>
           <h2 className="text-lg font-semibold">Unable to load dashboard data</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {errorMessage}
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{errorMessage}</p>
           <Button className="mt-4" onClick={() => refetch()}>
             Retry
           </Button>
@@ -152,7 +118,6 @@ const Index = () => {
           qualityControl={
             <QualityControl
               dashboardData={dashboardData}
-              filteredMapSubmissions={filteredMapSubmissions}
               onFilterChange={handleFilterChange}
               selectedLga={selectedLga}
             />

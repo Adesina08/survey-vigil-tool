@@ -58,7 +58,7 @@ const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
 };
 
 interface QualityControlContentProps {
-  dashboardData: Partial<DashboardData>;
+  dashboardData: Partial<DashboardData> & { lgas?: string[] };
   selectedLga: string | null;
   onFilterChange: (filterType: string, value: string) => void;
 }

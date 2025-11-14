@@ -199,6 +199,7 @@ export interface DashboardData {
     byInterviewer: AchievementByInterviewerRow[];
     byLGA: AchievementByLGARow[];
   };
+  lgas: string[];
   filters: {
     lgas: string[];
     interviewers: Array<{
@@ -1011,6 +1012,9 @@ export const buildDashboardData = ({
       byInterviewer: achievementsByInterviewer,
       byLGA: achievementsByLGA,
     },
+    lgas: Array.from(lgaSet)
+      .filter((value) => value && value.toLowerCase() !== "unknown")
+      .sort(),
     filters: {
       lgas: Array.from(lgaSet)
         .filter((value) => value && value.toLowerCase() !== "unknown")

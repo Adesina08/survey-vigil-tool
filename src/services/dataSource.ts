@@ -1,129 +1,526 @@
-import {
-  HEADER_ALIASES as BASE_HEADER_ALIASES,
-  mapSheetRowsToSubmissions,
-  normaliseHeaderKey,
-} from "@/lib/googleSheets";
-import { buildDashboardData, type AnalysisRow, type DashboardData } from "@/lib/dashboardData";
+// src/services/dataSource.ts
 import { fetchAllSurveyRows } from "./googleSheets";
+import { normalizeMapMetadata } from "@/lib/mapMetadata";
+import type { AnalysisRow, DashboardData, ErrorBreakdownRow } from "@/lib/dashboardData";
+
+type RawRow = Record<string, unknown>;
 
 const DEFAULT_STATE = "Ogun State";
 
-const ADDITIONAL_HEADER_ALIASES: Record<string, string> = {
-  ward: "Ward",
-  wardname: "Ward",
+const asNumber = (value: unknown): number => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
 };
 
-const headerAliasLookup: Record<string, string> = {
-  ...Object.fromEntries(
-    Object.entries(ADDITIONAL_HEADER_ALIASES).map(([key, value]) => [normaliseHeaderKey(key), value])
-  ),
-  ...BASE_HEADER_ALIASES,
-};
+const asString = (value: unknown): string =>
+  value === undefined || value === null ? "" : String(value);
 
-const aliasKey = (key: string): string => {
-  const normalised = normaliseHeaderKey(key);
-  if (!normalised) return key;
-  const canonical = headerAliasLookup[normalised];
-  return canonical ?? key;
-};
-
-const applyAliases = (rows: Record<string, unknown>[]) =>
-  rows.map((row) => {
-    const output: Record<string, unknown> = {};
-    Object.entries(row).forEach(([key, value]) => {
-      const canonicalKey = aliasKey(key);
-      output[canonicalKey] = value;
-    });
-    return output;
-  });
-
-const parseNumeric = (value: unknown): number | null => {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim().length > 0) {
-    const cleaned = value.replace(/[₦,]/g, "");
-    const parsed = Number.parseFloat(cleaned);
-    return Number.isFinite(parsed) ? parsed : null;
+const getFirstTextValue = (row: RawRow, keys: string[]): string | null => {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
   }
   return null;
 };
 
-const normaliseConsent = (value: unknown): string | undefined => {
-  const text = String(value ?? "").trim().toLowerCase();
-  if (!text) return undefined;
-  if (text.startsWith("y") || text === "approved" || text === "true") return "Yes";
-  if (text.startsWith("n")) return "No";
-  return undefined;
+const getLga = (row: RawRow): string =>
+  (
+    getFirstTextValue(row, [
+      "A3. select the LGA",
+      "A3. Select the LGA",
+      "A3. select the lga",
+      "lga",
+      "LGA",
+    ]) ?? ""
+  ).trim();
+
+const getState = (row: RawRow): string => {
+  const value = asString(row["State"]);
+  return value.trim().length > 0 ? value.trim() : DEFAULT_STATE;
 };
 
-const normaliseSex = (value: unknown): string | undefined => {
-  const text = String(value ?? "").trim().toLowerCase();
-  if (!text) return undefined;
-  if (text.startsWith("m")) return "Male";
-  if (text.startsWith("f")) return "Female";
-  return undefined;
+const getApproval = (row: RawRow): string => asString(row["Approval"]).trim();
+
+const getSex = (row: RawRow): string => asString(row["A7. Sex"]).trim();
+
+const getAge = (row: RawRow): number => asNumber(row["A8. Age"]);
+
+const getLat = (row: RawRow): number =>
+  asNumber(row["_A5. GPS Coordinates_latitude"] ?? row["Latitude"]);
+
+const getLng = (row: RawRow): number =>
+  asNumber(row["_A5. GPS Coordinates_longitude"] ?? row["Longitude"]);
+
+const getInterviewerId = (row: RawRow): string =>
+  (
+    getFirstTextValue(row, [
+      "A1. Enumerator ID",
+      "Interviewer ID",
+      "interviewer_id",
+      "enumerator_id",
+      "username",
+    ]) ?? "Unknown"
+  ).trim() || "Unknown";
+
+const getOgstepResponse = (row: RawRow): string | null =>
+  getFirstTextValue(row, [
+    "B2. Did you participate in OGSTEP?",
+    "b2_did_you_participate_in_ogstep",
+    "did_you_participate_in_ogstep",
+    "ogstep",
+    "ogstep_participation",
+    "ogstep_response",
+  ]);
+
+type OgstepPath = "treatment" | "control" | "unknown";
+
+const determineOgstepPath = (response: string | null): OgstepPath => {
+  if (!response) return "unknown";
+  const lower = response.trim().toLowerCase();
+  if (!lower) return "unknown";
+  if (lower.startsWith("y") || lower === "1" || lower === "true" || lower === "yes") return "treatment";
+  if (lower.startsWith("n") || lower === "0" || lower === "false" || lower === "no") return "control";
+  return "unknown";
 };
 
-const ensureString = (value: unknown) => {
-  if (value === undefined || value === null) return value;
-  return String(value);
-};
+const directionKeys = [
+  "Direction",
+  "Location Directions",
+  "Directions to Location",
+  "Directions to location",
+  "Direction to Location",
+  "Direction to location",
+  "Directions / Landmark",
+  "Nearest Landmark / Directions",
+];
 
-const deriveInterviewDuration = (row: Record<string, unknown>) => {
-  const existing = parseNumeric(row["Interview Duration (minutes)"] ?? row["Interview Length (mins)"]);
-  if (typeof existing === "number") return existing;
-  const start = row.start ?? row.starttime;
-  const end = row.end ?? row.endtime;
-  if (typeof start !== "string" || typeof end !== "string") return null;
-  const startDate = new Date(start);
-  const endDate = new Date(end);
-  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) return null;
-  return Math.round((endDate.getTime() - startDate.getTime()) / 60000);
-};
-
-const normaliseRows = (rows: Record<string, unknown>[]) =>
-  rows.map((row) => {
-    const normalised: Record<string, unknown> = { ...row };
-    const consent = normaliseConsent(normalised["A6. Consent to participate"]);
-    if (consent) normalised["A6. Consent to participate"] = consent;
-    const sex = normaliseSex(normalised["A7. Sex"]);
-    if (sex) normalised["A7. Sex"] = sex;
-    const numericKeys = [
-      "A8. Age",
-      "latitude",
-      "longitude",
-      "Latitude",
-      "Longitude",
-      "_A5. GPS Coordinates_latitude",
-      "_A5. GPS Coordinates_longitude",
-      "C5. Monthly income (₦)",
-      "E5.1. Monthly revenue",
-      "E5.2. Monthly cost",
-    ];
-    numericKeys.forEach((key) => {
-      if (!(key in normalised)) return;
-      const parsed = parseNumeric(normalised[key]);
-      normalised[key] = parsed ?? null;
-    });
-    const derivedDuration = deriveInterviewDuration(normalised);
-    if (typeof derivedDuration === "number") normalised["Interview Duration (minutes)"] = derivedDuration;
-    if (!normalised.State || String(normalised.State).trim().length === 0) normalised.State = DEFAULT_STATE;
-    if ("Respondent phone number" in normalised) {
-      normalised["Respondent phone number"] = ensureString(normalised["Respondent phone number"]);
+const getDirections = (row: RawRow): string | null => {
+  for (const key of directionKeys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
     }
-    return normalised;
+  }
+
+  for (const [key, value] of Object.entries(row)) {
+    if (!key.toLowerCase().includes("direction")) continue;
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+
+  return null;
+};
+
+const parseTimestamp = (row: RawRow): Date | null => {
+  const candidates: Array<string | null | undefined> = [
+    asString(row["_submission_time"]).trim() || null,
+  ];
+
+  const submissionDate = getFirstTextValue(row, ["Submission Date", "submission_date"]);
+  const submissionTime = getFirstTextValue(row, ["Submission Time", "submission_time"]);
+  if (submissionDate) {
+    if (submissionTime) {
+      candidates.push(`${submissionDate}T${submissionTime}`);
+      candidates.push(`${submissionDate} ${submissionTime}`);
+    } else {
+      candidates.push(submissionDate);
+    }
+  }
+
+  candidates.push(
+    getFirstTextValue(row, ["end", "endtime"]),
+    getFirstTextValue(row, ["start", "starttime"]),
+  );
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const parsed = new Date(candidate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+    const zoned = new Date(`${candidate}Z`);
+    if (!Number.isNaN(zoned.getTime())) {
+      return zoned;
+    }
+  }
+
+  return null;
+};
+
+const formatTimestamp = (timestamp: Date | null): string => {
+  if (!timestamp) {
+    return "Timestamp unavailable";
+  }
+
+  return timestamp.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const collectErrorInfo = (rows: RawRow[]) => {
+  const set = new Set<string>();
+  const counts = new Map<string, number>();
+
+  rows.forEach((row) => {
+    Object.entries(row).forEach(([key, value]) => {
+      if (!key.startsWith("QC_FLAG_") && !key.startsWith("QC_WARN_")) {
+        return;
+      }
+      const numeric = asNumber(value);
+      if (numeric > 0) {
+        set.add(key);
+        counts.set(key, (counts.get(key) ?? 0) + numeric);
+      }
+    });
   });
 
-const prepareRows = (rawRows: Record<string, unknown>[]): Record<string, unknown>[] =>
-  normaliseRows(applyAliases(rawRows));
+  return { errorTypes: Array.from(set).sort(), errorCounts: counts };
+};
 
-export async function fetchDashboardData(): Promise<DashboardData> {
-  const rawRows = await fetchAllSurveyRows();
-  const preparedRows = prepareRows(rawRows);
-  const submissions = mapSheetRowsToSubmissions(preparedRows, { defaultState: DEFAULT_STATE });
+const buildErrorBreakdown = (counts: Map<string, number>): ErrorBreakdownRow[] => {
+  const total = Array.from(counts.values()).reduce((sum, value) => sum + value, 0);
+  if (total === 0) {
+    return [];
+  }
 
-  return buildDashboardData({
-    submissions,
-    analysisRows: preparedRows as AnalysisRow[],
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([errorType, count]) => ({
+      errorType,
+      count,
+      percentage: total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0,
+    }));
+};
+
+const buildQuotaByLGA = (rows: RawRow[]) => {
+  const map = new Map<string, { state: string; lga: string; achieved: number }>();
+
+  rows.forEach((row) => {
+    const lga = getLga(row);
+    if (!lga) return;
+    const state = getState(row);
+    const key = `${state}|${lga}`;
+    if (!map.has(key)) {
+      map.set(key, { state, lga, achieved: 0 });
+    }
+    const entry = map.get(key)!;
+    if (getApproval(row).toLowerCase() === "approved") {
+      entry.achieved += 1;
+    }
   });
+
+  return Array.from(map.values())
+    .map(({ state, lga, achieved }) => ({
+      state,
+      lga,
+      target: 0,
+      achieved,
+      balance: 0,
+    }))
+    .sort((a, b) => a.lga.localeCompare(b.lga));
+};
+
+const ageBand = (age: number): string => {
+  if (!Number.isFinite(age)) return "Unknown";
+  if (age < 18) return "<18";
+  if (age <= 24) return "18–24";
+  if (age <= 35) return "25–35";
+  if (age <= 49) return "36–49";
+  return "50+";
+};
+
+const buildQuotaByLGAAge = (rows: RawRow[]) => {
+  const map = new Map<string, { state: string; lga: string; ageGroup: string; achieved: number }>();
+
+  rows.forEach((row) => {
+    const lga = getLga(row);
+    if (!lga) return;
+    const state = getState(row);
+    const group = ageBand(getAge(row));
+    const key = `${state}|${lga}|${group}`;
+    if (!map.has(key)) {
+      map.set(key, { state, lga, ageGroup: group, achieved: 0 });
+    }
+    const entry = map.get(key)!;
+    if (getApproval(row).toLowerCase() === "approved") {
+      entry.achieved += 1;
+    }
+  });
+
+  return Array.from(map.values()).map(({ state, lga, ageGroup, achieved }) => ({
+    state,
+    lga,
+    ageGroup,
+    target: 0,
+    achieved,
+    balance: 0,
+  }));
+};
+
+const buildQuotaByLGAGender = (rows: RawRow[]) => {
+  const map = new Map<string, { state: string; lga: string; gender: string; achieved: number }>();
+
+  rows.forEach((row) => {
+    const lga = getLga(row);
+    if (!lga) return;
+    const state = getState(row);
+    const gender = getSex(row) || "Unknown";
+    const key = `${state}|${lga}|${gender}`;
+    if (!map.has(key)) {
+      map.set(key, { state, lga, gender, achieved: 0 });
+    }
+    const entry = map.get(key)!;
+    if (getApproval(row).toLowerCase() === "approved") {
+      entry.achieved += 1;
+    }
+  });
+
+  return Array.from(map.values()).map(({ state, lga, gender, achieved }) => ({
+    state,
+    lga,
+    gender,
+    target: 0,
+    achieved,
+    balance: 0,
+  }));
+};
+
+const buildMapSubmissions = (rows: RawRow[]): DashboardData["mapSubmissions"] => {
+  const submissions: DashboardData["mapSubmissions"] = [];
+
+  rows.forEach((row) => {
+    const lat = getLat(row);
+    const lng = getLng(row);
+    if (!lat || !lng) {
+      return;
+    }
+
+    const interviewerId = getInterviewerId(row);
+    const ogstepResponse = getOgstepResponse(row);
+    const ogstepPath = determineOgstepPath(ogstepResponse);
+    const approval = getApproval(row).toLowerCase() === "approved" ? "approved" : "not_approved";
+    const timestamp = parseTimestamp(row);
+
+    const errorTypes = Object.entries(row)
+      .filter(([key, value]) => (key.startsWith("QC_FLAG_") || key.startsWith("QC_WARN_")) && asNumber(value) > 0)
+      .map(([key]) => key)
+      .sort();
+
+    const submissionId =
+      asString(row["_uuid"]).trim() || asString(row["_id"]).trim() || asString(row["_index"]).trim() || `${lat},${lng}`;
+
+    submissions.push({
+      id: submissionId,
+      lat,
+      lng,
+      interviewerId,
+      interviewerName: interviewerId,
+      interviewerLabel: interviewerId,
+      lga: getLga(row),
+      state: getState(row),
+      errorTypes,
+      timestamp: formatTimestamp(timestamp),
+      status: approval,
+      ogstepPath,
+      ogstepResponse: ogstepResponse ?? null,
+      directions: getDirections(row),
+    });
+  });
+
+  return submissions;
+};
+
+const buildAchievementsByState = (rows: RawRow[]) => {
+  const map = new Map<
+    string,
+    {
+      total: number;
+      approved: number;
+      notApproved: number;
+      treatmentPathCount: number;
+      controlPathCount: number;
+      unknownPathCount: number;
+    }
+  >();
+
+  rows.forEach((row) => {
+    const state = getState(row);
+    const approval = getApproval(row).toLowerCase() === "approved";
+    const ogstepResponse = getOgstepResponse(row);
+    const ogstepPath = determineOgstepPath(ogstepResponse);
+
+    if (!map.has(state)) {
+      map.set(state, {
+        total: 0,
+        approved: 0,
+        notApproved: 0,
+        treatmentPathCount: 0,
+        controlPathCount: 0,
+        unknownPathCount: 0,
+      });
+    }
+
+    const entry = map.get(state)!;
+    entry.total += 1;
+    if (approval) {
+      entry.approved += 1;
+    } else {
+      entry.notApproved += 1;
+    }
+
+    if (ogstepPath === "treatment") entry.treatmentPathCount += 1;
+    else if (ogstepPath === "control") entry.controlPathCount += 1;
+    else entry.unknownPathCount += 1;
+  });
+
+  return Array.from(map.entries()).map(([state, value]) => ({
+    state,
+    total: value.total,
+    approved: value.approved,
+    notApproved: value.notApproved,
+    percentageApproved: value.total > 0 ? Number(((value.approved / value.total) * 100).toFixed(1)) : 0,
+    treatmentPathCount: value.treatmentPathCount,
+    controlPathCount: value.controlPathCount,
+    unknownPathCount: value.unknownPathCount,
+  }));
+};
+
+const buildFilters = (rows: RawRow[], errorTypes: string[]) => {
+  const lgas = new Set<string>();
+  const interviewers = new Map<string, { id: string; name: string; label: string }>();
+
+  rows.forEach((row) => {
+    const lga = getLga(row);
+    if (lga) {
+      lgas.add(lga);
+    }
+
+    const interviewerId = getInterviewerId(row);
+    if (!interviewerId || interviewerId.toLowerCase() === "unknown") {
+      return;
+    }
+
+    if (!interviewers.has(interviewerId)) {
+      interviewers.set(interviewerId, {
+        id: interviewerId,
+        name: interviewerId,
+        label: interviewerId,
+      });
+    }
+  });
+
+  return {
+    lgas: Array.from(lgas).sort((a, b) => a.localeCompare(b)),
+    interviewers: Array.from(interviewers.values()).sort((a, b) => a.id.localeCompare(b.id)),
+    errorTypes,
+  };
+};
+
+const computeLastUpdated = (rows: RawRow[]): { label: string; summaryValue: string | null } => {
+  let latest: Date | null = null;
+  rows.forEach((row) => {
+    const timestamp = parseTimestamp(row);
+    if (!timestamp) return;
+    if (!latest || timestamp > latest) {
+      latest = timestamp;
+    }
+  });
+
+  if (!latest) {
+    return { label: "No data available", summaryValue: null };
+  }
+
+  return {
+    label: formatTimestamp(latest),
+    summaryValue: latest.toISOString(),
+  };
+};
+
+/**
+ * Main entry: this replaces the old Apps Script /api/apps-script-based loader.
+ * Everything now comes from the single Google Sheet.
+ */
+export async function fetchDashboardData(): Promise<DashboardData & { lgas: string[] }> {
+  const submissions = (await fetchAllSurveyRows()) as AnalysisRow[];
+
+  const quotaByLGA = buildQuotaByLGA(submissions);
+  const quotaByLGAAge = buildQuotaByLGAAge(submissions);
+  const quotaByLGAGender = buildQuotaByLGAGender(submissions);
+  const mapSubmissions = buildMapSubmissions(submissions);
+  const { errorTypes, errorCounts } = collectErrorInfo(submissions);
+  const errorBreakdown = buildErrorBreakdown(errorCounts);
+  const achievementsByState = buildAchievementsByState(submissions);
+  const filters = buildFilters(submissions, errorTypes);
+  const lastUpdatedInfo = computeLastUpdated(submissions);
+
+  const totalSubmissions = submissions.length;
+  const approvedSubmissions = submissions.filter((row) => getApproval(row).toLowerCase() === "approved").length;
+  const notApprovedSubmissions = totalSubmissions - approvedSubmissions;
+
+  const overallTarget = quotaByLGA.reduce((sum, row) => sum + row.target, 0);
+  const approvalRate =
+    totalSubmissions > 0 ? Number(((approvedSubmissions / totalSubmissions) * 100).toFixed(1)) : 0;
+  const notApprovedRate =
+    totalSubmissions > 0 ? Number(((notApprovedSubmissions / totalSubmissions) * 100).toFixed(1)) : 0;
+
+  const pathTotals = submissions.reduce(
+    (acc, row) => {
+      const path = determineOgstepPath(getOgstepResponse(row));
+      if (path === "treatment") acc.treatment += 1;
+      else if (path === "control") acc.control += 1;
+      else acc.unknown += 1;
+      return acc;
+    },
+    { treatment: 0, control: 0, unknown: 0 },
+  );
+
+  const summary: DashboardData["summary"] = {
+    overallTarget,
+    totalSubmissions,
+    approvedSubmissions,
+    approvalRate,
+    notApprovedSubmissions,
+    notApprovedRate,
+    latestSubmissionTime: lastUpdatedInfo.summaryValue,
+    treatmentPathCount: pathTotals.treatment,
+    controlPathCount: pathTotals.control,
+    unknownPathCount: pathTotals.unknown,
+  };
+
+  const quotaProgress = overallTarget > 0 ? Number(((approvedSubmissions / overallTarget) * 100).toFixed(1)) : 0;
+
+  const dashboardData = {
+    summary,
+    statusBreakdown: {
+      approved: approvedSubmissions,
+      notApproved: notApprovedSubmissions,
+    },
+    quotaProgress,
+    quotaByLGA,
+    quotaByLGAAge,
+    quotaByLGAGender,
+    mapSubmissions,
+    mapMetadata: normalizeMapMetadata(),
+    userProductivity: [],
+    userProductivityDetailed: [],
+    errorBreakdown,
+    achievements: {
+      byState: achievementsByState,
+      byInterviewer: [],
+      byLGA: [],
+    },
+    filters,
+    lastUpdated: lastUpdatedInfo.label,
+    analysisRows: submissions,
+    lgas: filters.lgas,
+  } satisfies DashboardData & { lgas: string[] };
+
+  return dashboardData;
 }
-
