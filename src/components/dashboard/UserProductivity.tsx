@@ -37,20 +37,21 @@ interface InterviewerData {
 }
 
 interface UserProductivityProps {
-  data: InterviewerData[];
-  errorTypes?: string[];
-}
-
-interface UserProductivityProps {
-  data?: InterviewerData[];      // 👈 make it optional
+  data?: InterviewerData[];      // 👈 Optional
   errorTypes?: string[];
 }
 
 export function UserProductivity({ data = [], errorTypes = [] }: UserProductivityProps) {
-  // 👆 default to [] if data is undefined, and [] if errorTypes is undefined
+  // 👇 Safely handle undefined/null data
+  const safeData = Array.isArray(data) ? data : [];
+  const safeErrorTypes = Array.isArray(errorTypes) ? errorTypes : [];
 
   const rankedProductivity = useMemo(() => {
-    const normalised = data.map((entry) => {
+    if (safeData.length === 0) {
+      return [];
+    }
+
+    const normalised = safeData.map((entry) => {
       const total = Math.max(entry.totalSubmissions ?? 0, 0);
       const valid = Math.max(entry.validSubmissions ?? 0, 0);
       const invalidFromSource = Math.max(entry.invalidSubmissions ?? 0, 0);
@@ -82,8 +83,7 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
     };
 
     return normalised.sort(compare);
-  }, [data]);
-
+  }, [safeData]);
 
   const [sortState, setSortState] = useState<{ column: string; direction: "asc" | "desc" }>(
     () => ({ column: "default", direction: "desc" })
@@ -178,16 +178,18 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
   };
 
   const errorColumns = useMemo(() => {
-    const unique = new Set<string>(errorTypes ?? []);
-    data.forEach((row) => {
-      Object.keys(row.errors).forEach((errorType) => {
-        unique.add(errorType);
-      });
+    const unique = new Set<string>(safeErrorTypes);
+    safeData.forEach((row) => {
+      if (row.errors) {
+        Object.keys(row.errors).forEach((errorType) => {
+          unique.add(errorType);
+        });
+      }
     });
     return Array.from(unique)
       .filter((value): value is string => typeof value === "string" && value.length > 0)
       .sort((a, b) => a.localeCompare(b));
-  }, [data, errorTypes]);
+  }, [safeData, safeErrorTypes]);
 
   const chartData = useMemo(
     () =>
@@ -246,6 +248,30 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
         invalid: topPerformer.invalidSubmissions,
       }
     : { total: 0, valid: 0, invalid: 0 };
+
+  // 👇 Show empty state if no data
+  if (safeData.length === 0) {
+    return (
+      <div className="space-y-6 fade-in">
+        <Card className="overflow-hidden border-none shadow-lg shadow-primary/20">
+          <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
+            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+              <Users className="h-5 w-5" />
+              User Productivity Rankings
+            </CardTitle>
+            <p className="text-sm text-primary-foreground/80">
+              Track interviewer performance, highlight top performers, and quickly spot where support is needed.
+            </p>
+          </CardHeader>
+          <CardContent className="bg-card/60 p-6">
+            <div className="flex items-center justify-center py-12 text-muted-foreground">
+              <p>No productivity data available</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 fade-in">
@@ -555,4 +581,3 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
     </div>
   );
 }
-
