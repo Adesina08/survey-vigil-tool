@@ -280,10 +280,16 @@ const Analysis = () => {
       return null;
     }
 
+    const labels = analysis.chart.labels ?? [];
+    const datasets = analysis.chart.datasets ?? [];
+    if (labels.length === 0 || datasets.length === 0) {
+      return null;
+    }
+
     return {
       data: {
-        labels: analysis.chart.labels,
-        datasets: analysis.chart.datasets.map((dataset) => ({
+        labels,
+        datasets: datasets.map((dataset) => ({
           ...dataset,
           borderRadius: 6,
         })),
@@ -438,7 +444,11 @@ const Analysis = () => {
             <div>
               <h2 className="text-xl font-semibold">Results</h2>
               <p className="text-sm text-muted-foreground">
-                {analysis.metadata.rowCount.toLocaleString()} interviews included. Filters: {analysis.metadata.appliedFilters.join(", ")}
+                {(analysis.metadata?.rowCount ?? 0).toLocaleString()} interviews included. Filters: {(
+                  analysis.metadata?.appliedFilters ?? []
+                )
+                  .filter((value) => typeof value === "string" && value.trim().length > 0)
+                  .join(", ") || "None"}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -451,7 +461,7 @@ const Analysis = () => {
             </div>
           </div>
 
-          {analysis.insights.length > 0 && (
+          {(analysis.insights ?? []).length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Summary insights</CardTitle>
@@ -461,7 +471,7 @@ const Analysis = () => {
               </CardHeader>
               <CardContent>
                 <ul className="list-disc space-y-2 pl-5 text-sm">
-                  {analysis.insights.map((insight, index) => (
+                  {(analysis.insights ?? []).map((insight, index) => (
                     <li key={index}>{insight}</li>
                   ))}
                 </ul>
@@ -474,7 +484,7 @@ const Analysis = () => {
               <CardHeader>
                 <CardTitle>Visual comparison</CardTitle>
                 <CardDescription>
-                  {analysis.chart?.sideBreak} split by treatment pathway.
+                  {analysis.chart?.sideBreak ?? "Comparison"} split by treatment pathway.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -484,7 +494,7 @@ const Analysis = () => {
           )}
 
           <div ref={tableContainerRef} className="space-y-6">
-            {analysis.tables.map((table) => (
+            {(analysis.tables ?? []).map((table) => (
               <Card key={table.sideBreak} className="overflow-hidden">
                 <CardHeader>
                   <CardTitle>{table.title}</CardTitle>
