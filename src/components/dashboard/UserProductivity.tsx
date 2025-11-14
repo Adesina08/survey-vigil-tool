@@ -41,7 +41,14 @@ interface UserProductivityProps {
   errorTypes?: string[];
 }
 
-export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
+interface UserProductivityProps {
+  data?: InterviewerData[];      // 👈 make it optional
+  errorTypes?: string[];
+}
+
+export function UserProductivity({ data = [], errorTypes = [] }: UserProductivityProps) {
+  // 👆 default to [] if data is undefined, and [] if errorTypes is undefined
+
   const rankedProductivity = useMemo(() => {
     const normalised = data.map((entry) => {
       const total = Math.max(entry.totalSubmissions ?? 0, 0);
@@ -76,6 +83,7 @@ export function UserProductivity({ data, errorTypes }: UserProductivityProps) {
 
     return normalised.sort(compare);
   }, [data]);
+
 
   const [sortState, setSortState] = useState<{ column: string; direction: "asc" | "desc" }>(
     () => ({ column: "default", direction: "desc" })
