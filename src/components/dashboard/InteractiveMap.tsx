@@ -32,12 +32,16 @@ interface Submission {
   lat: number;
   lng: number;
   interviewerId: string;
-  // Names no longer used anywhere
+  interviewerLabel?: string;
   lga: string;
   state: string;
   errorTypes: string[];
+  qcFlags?: string[];
+  otherFlags?: string[];
   timestamp: string;
   status: "approved" | "not_approved";
+  approvalLabel?: string | null;
+  approvalSource?: string | null;
   ogstepPath: "treatment" | "control" | "unknown";
   ogstepResponse: string | null;
   directions: string | null;
@@ -88,6 +92,15 @@ const getApprovalMetadata = (submission: Submission) => {
 
 const getMarkerColor = (submission: Submission, mode: ColorMode) =>
   mode === "approval" ? getApprovalMetadata(submission).color : getPathMetadata(submission).color;
+
+const isQualityFlag = (code: string) => /^QC_(FLAG|WARN)_/i.test(code);
+
+const formatColumnLabel = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 
 const MARKER_DIAMETER = 18;
 const MARKER_BORDER_WIDTH = 3;
@@ -228,45 +241,119 @@ const renderNodeToPng = async (node: HTMLElement): Promise<string> => {
   }
 };
 
+const waitForTileLayerToRender = async (tileLayer: L.TileLayer | null) => {
+  if (!tileLayer) {
+    return;
+  }
+
+  const internalTileLayer = tileLayer as L.TileLayer & { _loading?: boolean };
+
+  if (!internalTileLayer._loading) {
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    let resolved = false;
+
+    const cleanup = () => {
+      if (resolved) {
+        return;
+      }
+      resolved = true;
+      tileLayer.off("load", handleLoad);
+      tileLayer.off("tileload", handleTileLoad);
+      resolve();
+    };
+
+    const handleLoad = () => {
+      cleanup();
+    };
+
+    const handleTileLoad = () => {
+      if (!internalTileLayer._loading) {
+        cleanup();
+      }
+    };
+
+    tileLayer.on("load", handleLoad);
+    tileLayer.on("tileload", handleTileLoad);
+
+    window.setTimeout(() => {
+      cleanup();
+    }, 1500);
+  });
+};
+
 const createPopupHtml = (submission: Submission): string => {
   const statusLabel = submission.status === "approved" ? "Approved" : "Not Approved";
   const statusColor = submission.status === "approved" ? "#16a34a" : "#dc2626";
   const pathMetadata = getPathMetadata(submission);
-  const enumeratorLabel = escapeHtml(`Enumerator ${submission.interviewerId}`);
+  const enumeratorLabel = escapeHtml(
+    submission.interviewerLabel && submission.interviewerLabel.length > 0
+      ? submission.interviewerLabel
+      : `Enumerator ${submission.interviewerId}`,
+  );
+  const stateLabel = escapeHtml(submission.state);
   const lgaLabel = escapeHtml(submission.lga);
   const timestampLabel = escapeHtml(submission.timestamp);
   const pathLabel = escapeHtml(pathMetadata.label);
+  const approvalLabel = escapeHtml(submission.approvalLabel ?? statusLabel);
+  const approvalSourceLabel = escapeHtml(
+    submission.approvalSource ? formatColumnLabel(submission.approvalSource) : "Approval",
+  );
   const statusLabelEscaped = escapeHtml(statusLabel);
+  const ogstepResponse = submission.ogstepResponse ? escapeHtml(submission.ogstepResponse) : null;
   const rawDirection = submission.directions?.trim() ?? "";
   const directionsHtml =
-    rawDirection.length > 0
+    rawDirection.length > 0 && isLikelyUrl(rawDirection)
       ? `<a href="${escapeHtml(rawDirection)}" target="_blank" rel="noopener noreferrer" style="color:#2563eb;font-weight:600;text-decoration:underline;">Direction link</a>`
-      : '<span>Direction link (unavailable)</span>';
-  const errorsSection =
-    submission.errorTypes.length
-      ? `<div style="margin-top:8px;">
-           <div style="font-weight:600;">Error Types:</div>
-           <ul style="margin:6px 0 0 16px; padding:0; font-size:12px;">
-             ${submission.errorTypes
-               .map((e) => `<li>${escapeHtml(formatErrorLabel(e))}</li>`)
-               .join("")}
+      : rawDirection.length > 0
+        ? escapeHtml(rawDirection)
+        : "<span>Direction link (unavailable)</span>";
+
+  const qcFlags = (submission.qcFlags ?? submission.errorTypes.filter((code) => isQualityFlag(code))).map(
+    (code) => formatErrorLabel(code),
+  );
+  const otherFlags = (submission.otherFlags ?? submission.errorTypes.filter((code) => !isQualityFlag(code))).map(
+    (code) => formatErrorLabel(code),
+  );
+
+  const renderFlagList = (title: string, items: string[]) =>
+    items.length
+      ? `<div style="display:flex;flex-direction:column;gap:4px;">
+           <div style="font-weight:600;">${escapeHtml(title)} (${items.length})</div>
+           <ul style="margin:0 0 0 16px;padding:0;display:flex;flex-direction:column;gap:2px;font-size:12px;">
+             ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
            </ul>
          </div>`
       : "";
 
+  const flagsSection = [
+    renderFlagList("QC Flags", qcFlags),
+    renderFlagList("Other Flags", otherFlags),
+  ]
+    .filter((section) => section.length > 0)
+    .join("\n");
+
   return `
-    <div style="min-width:220px;display:flex;flex-direction:column;gap:8px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
+    <div style="min-width:240px;display:flex;flex-direction:column;gap:10px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
       <div style="display:flex;flex-direction:column;gap:2px;">
         <div style="font-weight:700;color:#2563eb;">${enumeratorLabel}</div>
+        <div style="font-size:12px;color:#4b5563;">${stateLabel ? `${stateLabel} · ` : ""}${lgaLabel}</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px;">
-        <div><span style="font-weight:600;">LGA:</span> ${lgaLabel}</div>
-        <div><span style="font-weight:600;">Direction:</span> ${directionsHtml}</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div><span style="font-weight:600;">${approvalSourceLabel}:</span> <span style="font-weight:700;color:${statusColor};">${approvalLabel}</span></div>
+        <div><span style="font-weight:600;">Status (normalised):</span> <span style="font-weight:700;color:${statusColor};">${statusLabelEscaped}</span></div>
         <div><span style="font-weight:600;">OGSTEP Path:</span> <span style="font-weight:700;">${pathLabel}</span></div>
-        <div><span style="font-weight:600;">Status:</span> <span style="font-weight:700;color:${statusColor};">${statusLabelEscaped}</span></div>
+        ${
+          ogstepResponse
+            ? `<div><span style='font-weight:600;'>OGSTEP Response:</span> ${ogstepResponse}</div>`
+            : ""
+        }
+        <div><span style="font-weight:600;">Directions:</span> ${directionsHtml}</div>
         <div><span style="font-weight:600;">Submitted:</span> ${timestampLabel}</div>
       </div>
-      ${errorsSection}
+      ${flagsSection ? `<div style="display:flex;flex-direction:column;gap:6px;">${flagsSection}</div>` : ""}
     </div>
   `;
 };
@@ -289,6 +376,7 @@ export function InteractiveMap({
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
   const labelLayerRef = useRef<L.LayerGroup | null>(null);
   const boundaryLayerRef = useRef<L.GeoJSON | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
   const [geoJsonFeatures, setGeoJsonFeatures] = useState<
     Feature<Geometry, Record<string, unknown>>[]
   >([]);
@@ -422,10 +510,9 @@ export function InteractiveMap({
       return;
     }
 
-    const container = mapContainerRef.current;
-    const mapElement = container?.querySelector(".leaflet-container") as HTMLElement | null;
+    const mapElement = mapContainerRef.current;
 
-    if (!container || !mapElement) {
+    if (!mapElement) {
       console.warn("Map element is not ready for export.");
       return;
     }
@@ -433,6 +520,8 @@ export function InteractiveMap({
     setIsExporting(true);
 
     try {
+      await waitForTileLayerToRender(tileLayerRef.current);
+
       const dataUrl = await renderNodeToPng(mapElement);
       const sanitizedPrefix = sanitizeFilePrefix(normalizedMetadata.exportFilenamePrefix);
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -459,7 +548,7 @@ export function InteractiveMap({
         scrollWheelZoom: true,
       });
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      tileLayerRef.current = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         crossOrigin: true,
@@ -476,6 +565,7 @@ export function InteractiveMap({
       markerLayerRef.current = null;
       labelLayerRef.current = null;
       boundaryLayerRef.current = null;
+      tileLayerRef.current = null;
     };
   }, []);
 

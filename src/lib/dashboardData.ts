@@ -8,7 +8,7 @@ import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks
 import { normaliseHeaderKey } from "./googleSheets";
 import { getSubmissionMetrics, type Row as MetricRow } from "@/utils/metrics";
 import { getErrorBreakdown, extractQualityIndicatorCounts } from "@/utils/errors";
-import { determineApprovalStatus } from "@/utils/approval";
+import { determineApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
 import {
   normalizeMapMetadata,
   type MapMetadataConfig,
@@ -29,8 +29,12 @@ interface MapSubmission {
   lga: string;
   state: string;
   errorTypes: string[];
+  qcFlags: string[];
+  otherFlags: string[];
   timestamp: string;
   status: "approved" | "not_approved";
+  approvalLabel: string;
+  approvalSource: string | null;
   ogstepPath: OgstepPath;
   ogstepResponse: string | null;
   directions: string | null;
@@ -553,6 +557,11 @@ const getInterviewerName = (row: SheetSubmissionRow) => {
 const getApprovalStatus = (row: SheetSubmissionRow) =>
   determineApprovalStatus(row as unknown as Record<string, unknown>);
 
+const getApprovalField = (row: SheetSubmissionRow) =>
+  findApprovalFieldValue(row as unknown as Record<string, unknown>);
+
+const isQualityFlag = (code: string) => /^QC_(FLAG|WARN)_/i.test(code);
+
 interface DashboardDataInput {
   submissions: SheetSubmissionRow[];
   stateTargets?: SheetStateTargetRow[];
@@ -663,6 +672,10 @@ export const buildDashboardData = ({
         ),
       ),
     ).filter((flag) => !shouldIgnoreErrorType(flag));
+
+    const qualityFlags = errorFlags.filter((flag) => isQualityFlag(flag));
+    const otherFlags = errorFlags.filter((flag) => !isQualityFlag(flag));
+    const combinedFlags = [...qualityFlags, ...otherFlags];
     const { response: ogstepResponse, path: ogstepPath } = extractOgstepDetails(row);
 
     const genderValue = getGender(row);
@@ -771,6 +784,11 @@ export const buildDashboardData = ({
           })
         : "Timestamp unavailable";
 
+      const approvalField = getApprovalField(row);
+      const approvalLabel = approvalField?.value ?? approvalStatus;
+      const approvalSource = approvalField?.key ?? null;
+      const normalisedStatus = approvalStatus === "Approved" ? "approved" : "not_approved";
+
       mapSubmissions.push({
         id: submissionId,
         lat,
@@ -780,9 +798,13 @@ export const buildDashboardData = ({
         interviewerLabel,
         lga: lga!,
         state,
-        errorTypes: errorFlags.filter((flag) => !shouldIgnoreErrorType(flag)),
+        errorTypes: combinedFlags,
+        qcFlags: qualityFlags,
+        otherFlags,
         timestamp: timestampLabel,
-        status: approvalStatus === "Approved" ? "approved" : "not_approved",
+        status: normalisedStatus,
+        approvalLabel,
+        approvalSource,
         sortKey,
         ogstepPath,
         ogstepResponse: ogstepResponse,

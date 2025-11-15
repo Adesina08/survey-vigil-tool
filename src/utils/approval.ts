@@ -55,7 +55,7 @@ const normaliseCandidate = (value: unknown): NormalisedApprovalStatus | null => 
   return null;
 };
 
-const candidateKeys = [
+export const APPROVAL_FIELD_CANDIDATES = [
   "Approval",
   "approval",
   "Approval Status",
@@ -65,18 +65,59 @@ const candidateKeys = [
   "outcome_status",
   "QC Status",
   "qc_status",
-];
+] as const;
+
+export type ApprovalFieldKey = (typeof APPROVAL_FIELD_CANDIDATES)[number];
+
+const normaliseApprovalFieldValue = (value: unknown): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : null;
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Approved" : "Not Approved";
+  }
+
+  return String(value ?? "").trim() || null;
+};
+
+export const findApprovalFieldValue = (
+  row: Record<string, unknown>,
+): { key: ApprovalFieldKey; value: string } | null => {
+  for (const key of APPROVAL_FIELD_CANDIDATES) {
+    if (key in row) {
+      const rawValue = (row as Record<string, unknown>)[key];
+      const normalised = normaliseApprovalFieldValue(rawValue);
+      if (normalised) {
+        return { key, value: normalised };
+      }
+    }
+  }
+
+  return null;
+};
 
 export const determineApprovalStatus = (
   row: Record<string, unknown>,
 ): NormalisedApprovalStatus => {
-  for (const key of candidateKeys) {
-    if (key in row) {
-      const value = (row as Record<string, unknown>)[key];
-      const status = normaliseCandidate(value);
-      if (status) {
-        return status;
-      }
+  for (const key of APPROVAL_FIELD_CANDIDATES) {
+    if (!(key in row)) {
+      continue;
+    }
+
+    const value = (row as Record<string, unknown>)[key];
+    const status = normaliseCandidate(value);
+    if (status) {
+      return status;
     }
   }
 
