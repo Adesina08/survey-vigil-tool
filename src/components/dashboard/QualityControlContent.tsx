@@ -102,6 +102,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     return rows.filter((row) => {
       const lgaValue =
         getFirstTextValue(row, [
+          "A3. select the LGA",
           "A3. Select the LGA",
           "a3_select_the_lga",
           "lga",
@@ -197,13 +198,24 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
           "INTERVIEWER_ID",
           "a1_interviewer_id",
           "a1. Interviewer ID",
+          "A1. Enumerator ID",
+          "Enumerator ID",
+          "enumerator_id",
         ]) ?? "Unknown";
 
       const interviewerName =
-        getFirstTextValue(row, ["interviewer_name", "Interviewer Name", "INTERVIEWER_NAME"]) ?? "Unknown";
+        getFirstTextValue(row, [
+          "interviewer_name",
+          "Interviewer Name",
+          "INTERVIEWER_NAME",
+          "username",
+          "Enumerator name",
+          "enumerator_name",
+        ]) ?? "Unknown";
 
       const lga =
         getFirstTextValue(row, [
+          "A3. select the LGA",
           "A3. Select the LGA",
           "a3_select_the_lga",
           "lga",

@@ -211,8 +211,15 @@ const getSheetRows = (rows: QuotaRow[]) =>
 const headerCellClass = "border-l border-border/60 px-4 py-3 first:border-l-0";
 const bodyCellClass = "border-l border-border/50 px-4 py-3 first:border-l-0";
 
+const forbiddenSheetChars = new Set(["\\", "/", "?", "*", "[", "]", ":"]);
+
 const sanitizeSheetName = (label: string): string => {
-  const cleaned = label.replace(/[\\/?*\[\]:]/g, "-").trim();
+  const cleaned = label
+    .split("")
+    .map((char) => (forbiddenSheetChars.has(char) ? "-" : char))
+    .join("")
+    .trim();
+
   if (!cleaned) {
     return "Sheet";
   }
@@ -284,31 +291,11 @@ export function QuotaTracker() {
                   <TableHeader className="bg-background">
                     <TableRow className="divide-x divide-border/60 border-b border-border/60">
                       <TableHead
-                        rowSpan={4}
+                        rowSpan={3}
                         className={`${headerCellClass} bg-background align-middle font-semibold`}
                       >
                         Arm
                       </TableHead>
-                      <TableHead
-                        colSpan={4}
-                        className={`${headerCellClass} bg-background text-center text-sm font-semibold`}
-                      >
-                        TVET / Skills
-                      </TableHead>
-                      <TableHead
-                        colSpan={2}
-                        className={`${headerCellClass} bg-background text-center text-sm font-semibold`}
-                      >
-                        Agriculture
-                      </TableHead>
-                      <TableHead
-                        colSpan={4}
-                        className={`${headerCellClass} bg-background text-center text-sm font-semibold`}
-                      >
-                        SMEs / Start-ups
-                      </TableHead>
-                    </TableRow>
-                    <TableRow className="divide-x divide-border/60 border-b border-border/60">
                       <TableHead
                         colSpan={2}
                         className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
@@ -340,27 +327,33 @@ export function QuotaTracker() {
                         Youth quota
                       </TableHead>
                     </TableRow>
-                    <TableRow className="divide-x divide-border/60">
+                    <TableRow className="divide-x divide-border/60 border-b border-border/60">
                       <TableHead
-                        rowSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Target
                       </TableHead>
                       <TableHead
-                        rowSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Achieved
                       </TableHead>
                       <TableHead
-                        rowSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Target
                       </TableHead>
                       <TableHead
-                        rowSpan={2}
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
+                        Achieved
+                      </TableHead>
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
+                        Target
+                      </TableHead>
+                      <TableHead
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Achieved
@@ -378,13 +371,11 @@ export function QuotaTracker() {
                         Achieved
                       </TableHead>
                       <TableHead
-                        rowSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Target
                       </TableHead>
                       <TableHead
-                        rowSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Achieved
@@ -457,16 +448,16 @@ export function QuotaTracker() {
                         >
                           {formatValue(row.sampleSize.achieved)}
                         </TableCell>
-                        <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
+                        <TableCell className={`${bodyCellClass} text-right text-muted-foreground`}>
                           {formatValue(row.gender.target.male)}
                         </TableCell>
-                        <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
+                        <TableCell className={`${bodyCellClass} text-right text-muted-foreground`}>
                           {formatValue(row.gender.target.female)}
                         </TableCell>
-                        <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
+                        <TableCell className={`${bodyCellClass} text-right text-muted-foreground`}>
                           {formatValue(row.gender.achieved.male)}
                         </TableCell>
-                        <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
+                        <TableCell className={`${bodyCellClass} text-right text-muted-foreground`}>
                           {formatValue(row.gender.achieved.female)}
                         </TableCell>
                         <TableCell className={`${bodyCellClass} text-right font-medium`}>

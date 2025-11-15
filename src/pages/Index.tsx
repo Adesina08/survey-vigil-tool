@@ -8,7 +8,6 @@ import TabsQCAnalysis from "@/components/TabsQCAnalysis";
 import QualityControl from "./QualityControl";
 
 const Index = () => {
-  const [statusMessage, setStatusMessage] = useState("Loading…");
   const {
     data: dashboardData,
     isLoading,
@@ -56,14 +55,8 @@ const Index = () => {
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    setStatusMessage("Refreshing…");
     try {
-      const result = await refetch();
-      if (!result.error) {
-        setStatusMessage("Data loaded");
-      } else {
-        setStatusMessage("Refresh failed");
-      }
+      await refetch();
     } finally {
       setIsRefreshing(false);
     }
@@ -79,19 +72,6 @@ const Index = () => {
 
     console.log(`Filter changed: ${filterType} = ${value}`);
   };
-
-  useEffect(() => {
-    if (!dashboardData || isLoading) {
-      return;
-    }
-
-    setStatusMessage((current) => {
-      if (current === "Loading…" || current === "Refreshing…" || current === "Refresh failed") {
-        return "Data loaded";
-      }
-      return current;
-    });
-  }, [dashboardData, isLoading]);
 
   useEffect(() => {
     if (!selectedLga || !dashboardData) {
@@ -152,7 +132,6 @@ const Index = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <DashboardHeader
-        statusMessage={statusMessage}
         lastUpdated={latestSurveyLabel ?? undefined}
         lastRefreshedAt={lastRefreshedLabel ?? undefined}
         onRefresh={handleRefresh}

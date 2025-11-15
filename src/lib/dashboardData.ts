@@ -720,6 +720,21 @@ export const buildDashboardData = ({
     );
     const qualityIndicatorKeys = Object.keys(qualityIndicatorCounts);
 
+    Object.keys(row).forEach((key) => {
+      if (!QC_FLAG_REGEX.test(key)) {
+        return;
+      }
+
+      if (/count$/i.test(key.trim())) {
+        return;
+      }
+
+      const slug = normaliseErrorType(key).slug;
+      if (slug.length > 0) {
+        errorTypeSet.add(slug);
+      }
+    });
+
     const qcFlagSlugs = collectQcFlagSlugs(row);
     const manualErrorFlags = Array.isArray(row["Error Flags"])
       ? (row["Error Flags"] as unknown[])
