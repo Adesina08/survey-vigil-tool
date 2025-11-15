@@ -141,6 +141,39 @@ export function getErrorBreakdown(rows: Record<string, unknown>[]) {
   return counts;
 }
 
+export const collectQualityIndicatorLabels = (
+  row: Record<string, unknown>,
+): Record<string, string> => {
+  const labels: Record<string, string> = {};
+
+  Object.keys(row).forEach((key) => {
+    const trimmedKey = typeof key === "string" ? key.trim() : "";
+
+    if (!trimmedKey) {
+      return;
+    }
+
+    if (/^QC\s*FLAG\s*COUNT$/i.test(trimmedKey)) {
+      return;
+    }
+
+    if (!/^QC_(FLAG|WARN)_/i.test(trimmedKey)) {
+      return;
+    }
+
+    const slug = normaliseErrorType(trimmedKey).slug;
+    if (!slug || slug.length === 0) {
+      return;
+    }
+
+    if (!(slug in labels)) {
+      labels[slug] = trimmedKey;
+    }
+  });
+
+  return labels;
+};
+
 export const extractQualityIndicatorCounts = (
   row: Record<string, unknown>,
 ): Record<string, number> => {

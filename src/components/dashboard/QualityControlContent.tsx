@@ -2,10 +2,9 @@ import { useMemo } from "react";
 import type { DashboardData } from "@/types/dashboard";
 import { determineApprovalStatus } from "@/utils/approval";
 import {
-  QUALITY_INDICATOR_COUNT_REGEX,
-  QUALITY_INDICATOR_PREFIX_REGEX,
   extractErrorCodes,
   extractQualityIndicatorCounts,
+  collectQualityIndicatorLabels,
 } from "@/utils/errors";
 import { normaliseErrorType } from "@/lib/errorTypes";
 import { FilterControls } from "./FilterControls";
@@ -153,6 +152,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     achievementsByInterviewer,
     achievementsByLGA,
     errorTypes,
+    errorLabels,
   } = useMemo(() => {
     const relevantQuotaByLGA = selectedLga
       ? (dashboardData.quotaByLGA || []).filter((row) => matchesSelectedLga(row.lga, selectedLga))
@@ -190,6 +190,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       }
     >();
     const errorTotals = new Map<string, number>();
+    const errorLabels = new Map<string, string>();
 
     const achievementsByInterviewerMap = new Map<
       string,
@@ -300,21 +301,27 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       pathTotals[ogstepPath] += 1;
 
       const qualityCounts = extractQualityIndicatorCounts(row);
+      const qualityLabels = collectQualityIndicatorLabels(row as Record<string, unknown>);
       Object.entries(qualityCounts).forEach(([code, value]) => {
-        if (!value || !Number.isFinite(value)) return;
+        if (!Number.isFinite(value)) return;
         const info = normaliseErrorType(code);
-        const slug = info.slug;
-        existing.errors[slug] = (existing.errors[slug] ?? 0) + value;
-        existing.totalErrors += value;
-        errorTotals.set(slug, (errorTotals.get(slug) ?? 0) + value);
+        const displayLabel = qualityLabels[info.slug] ?? info.label;
+        existing.errors[info.slug] = (existing.errors[info.slug] ?? 0) + (value ?? 0);
+        existing.totalErrors += value ?? 0;
+        errorTotals.set(info.slug, (errorTotals.get(info.slug) ?? 0) + (value ?? 0));
+        if (displayLabel && displayLabel.trim().length > 0) {
+          errorLabels.set(info.slug, displayLabel.trim());
+        }
       });
 
       extractErrorCodes(row).forEach((code) => {
         const info = normaliseErrorType(code);
-        const slug = info.slug;
-        existing.errors[slug] = (existing.errors[slug] ?? 0) + 1;
+        existing.errors[info.slug] = (existing.errors[info.slug] ?? 0) + 1;
         existing.totalErrors += 1;
-        errorTotals.set(slug, (errorTotals.get(slug) ?? 0) + 1);
+        errorTotals.set(info.slug, (errorTotals.get(info.slug) ?? 0) + 1);
+        if (!errorLabels.has(info.slug) && info.label.trim().length > 0) {
+          errorLabels.set(info.slug, info.label);
+        }
       });
 
       // Achievements by interviewer
@@ -450,9 +457,10 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     const errorBreakdown = Array.from(errorTotals.entries())
       .map(([slug, count]) => {
         const info = normaliseErrorType(slug);
+        const displayLabel = errorLabels.get(info.slug) ?? info.label;
         return {
           code: info.slug,
-          errorType: info.label,
+          errorType: displayLabel,
           relatedVariables: info.relatedVariables,
           count,
           percentage: totalErrors > 0 ? Number(((count / totalErrors) * 100).toFixed(1)) : 0,
@@ -465,10 +473,9 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
         return a.errorType.localeCompare(b.errorType);
       });
 
-    const errorTypes = Array.from(errorTotals.keys())
-      .map((slug) => ({ slug, label: normaliseErrorType(slug).label }))
-      .sort((a, b) => a.label.localeCompare(b.label))
-      .map((entry) => entry.slug);
+    const errorLabelLookup = Object.fromEntries(
+      errorBreakdown.map((item) => [item.code ?? item.errorType, item.errorType]),
+    );
 
     return {
       summary,
@@ -478,7 +485,8 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       errorBreakdown,
       achievementsByInterviewer,
       achievementsByLGA,
-      errorTypes,
+      errorTypes: errorBreakdown.map((item) => item.code),
+      errorLabels: errorLabelLookup,
     };
   }, [
     dashboardData.quotaByLGA,
@@ -524,10 +532,10 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       <UserProductivity
         data={productivity}
         errorTypes={errorTypes.length > 0 ? errorTypes : dashboardData.filters?.errorTypes || []}
+        errorLabels={errorLabels}
       />
       <ErrorBreakdown data={errorBreakdown} />
       <AchievementsTables
-        byState={dashboardData.achievements?.byState || []}
         byInterviewer={achievementsByInterviewer}
         byLGA={achievementsByLGA}
       />

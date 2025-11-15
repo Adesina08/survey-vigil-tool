@@ -768,9 +768,9 @@ export function InteractiveMap({
           </div>
         </CardHeader>
         <CardContent className="space-y-6 bg-card/60 p-6">
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <Select value={selectedLga} onValueChange={setSelectedLga}>
-              <SelectTrigger className="min-w-[180px]">
+              <SelectTrigger className="w-full min-w-[180px]">
                 <SelectValue placeholder="All LGAs" />
               </SelectTrigger>
               <SelectContent>
@@ -783,7 +783,7 @@ export function InteractiveMap({
               </SelectContent>
             </Select>
             <Select value={selectedErrorType} onValueChange={setSelectedErrorType}>
-              <SelectTrigger className="min-w-[200px]">
+              <SelectTrigger className="w-full min-w-[200px]">
                 <SelectValue placeholder="All Flags" />
               </SelectTrigger>
               <SelectContent>
@@ -796,7 +796,7 @@ export function InteractiveMap({
               </SelectContent>
             </Select>
             <Select value={selectedInterviewer} onValueChange={setSelectedInterviewer}>
-              <SelectTrigger className="min-w-[220px]">
+              <SelectTrigger className="w-full min-w-[220px]">
                 <SelectValue placeholder="All Interviewers" />
               </SelectTrigger>
               <SelectContent>
