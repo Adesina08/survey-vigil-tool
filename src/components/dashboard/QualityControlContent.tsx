@@ -120,9 +120,6 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     errorBreakdown,
     achievementsByInterviewer,
     achievementsByLGA,
-    filteredQuotaByLGA,
-    filteredQuotaByLGAAge,
-    filteredQuotaByLGAGender,
     errorTypes,
   } = useMemo(() => {
     const relevantQuotaByLGA = selectedLga
@@ -406,9 +403,6 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       errorBreakdown,
       achievementsByInterviewer,
       achievementsByLGA,
-      filteredQuotaByLGA: relevantQuotaByLGA,
-      filteredQuotaByLGAAge: relevantQuotaByLGAAge,
-      filteredQuotaByLGAGender: relevantQuotaByLGAGender,
       errorTypes: errorBreakdown.map((item) => item.errorType),
     };
   }, [
@@ -430,11 +424,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       <SummaryCards summary={summary} />
       <div className="grid gap-6 md:grid-cols-[2fr_1fr]">
         <ProgressCharts quotaSummary={quotaSummary} statusBreakdown={statusBreakdown} />
-        <QuotaTracker
-          quotaByLGA={filteredQuotaByLGA}
-          quotaByLGAAge={filteredQuotaByLGAAge}
-          quotaByLGAGender={filteredQuotaByLGAGender}
-        />
+        <QuotaTracker />
       </div>
       <div className="grid gap-6 md:grid-cols-[3fr_2fr]">
         <InteractiveMap
