@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/table";
 import { AlertTriangle } from "lucide-react";
 import { useMemo, useState } from "react";
+import { formatErrorLabel } from "@/lib/utils";
 
 interface ErrorData {
   errorType: string;
@@ -72,7 +73,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
         <Table
-          containerClassName="overflow-x-auto overflow-y-visible"
+          containerClassName="max-h-[420px] overflow-x-auto overflow-y-auto"
           className="min-w-[720px] text-[13px]"
         >
           <TableHeader className="bg-background/95 backdrop-blur">
@@ -101,7 +102,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
                 className="divide-x divide-border/50 hover:bg-muted/40"
               >
                 <TableCell className="sticky left-0 z-10 bg-background/95 font-medium text-foreground">
-                  {row.errorType}
+                  {formatErrorLabel(row.errorType)}
                 </TableCell>
                 <TableCell className="whitespace-pre-wrap text-sm text-muted-foreground">
                   {(row.relatedVariables && row.relatedVariables.length > 0

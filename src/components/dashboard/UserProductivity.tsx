@@ -468,7 +468,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
                       <ComposedChart
                         data={chartData}
                         layout="vertical"
-                        margin={{ top: 88, right: 32, bottom: 48, left: 24 }}
+                        margin={{ top: 72, right: 32, bottom: 96, left: 24 }}
                         barCategoryGap={12}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" horizontal={false} />
@@ -515,10 +515,10 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
                           }
                         />
                         <ChartLegend
-                          verticalAlign="top"
+                          verticalAlign="bottom"
                           align="left"
-                          wrapperStyle={{ paddingBottom: 12 }}
-                          content={<ChartLegendContent verticalAlign="top" className="justify-start" />}
+                          wrapperStyle={{ paddingTop: 24, marginTop: 16 }}
+                          content={<ChartLegendContent className="justify-start" />}
                         />
                         <Bar
                           dataKey="approved"
@@ -611,7 +611,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
                             onClick={() => handleSort(errorType, "number")}
                             className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-foreground sm:text-sm"
                           >
-                            <span>{safeErrorLabelMap[errorType] ?? errorType}</span>
+                            <span>{formatErrorLabel(safeErrorLabelMap[errorType] ?? errorType)}</span>
                             {renderSortIcon(errorType)}
                           </button>
                         </TableHead>

@@ -1,15 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Select, { type GroupBase, type StylesConfig } from "react-select";
 import makeAnimated from "react-select/animated";
-import { Bar } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Tooltip,
-  Legend,
-} from "chart.js";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import * as XLSX from "xlsx";
@@ -22,8 +13,6 @@ import { Separator } from "@/components/ui/separator";
 import { getAnalysisSchema, type AnalysisSchema } from "@/lib/api.analysis";
 import type { AnalysisResult, DisplayMode } from "@/services/analysis";
 import { generateAnalysis } from "@/services/analysis";
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 const animatedComponents = makeAnimated();
 
@@ -38,7 +27,7 @@ const DISPLAY_MODES: { label: string; value: DisplayMode; description: string }[
   { label: "Total %", value: "totalpct", description: "Share of all included interviews" },
 ];
 
-const selectStyles: StylesConfig<Option, true, GroupBase<Option>> = {
+const selectStyles: StylesConfig<Option, false, GroupBase<Option>> = {
   control: (provided) => ({
     ...provided,
     borderRadius: "0.75rem",
@@ -46,10 +35,6 @@ const selectStyles: StylesConfig<Option, true, GroupBase<Option>> = {
     boxShadow: "none",
     padding: "2px 4px",
     minHeight: "48px",
-  }),
-  multiValue: (provided) => ({
-    ...provided,
-    borderRadius: "9999px",
   }),
   option: (provided, state) => ({
     ...provided,
@@ -128,7 +113,7 @@ const Analysis = () => {
   const [schemaError, setSchemaError] = useState<string | null>(null);
   const [isSchemaLoading, setIsSchemaLoading] = useState(true);
   const [topBreakSelection, setTopBreakSelection] = useState<Option | null>(null);
-  const [sideBreakSelection, setSideBreakSelection] = useState<Option[]>([]);
+  const [sideBreakSelection, setSideBreakSelection] = useState<Option | null>(null);
   const [mode, setMode] = useState<DisplayMode>(DISPLAY_MODES[0].value);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,7 +132,7 @@ const Analysis = () => {
           setTopBreakSelection(toOption(data.topbreak_candidates[0]));
         }
         if (data.categorical_candidates.length > 0) {
-          setSideBreakSelection([toOption(data.categorical_candidates[0])]);
+          setSideBreakSelection(toOption(data.categorical_candidates[0]));
         }
       })
       .catch((err) => {
@@ -182,8 +167,8 @@ const Analysis = () => {
       setError("Select a top-break variable to continue.");
       return;
     }
-    if (sideBreakSelection.length === 0) {
-      setError("Select at least one variable to analyse.");
+    if (!sideBreakSelection) {
+      setError("Select a variable to analyse.");
       return;
     }
 
@@ -193,7 +178,7 @@ const Analysis = () => {
     try {
       const response = await generateAnalysis({
         topBreak: topBreakSelection.value,
-        variables: sideBreakSelection.map((item) => item.value),
+        variables: [sideBreakSelection.value],
         mode,
       });
       setAnalysis(response);
@@ -209,7 +194,7 @@ const Analysis = () => {
     const defaultTopBreak = topBreakOptions[0] ?? null;
     const defaultVariable = sideBreakOptions[0]?.options?.[0] ?? null;
     setTopBreakSelection(defaultTopBreak);
-    setSideBreakSelection(defaultVariable ? [defaultVariable] : []);
+    setSideBreakSelection(defaultVariable ?? null);
     setMode(DISPLAY_MODES[0].value);
     setAnalysis(null);
     setError(null);
@@ -255,117 +240,18 @@ const Analysis = () => {
     pdf.save(`ogstep-analysis-${timestamp}.pdf`);
   };
 
-  const chartConfig = useMemo(() => {
-    const chart = analysis?.tables?.[0]?.chart;
-    const chartStat = analysis?.tables?.[0]?.meta.stat ?? mode;
-    if (!chart) {
-      return null;
-    }
-
-    const labels = Array.from(
-      new Set(
-        chart.series
-          .flatMap((series) => series.data)
-          .map((point) => (typeof point.x === "number" ? String(point.x) : point.x)),
-      ),
-    );
-
-    if (labels.length === 0) {
-      return null;
-    }
-
-    const datasets = chart.series.map((series) => {
-      return {
-        label: series.name,
-        data: labels.map((label) => {
-          const match = series.data.find((point) => {
-            const pointLabel = typeof point.x === "number" ? String(point.x) : point.x;
-            return pointLabel === label;
-          });
-          return match ? match.y : 0;
-        }),
-        backgroundColor: series.color,
-        borderRadius: 6,
-      };
-    });
-
-    if (datasets.length === 0) {
-      return null;
-    }
-
-    const isStacked = chart.kind === "stacked_bar";
-    const options = {
-      responsive: true,
-      plugins: {
-        legend: {
-          position: "bottom" as const,
-        },
-        tooltip: {
-          callbacks: {
-            label: (context: { dataset: { label?: string }; parsed: { y: number } }) => {
-              const label = context.dataset.label ?? "";
-              const value = context.parsed?.y ?? 0;
-              const suffix = chartStat === "counts" ? "" : "%";
-              const formatted = chartStat === "counts" ? value.toFixed(0) : value.toFixed(1);
-              return `${label}: ${formatted}${suffix}`;
-            },
-          },
-        },
-      },
-      scales: {
-        x: {
-          stacked: isStacked,
-        },
-        y: {
-          stacked: isStacked,
-          beginAtZero: true,
-          ticks: {
-            callback: (value: string | number) => {
-              if (chartStat === "counts") {
-                return `${value}`;
-              }
-              return `${value}%`;
-            },
-          },
-        },
-      },
-    };
-
-    if (chart.kind === "grouped_bar" || chart.kind === "bar") {
-      options.scales.x.stacked = false;
-      options.scales.y.stacked = false;
-    }
-
-    return {
-      data: {
-        labels,
-        datasets,
-      },
-      options,
-    };
-  }, [analysis, mode]);
-
   const primaryMeta = analysis?.tables?.[0]?.meta;
   const summaryTitle = primaryMeta ? describeMeta(primaryMeta) : "Analysis summary";
   const notes = analysis?.tables?.flatMap((table) => table.meta.notes ?? []) ?? [];
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 lg:p-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">OGSTEP Impact Analysis</h1>
           <p className="text-sm text-muted-foreground">
             Slice post-survey outcomes by respondent attributes using the Netlify analysis service.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleReset} className="gap-2" disabled={isSchemaLoading}>
-            <RefreshCcw className="h-4 w-4" /> Reset
-          </Button>
-          <Button onClick={handleGenerate} disabled={isLoading || isSchemaLoading} className="gap-2">
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
-            Generate table
-          </Button>
         </div>
       </div>
 
@@ -394,7 +280,7 @@ const Analysis = () => {
                 isMulti={false}
                 options={topBreakOptions}
                 value={topBreakSelection}
-                styles={selectStyles as StylesConfig<Option, false, GroupBase<Option>>}
+                styles={selectStyles}
                 onChange={(value) => setTopBreakSelection(value as Option)}
                 placeholder={isSchemaLoading ? "Loading options..." : "Choose respondent attribute"}
                 isDisabled={isSchemaLoading || topBreakOptions.length === 0}
@@ -405,15 +291,15 @@ const Analysis = () => {
                 <h3 className="text-sm font-medium">Variables (rows)</h3>
                 <Badge variant="secondary">Dataset</Badge>
               </div>
-              <Select<Option, true, GroupBase<Option>>
-                closeMenuOnSelect={false}
+              <Select<Option, false, GroupBase<Option>>
+                closeMenuOnSelect
                 components={animatedComponents}
-                isMulti
+                isMulti={false}
                 options={sideBreakOptions}
                 value={sideBreakSelection}
                 styles={selectStyles}
-                onChange={(values) => setSideBreakSelection((values as Option[]) ?? [])}
-                placeholder={isSchemaLoading ? "Loading variables..." : "Choose outcome indicators"}
+                onChange={(value) => setSideBreakSelection((value as Option) ?? null)}
+                placeholder={isSchemaLoading ? "Loading variables..." : "Choose outcome indicator"}
                 isDisabled={isSchemaLoading || sideBreakOptions.length === 0}
               />
             </div>
@@ -443,12 +329,17 @@ const Analysis = () => {
                 })}
               </div>
             </div>
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">Guidance</h3>
-              <p className="text-xs text-muted-foreground">
-                Configure the table, then generate a fresh view powered by the Netlify serverless analysis endpoint.
-              </p>
-            </div>
+            <div className="space-y-2" />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={handleReset} className="gap-2" disabled={isSchemaLoading}>
+              <RefreshCcw className="h-4 w-4" /> Reset
+            </Button>
+            <Button onClick={handleGenerate} disabled={isLoading || isSchemaLoading} className="gap-2">
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <BarChart3 className="h-4 w-4" />}
+              Generate table
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -491,18 +382,6 @@ const Analysis = () => {
                     <li key={`${note}-${index}`}>{note}</li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
-          )}
-
-          {chartConfig && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Visual comparison</CardTitle>
-                <CardDescription>{primaryMeta ? describeMeta(primaryMeta) : "Comparison"}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Bar data={chartConfig.data} options={chartConfig.options} />
               </CardContent>
             </Card>
           )}

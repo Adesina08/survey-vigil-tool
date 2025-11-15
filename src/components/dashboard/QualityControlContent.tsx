@@ -9,6 +9,7 @@ import {
   collectQualityIndicatorLabels,
 } from "@/utils/errors";
 import { normaliseErrorType } from "@/lib/errorTypes";
+import { formatErrorLabel } from "@/lib/utils";
 import { FilterControls } from "./FilterControls";
 import { SummaryCards } from "./SummaryCards";
 import { ProgressCharts } from "./ProgressCharts";
@@ -304,10 +305,13 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
       const qualityCounts = extractQualityIndicatorCounts(row);
       const qualityLabels = collectQualityIndicatorLabels(row as Record<string, unknown>);
+      const countedSlugs = new Set<string>();
+
       Object.entries(qualityCounts).forEach(([code, value]) => {
-        if (!Number.isFinite(value)) return;
+        if (!Number.isFinite(value) || (value ?? 0) <= 0) return;
         const info = normaliseErrorType(code);
         const displayLabel = qualityLabels[info.slug] ?? info.label;
+        countedSlugs.add(info.slug);
         existing.errors[info.slug] = (existing.errors[info.slug] ?? 0) + (value ?? 0);
         existing.totalErrors += value ?? 0;
         errorTotals.set(info.slug, (errorTotals.get(info.slug) ?? 0) + (value ?? 0));
@@ -318,6 +322,9 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
       extractErrorCodes(row).forEach((code) => {
         const info = normaliseErrorType(code);
+        if (countedSlugs.has(info.slug)) {
+          return;
+        }
         existing.errors[info.slug] = (existing.errors[info.slug] ?? 0) + 1;
         existing.totalErrors += 1;
         errorTotals.set(info.slug, (errorTotals.get(info.slug) ?? 0) + 1);
@@ -459,7 +466,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     const errorBreakdown = Array.from(errorTotals.entries())
       .map(([slug, count]) => {
         const info = normaliseErrorType(slug);
-        const displayLabel = errorLabels.get(info.slug) ?? info.label;
+        const displayLabel = formatErrorLabel(errorLabels.get(info.slug) ?? info.label);
         return {
           code: info.slug,
           errorType: displayLabel,
