@@ -74,14 +74,15 @@ const Index = () => {
   };
 
   useEffect(() => {
-    if (!selectedLga || !dashboardData) {
+    if (!selectedLga) {
       return;
     }
 
-    if (!dashboardData.filters.lgas.includes(selectedLga)) {
+    const availableLgas = dashboardData?.filters?.lgas ?? [];
+    if (!availableLgas.includes(selectedLga)) {
       setSelectedLga(null);
     }
-  }, [dashboardData, selectedLga]);
+  }, [dashboardData?.filters?.lgas, selectedLga]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

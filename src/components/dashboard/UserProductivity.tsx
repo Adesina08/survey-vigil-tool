@@ -188,7 +188,7 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
     });
     return Array.from(unique)
       .filter((value): value is string => typeof value === "string" && value.length > 0)
-      .sort((a, b) => a.localeCompare(b));
+      .sort((a, b) => formatErrorLabel(a).localeCompare(formatErrorLabel(b)));
   }, [safeData, safeErrorTypes]);
 
   const chartData = useMemo(
@@ -405,7 +405,7 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
                       <ComposedChart
                         data={chartData}
                         layout="vertical"
-                        margin={{ top: 48, right: 32, bottom: 24, left: 24 }}
+                        margin={{ top: 48, right: 32, bottom: 88, left: 24 }}
                         barCategoryGap={12}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" horizontal={false} />
@@ -451,7 +451,13 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
                             />
                           }
                         />
-                        <ChartLegend content={<ChartLegendContent />} />
+                        <ChartLegend
+                          verticalAlign="bottom"
+                          align="center"
+                          layout="horizontal"
+                          wrapperStyle={{ paddingTop: 16 }}
+                          content={<ChartLegendContent />}
+                        />
                         <Bar
                           dataKey="approved"
                           stackId="status"

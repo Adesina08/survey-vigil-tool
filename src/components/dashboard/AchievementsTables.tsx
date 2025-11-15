@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -56,15 +57,107 @@ interface AchievementsTablesProps {
   byLGA: LGAAchievement[];
 }
 
+type SimpleExportRow = Record<string, string | number>;
+type SheetJS = typeof import("xlsx");
+
+const toOneDecimal = (value: number | undefined | null) => Math.round((value ?? 0) * 10) / 10;
+
+const sanitizeSheetName = (raw: string): string => {
+  const fallback = "Sheet1";
+  if (!raw || typeof raw !== "string") {
+    return fallback;
+  }
+
+  const cleaned = raw
+    .replace(/[\\/?*:]/g, " ")
+    .replace(/\[/g, " ")
+    .replace(/\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return fallback;
+  }
+
+  return cleaned.slice(0, 31);
+};
+
+const formatCurrentDateLabel = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const createExportFileName = (label: string) => {
+  const normalised = label
+    .replace(/[^A-Za-z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
+
+  const suffix = normalised.length > 0 ? normalised : "DATA";
+  return `OGSTEP_ACHIEVEMENTS_${suffix}_${formatCurrentDateLabel()}.xlsx`;
+};
+
+const buildSheetData = (headers: string[], rows: SimpleExportRow[]): Array<Array<string | number | null>> => {
+  const headerRow = headers.map((header) => header ?? "");
+  const bodyRows = rows.map((row) =>
+    headers.map((header) => {
+      const value = row[header];
+      if (value === undefined || value === null) {
+        return null;
+      }
+      return value;
+    }),
+  );
+  return [headerRow, ...bodyRows];
+};
+
+const loadSheetJS = async (): Promise<SheetJS> => {
+  const module = (await import("xlsx")) as SheetJS & { default?: SheetJS };
+  return module.default ?? module;
+};
+
+const downloadAchievementsWorkbook = async (
+  label: string,
+  headers: string[],
+  rows: SimpleExportRow[],
+) => {
+  if (typeof window === "undefined") {
+    console.warn("Achievements export is only supported in the browser context.");
+    return;
+  }
+
+  if (!Array.isArray(headers) || headers.length === 0) {
+    console.warn("No headers available for achievements export.");
+    return;
+  }
+
+  try {
+    const XLSX = await loadSheetJS();
+    const workbook = XLSX.utils.book_new();
+    const sheetName = sanitizeSheetName(`${label} Achievements`);
+    const data = buildSheetData(headers, rows);
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    XLSX.writeFile(workbook, createExportFileName(label), {
+      bookType: "xlsx",
+      compression: true,
+      sheet: sheetName,
+    });
+  } catch (error) {
+    console.error("Failed to export achievements workbook", error);
+  }
+};
+
 export function AchievementsTables({ byState = [], byInterviewer, byLGA }: AchievementsTablesProps) {
   // Add defensive checks to ensure arrays are valid
   const safeByState = Array.isArray(byState) ? byState : [];
   const safeByInterviewer = Array.isArray(byInterviewer) ? byInterviewer : [];
   const safeByLGA = Array.isArray(byLGA) ? byLGA : [];
-
-  const handleExport = (type: AchievementsExportType) => {
-    console.log(`Exporting ${type} achievements...`);
-  };
 
   const calculateTotals = <
     T extends {
@@ -104,6 +197,134 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
   const interviewerTotals = calculateTotals(safeByInterviewer);
   const lgaTotals = calculateTotals(safeByLGA);
   const stateTotals = calculateTotals(safeByState);
+
+  const handleExport = useCallback(
+    async (type: AchievementsExportType) => {
+      let config: { label: string; headers: string[]; rows: SimpleExportRow[] } | null = null;
+
+      if (type === "interviewer") {
+        const headers = [
+          "Interviewer",
+          "Total",
+          "Approved",
+          "Not Approved",
+          "Treatment",
+          "Control",
+          "Unknown",
+          "% Approved",
+        ];
+
+        const rows: SimpleExportRow[] = safeByInterviewer.map((row) => ({
+          Interviewer: row?.displayLabel ?? row?.interviewerId ?? "Unknown",
+          Total: row?.total ?? 0,
+          Approved: row?.approved ?? 0,
+          "Not Approved": row?.notApproved ?? 0,
+          Treatment: row?.treatmentPathCount ?? 0,
+          Control: row?.controlPathCount ?? 0,
+          Unknown: row?.unknownPathCount ?? 0,
+          "% Approved": toOneDecimal(row?.percentageApproved ?? 0),
+        }));
+
+        rows.push({
+          Interviewer: "Total",
+          Total: interviewerTotals.total,
+          Approved: interviewerTotals.approved,
+          "Not Approved": interviewerTotals.notApproved,
+          Treatment: interviewerTotals.treatmentPathCount,
+          Control: interviewerTotals.controlPathCount,
+          Unknown: interviewerTotals.unknownPathCount,
+          "% Approved":
+            interviewerTotals.total > 0
+              ? toOneDecimal((interviewerTotals.approved / interviewerTotals.total) * 100)
+              : 0,
+        });
+
+        config = { label: "Interviewer", headers, rows };
+      } else if (type === "lga") {
+        const headers = [
+          "State",
+          "LGA",
+          "Total",
+          "Approved",
+          "Not Approved",
+          "Treatment",
+          "Control",
+          "Unknown",
+          "% Approved",
+        ];
+
+        const rows: SimpleExportRow[] = safeByLGA.map((row) => ({
+          State: row?.state ?? "Unknown",
+          LGA: row?.lga ?? "Unknown",
+          Total: row?.total ?? 0,
+          Approved: row?.approved ?? 0,
+          "Not Approved": row?.notApproved ?? 0,
+          Treatment: row?.treatmentPathCount ?? 0,
+          Control: row?.controlPathCount ?? 0,
+          Unknown: row?.unknownPathCount ?? 0,
+          "% Approved": toOneDecimal(row?.percentageApproved ?? 0),
+        }));
+
+        rows.push({
+          State: "Total",
+          LGA: "",
+          Total: lgaTotals.total,
+          Approved: lgaTotals.approved,
+          "Not Approved": lgaTotals.notApproved,
+          Treatment: lgaTotals.treatmentPathCount,
+          Control: lgaTotals.controlPathCount,
+          Unknown: lgaTotals.unknownPathCount,
+          "% Approved":
+            lgaTotals.total > 0 ? toOneDecimal((lgaTotals.approved / lgaTotals.total) * 100) : 0,
+        });
+
+        config = { label: "LGA", headers, rows };
+      } else if (type === "state") {
+        const headers = [
+          "State",
+          "Total",
+          "Approved",
+          "Not Approved",
+          "Treatment",
+          "Control",
+          "Unknown",
+          "% Approved",
+        ];
+
+        const rows: SimpleExportRow[] = safeByState.map((row) => ({
+          State: row?.state ?? "Unknown",
+          Total: row?.total ?? 0,
+          Approved: row?.approved ?? 0,
+          "Not Approved": row?.notApproved ?? 0,
+          Treatment: row?.treatmentPathCount ?? 0,
+          Control: row?.controlPathCount ?? 0,
+          Unknown: row?.unknownPathCount ?? 0,
+          "% Approved": toOneDecimal(row?.percentageApproved ?? 0),
+        }));
+
+        rows.push({
+          State: "Total",
+          Total: stateTotals.total,
+          Approved: stateTotals.approved,
+          "Not Approved": stateTotals.notApproved,
+          Treatment: stateTotals.treatmentPathCount,
+          Control: stateTotals.controlPathCount,
+          Unknown: stateTotals.unknownPathCount,
+          "% Approved":
+            stateTotals.total > 0 ? toOneDecimal((stateTotals.approved / stateTotals.total) * 100) : 0,
+        });
+
+        config = { label: "State", headers, rows };
+      }
+
+      if (!config) {
+        return;
+      }
+
+      await downloadAchievementsWorkbook(config.label, config.headers, config.rows);
+    },
+    [safeByInterviewer, safeByLGA, safeByState, interviewerTotals, lgaTotals, stateTotals],
+  );
 
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
@@ -151,7 +372,7 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
           <TabsContent value="interviewer">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={() => handleExport("interviewer")} variant="outline" size="sm" className="gap-2">
+                <Button onClick={() => void handleExport("interviewer")} variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export Interviewer Data
                 </Button>
@@ -243,7 +464,7 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
           <TabsContent value="lga">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={() => handleExport("lga")} variant="outline" size="sm" className="gap-2">
+                <Button onClick={() => void handleExport("lga")} variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export LGA Data
                 </Button>
@@ -341,7 +562,7 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
           <TabsContent value="state">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={() => handleExport("state")} variant="outline" size="sm" className="gap-2">
+                <Button onClick={() => void handleExport("state")} variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export State Data
                 </Button>

@@ -1,6 +1,8 @@
 import { normaliseErrorType } from "@/lib/errorTypes";
 
 const DELIMITER_REGEX = /[;|,\n]/;
+export const QUALITY_INDICATOR_PREFIX_REGEX = /^QC[\s_-]*(FLAG[S]?|WARN)[\s_-]+/i;
+export const QUALITY_INDICATOR_COUNT_REGEX = /^QC[\s_-]*(FLAG[S]?|WARN)[\s_-]*COUNT$/i;
 
 const ERROR_FIELD_CANDIDATES = [
   "Quality Flags",
@@ -76,7 +78,7 @@ export const extractErrorCodes = (row: Record<string, unknown>): string[] => {
 
   // Dynamically harvest flag-like columns: QC_FLAG_* and QC_WARN_*
   Object.entries(row).forEach(([key, val]) => {
-    if (typeof key === "string" && /^QC_(FLAG|WARN)_/i.test(key)) {
+    if (typeof key === "string" && QUALITY_INDICATOR_PREFIX_REGEX.test(key)) {
       const num =
         typeof val === "number"
           ? val
@@ -147,11 +149,11 @@ export const extractQualityIndicatorCounts = (
   Object.entries(row).forEach(([key, value]) => {
     const trimmedKey = key.trim();
 
-    if (/^QC\s*FLAG\s*COUNT$/i.test(trimmedKey)) {
+    if (QUALITY_INDICATOR_COUNT_REGEX.test(trimmedKey)) {
       return;
     }
 
-    if (!/^QC_(FLAG|WARN)_/i.test(key)) {
+    if (!QUALITY_INDICATOR_PREFIX_REGEX.test(key)) {
       return;
     }
 
