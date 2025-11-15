@@ -78,11 +78,18 @@ const Index = () => {
       return;
     }
 
-    const availableLgas = dashboardData?.filters?.lgas ?? [];
+    const availableLgas = (
+      dashboardData?.filters?.lgas ?? dashboardData?.lgas ?? []
+    ).filter((lga): lga is string => typeof lga === "string" && lga.trim().length > 0);
+
+    if (availableLgas.length === 0) {
+      return;
+    }
+
     if (!availableLgas.includes(selectedLga)) {
       setSelectedLga(null);
     }
-  }, [dashboardData?.filters?.lgas, selectedLga]);
+  }, [dashboardData?.filters?.lgas, dashboardData?.lgas, selectedLga]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
