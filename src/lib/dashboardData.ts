@@ -8,7 +8,11 @@ import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks
 import { normaliseHeaderKey } from "./googleSheets";
 import { normaliseErrorType } from "./errorTypes";
 import { getSubmissionMetrics, type Row as MetricRow } from "@/utils/metrics";
-import { getErrorBreakdown, extractQualityIndicatorCounts } from "@/utils/errors";
+import {
+  getErrorBreakdown,
+  extractQualityIndicatorCounts,
+  collectQualityIndicatorLabels,
+} from "@/utils/errors";
 import { determineApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
 import {
   normalizeMapMetadata,
@@ -693,6 +697,7 @@ export const buildDashboardData = ({
   const errorCounts: Record<string, number> = {};
 
   const interviewerErrors = new Map<string, Record<string, number>>();
+  const errorSlugToLabel = new Map<string, string>();
 
   const lgaSet = new Set<string>();
   const interviewerSet = new Set<string>();
@@ -718,6 +723,17 @@ export const buildDashboardData = ({
     const qualityIndicatorCounts = extractQualityIndicatorCounts(
       row as unknown as Record<string, unknown>,
     );
+    const qualityIndicatorLabels = collectQualityIndicatorLabels(
+      row as unknown as Record<string, unknown>,
+    );
+    Object.entries(qualityIndicatorLabels).forEach(([slug, label]) => {
+      if (slug && label) {
+        const trimmedLabel = label.trim();
+        if (trimmedLabel.length > 0) {
+          errorSlugToLabel.set(slug, trimmedLabel);
+        }
+      }
+    });
     const qualityIndicatorKeys = Object.keys(qualityIndicatorCounts);
 
     Object.keys(row).forEach((key) => {
@@ -750,9 +766,33 @@ export const buildDashboardData = ({
       .filter((slug) => slug.length > 0);
 
     const combinedFlagSet = new Set<string>();
-    qualityIndicatorSlugs.forEach((slug) => combinedFlagSet.add(slug));
-    manualErrorSlugs.forEach((slug) => combinedFlagSet.add(slug));
-    qcFlagSlugs.forEach((slug) => combinedFlagSet.add(slug));
+    qualityIndicatorSlugs.forEach((slug) => {
+      combinedFlagSet.add(slug);
+      if (!errorSlugToLabel.has(slug)) {
+        const label = normaliseErrorType(slug).label;
+        if (label.trim().length > 0) {
+          errorSlugToLabel.set(slug, label);
+        }
+      }
+    });
+    manualErrorSlugs.forEach((slug) => {
+      combinedFlagSet.add(slug);
+      if (!errorSlugToLabel.has(slug)) {
+        const label = normaliseErrorType(slug).label;
+        if (label.trim().length > 0) {
+          errorSlugToLabel.set(slug, label);
+        }
+      }
+    });
+    qcFlagSlugs.forEach((slug) => {
+      combinedFlagSet.add(slug);
+      if (!errorSlugToLabel.has(slug)) {
+        const label = normaliseErrorType(slug).label;
+        if (label.trim().length > 0) {
+          errorSlugToLabel.set(slug, label);
+        }
+      }
+    });
 
     const qualityFlags = Array.from(new Set(qcFlagSlugs));
     const otherFlags = Array.from(combinedFlagSet).filter((slug) => !qualityFlags.includes(slug));
@@ -855,6 +895,12 @@ export const buildDashboardData = ({
       if (!slug) {
         return;
       }
+      if (!errorSlugToLabel.has(slug)) {
+        const label = qualityIndicatorLabels[slug] ?? normaliseErrorType(slug).label;
+        if (label.trim().length > 0) {
+          errorSlugToLabel.set(slug, label);
+        }
+      }
       errorCounts[slug] = getNumber(errorCounts[slug]) + value;
       interviewerError[slug] = getNumber(interviewerError[slug]) + value;
     });
@@ -862,6 +908,12 @@ export const buildDashboardData = ({
     manualErrorSlugs.forEach((slug) => {
       if (!slug) {
         return;
+      }
+      if (!errorSlugToLabel.has(slug)) {
+        const label = normaliseErrorType(slug).label;
+        if (label.trim().length > 0) {
+          errorSlugToLabel.set(slug, label);
+        }
       }
       errorCounts[slug] = getNumber(errorCounts[slug]) + 1;
       interviewerError[slug] = getNumber(interviewerError[slug]) + 1;
@@ -1070,11 +1122,17 @@ export const buildDashboardData = ({
   const totalErrorEvents = Object.values(cleanedErrorCounts).reduce((sum, value) => sum + value, 0);
   const errorBreakdown: ErrorBreakdownRow[] = Object.entries(cleanedErrorCounts)
     .sort((a, b) => b[1] - a[1])
-    .map(([label, count]) => ({
-      errorType: label,
-      count,
-      percentage: totalErrorEvents > 0 ? (count / totalErrorEvents) * 100 : 0,
-    }));
+    .map(([slug, count]) => {
+      const info = normaliseErrorType(slug);
+      const displayLabel = errorSlugToLabel.get(info.slug) ?? info.label;
+      return {
+        errorType: displayLabel,
+        count,
+        percentage: totalErrorEvents > 0 ? (count / totalErrorEvents) * 100 : 0,
+        relatedVariables: info.relatedVariables,
+        code: info.slug,
+      };
+    });
 
   const achievementsByState: AchievementByStateRow[] = [...totalsByState.entries()].map(([state, total]) => {
     const approved = approvedByState.get(state) ?? 0;
