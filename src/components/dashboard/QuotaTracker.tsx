@@ -19,9 +19,14 @@ interface QuotaMetric {
   achieved: QuotaValue;
 }
 
-interface GenderQuota {
+interface GenderQuotaBreakdown {
   male: QuotaValue;
   female: QuotaValue;
+}
+
+interface GenderQuota {
+  target: GenderQuotaBreakdown;
+  achieved: GenderQuotaBreakdown;
 }
 
 interface QuotaRow {
@@ -58,7 +63,10 @@ const quotaTabs: QuotaTabDefinition[] = [
         clusters: { target: 16, achieved: null },
         averagePerCluster: { target: 50, achieved: null },
         sampleSize: { target: 1000, achieved: null },
-        gender: { male: null, female: null },
+        gender: {
+          target: { male: null, female: null },
+          achieved: { male: null, female: null },
+        },
         youth: { target: 400, achieved: null },
       },
       {
@@ -66,7 +74,10 @@ const quotaTabs: QuotaTabDefinition[] = [
         clusters: { target: 16, achieved: null },
         averagePerCluster: { target: 50, achieved: null },
         sampleSize: { target: 1000, achieved: null },
-        gender: { male: null, female: null },
+        gender: {
+          target: { male: null, female: null },
+          achieved: { male: null, female: null },
+        },
         youth: { target: 400, achieved: null },
       },
     ],
@@ -80,7 +91,10 @@ const quotaTabs: QuotaTabDefinition[] = [
         clusters: { target: 22, achieved: null },
         averagePerCluster: { target: 50, achieved: null },
         sampleSize: { target: 1300, achieved: null },
-        gender: { male: null, female: null },
+        gender: {
+          target: { male: null, female: null },
+          achieved: { male: null, female: null },
+        },
         youth: { target: 550, achieved: null },
       },
       {
@@ -88,7 +102,10 @@ const quotaTabs: QuotaTabDefinition[] = [
         clusters: { target: 22, achieved: null },
         averagePerCluster: { target: 50, achieved: null },
         sampleSize: { target: 1300, achieved: null },
-        gender: { male: null, female: null },
+        gender: {
+          target: { male: null, female: null },
+          achieved: { male: null, female: null },
+        },
         youth: { target: 550, achieved: null },
       },
     ],
@@ -102,7 +119,10 @@ const quotaTabs: QuotaTabDefinition[] = [
         clusters: { target: 10, achieved: null },
         averagePerCluster: { target: 40, achieved: null },
         sampleSize: { target: 400, achieved: null },
-        gender: { male: null, female: null },
+        gender: {
+          target: { male: null, female: null },
+          achieved: { male: null, female: null },
+        },
         youth: { target: 400, achieved: null },
       },
       {
@@ -110,7 +130,10 @@ const quotaTabs: QuotaTabDefinition[] = [
         clusters: { target: 10, achieved: null },
         averagePerCluster: { target: 40, achieved: null },
         sampleSize: { target: 400, achieved: null },
-        gender: { male: null, female: null },
+        gender: {
+          target: { male: null, female: null },
+          achieved: { male: null, female: null },
+        },
         youth: { target: 400, achieved: null },
       },
     ],
@@ -177,8 +200,10 @@ const getSheetRows = (rows: QuotaRow[]) =>
     "Avg/Cluster Achieved": row.averagePerCluster.achieved,
     "Sample Target": row.sampleSize.target,
     "Sample Achieved": row.sampleSize.achieved,
-    "Gender (Male)": row.gender.male,
-    "Gender (Female)": row.gender.female,
+    "Gender Target (Male)": row.gender.target.male,
+    "Gender Target (Female)": row.gender.target.female,
+    "Gender Achieved (Male)": row.gender.achieved.male,
+    "Gender Achieved (Female)": row.gender.achieved.female,
     "Youth Target": row.youth.target,
     "Youth Achieved": row.youth.achieved,
   }));
@@ -234,11 +259,11 @@ export function QuotaTracker() {
           {quotaTabs.map((tab) => (
             <TabsContent key={tab.value} value={tab.value}>
               <div className="overflow-x-auto rounded-xl border bg-background/80">
-                <Table className="min-w-[960px] border border-border/60 text-sm">
+                <Table className="min-w-[1040px] border border-border/60 text-sm">
                   <TableHeader className="bg-background">
                     <TableRow className="divide-x divide-border/60 border-b border-border/60">
                       <TableHead
-                        rowSpan={3}
+                        rowSpan={4}
                         className={`${headerCellClass} bg-background align-middle font-semibold`}
                       >
                         Arm
@@ -282,7 +307,7 @@ export function QuotaTracker() {
                         Sample (n)
                       </TableHead>
                       <TableHead
-                        colSpan={2}
+                        colSpan={4}
                         className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
                       >
                         Gender quota
@@ -296,35 +321,55 @@ export function QuotaTracker() {
                     </TableRow>
                     <TableRow className="divide-x divide-border/60">
                       <TableHead
+                        rowSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Target
                       </TableHead>
                       <TableHead
+                        rowSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Achieved
                       </TableHead>
                       <TableHead
+                        rowSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Target
                       </TableHead>
                       <TableHead
+                        rowSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Achieved
                       </TableHead>
                       <TableHead
+                        colSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Target
                       </TableHead>
                       <TableHead
+                        colSpan={2}
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
                         Achieved
                       </TableHead>
+                      <TableHead
+                        rowSpan={2}
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
+                        Target
+                      </TableHead>
+                      <TableHead
+                        rowSpan={2}
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
+                        Achieved
+                      </TableHead>
+                    </TableRow>
+                    <TableRow className="divide-x divide-border/60">
                       <TableHead
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
@@ -338,12 +383,12 @@ export function QuotaTracker() {
                       <TableHead
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
-                        Target
+                        Male
                       </TableHead>
                       <TableHead
                         className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
                       >
-                        Achieved
+                        Female
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -392,10 +437,16 @@ export function QuotaTracker() {
                           {formatValue(row.sampleSize.achieved)}
                         </TableCell>
                         <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
-                          {formatValue(row.gender.male)}
+                          {formatValue(row.gender.target.male)}
                         </TableCell>
                         <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
-                          {formatValue(row.gender.female)}
+                          {formatValue(row.gender.target.female)}
+                        </TableCell>
+                        <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
+                          {formatValue(row.gender.achieved.male)}
+                        </TableCell>
+                        <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
+                          {formatValue(row.gender.achieved.female)}
                         </TableCell>
                         <TableCell className={`${bodyCellClass} text-right font-medium`}>
                           {formatValue(row.youth.target)}
