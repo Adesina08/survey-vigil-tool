@@ -23,7 +23,7 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart";
-import { cn } from "@/lib/utils";
+import { cn, formatErrorLabel } from "@/lib/utils";
 
 interface InterviewerData {
   interviewerId: string;

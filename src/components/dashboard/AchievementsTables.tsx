@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -12,6 +12,91 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download, Award } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+type SimpleExportRow = Record<string, string | number>;
+
+interface StateAchievement {
+  state: string;
+  total: number;
+  approved: number;
+  notApproved: number;
+  percentageApproved: number;
+  treatmentPathCount: number;
+  controlPathCount: number;
+  unknownPathCount: number;
+}
+
+type SheetJS = typeof import("xlsx");
+
+const toOneDecimal = (value: number): number => {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.round(value * 10) / 10;
+};
+
+const sanitizeSheetName = (raw: string): string => {
+  const fallback = "Sheet1";
+  if (!raw || typeof raw !== "string") {
+    return fallback;
+  }
+
+  const cleaned = raw.replace(/[\\/?*:]/g, " ").replace(/\[/g, " ").replace(/\]/g, " ").trim();
+  if (!cleaned) {
+    return fallback;
+  }
+
+  return cleaned.slice(0, 31);
+};
+
+const sanitizeFileName = (label: string): string => {
+  const fallback = "achievements";
+  if (!label || typeof label !== "string") {
+    return fallback;
+  }
+
+  const cleaned = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return cleaned || fallback;
+};
+
+const loadSheetModule = async (): Promise<SheetJS> => {
+  const module = (await import("xlsx")) as SheetJS & { default?: SheetJS };
+  return module.default ?? module;
+};
+
+const downloadAchievementsWorkbook = async (
+  label: string,
+  headers: string[],
+  rows: SimpleExportRow[],
+): Promise<void> => {
+  if (typeof window === "undefined") {
+    console.warn("Achievements export is only available in the browser context.");
+    return;
+  }
+
+  try {
+    const XLSX = await loadSheetModule();
+    const data = [
+      headers,
+      ...rows.map((row) =>
+        headers.map((header) => {
+          const cell = row[header];
+          return cell === undefined ? "" : cell;
+        }),
+      ),
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sanitizeSheetName(`${label} Achievements`));
+
+    const fileName = `achievements-${sanitizeFileName(label)}.xlsx`;
+    XLSX.writeFile(workbook, fileName, { bookType: "xlsx" });
+  } catch (error) {
+    console.error("Failed to export achievements workbook", error);
+  }
+};
 
 interface InterviewerAchievement {
   interviewerId: string;
@@ -38,7 +123,7 @@ interface LGAAchievement {
   unknownPathCount: number;
 }
 
-type AchievementsExportType = "interviewer" | "lga";
+type AchievementsExportType = "interviewer" | "lga" | "state";
 
 interface AchievementsTablesProps {
   byInterviewer: InterviewerAchievement[];
@@ -49,6 +134,42 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
   // Add defensive checks to ensure arrays are valid
   const safeByInterviewer = Array.isArray(byInterviewer) ? byInterviewer : [];
   const safeByLGA = Array.isArray(byLGA) ? byLGA : [];
+  const safeByState = useMemo<StateAchievement[]>(() => {
+    if (safeByLGA.length === 0) {
+      return [];
+    }
+
+    const aggregated = new Map<string, Omit<StateAchievement, "percentageApproved">>();
+
+    safeByLGA.forEach((row) => {
+      const stateKey = row?.state ?? "Unknown";
+      const current = aggregated.get(stateKey) ?? {
+        state: stateKey,
+        total: 0,
+        approved: 0,
+        notApproved: 0,
+        treatmentPathCount: 0,
+        controlPathCount: 0,
+        unknownPathCount: 0,
+      };
+
+      current.total += row?.total ?? 0;
+      current.approved += row?.approved ?? 0;
+      current.notApproved += row?.notApproved ?? 0;
+      current.treatmentPathCount += row?.treatmentPathCount ?? 0;
+      current.controlPathCount += row?.controlPathCount ?? 0;
+      current.unknownPathCount += row?.unknownPathCount ?? 0;
+
+      aggregated.set(stateKey, current);
+    });
+
+    return Array.from(aggregated.values())
+      .map<StateAchievement>((entry) => ({
+        ...entry,
+        percentageApproved: entry.total > 0 ? (entry.approved / entry.total) * 100 : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [safeByLGA]);
 
   const calculateTotals = <
     T extends {
@@ -87,6 +208,7 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
 
   const interviewerTotals = calculateTotals(safeByInterviewer);
   const lgaTotals = calculateTotals(safeByLGA);
+  const stateTotals = calculateTotals(safeByState);
 
   const handleExport = useCallback(
     async (type: AchievementsExportType) => {
@@ -216,7 +338,8 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
     [safeByInterviewer, safeByLGA, safeByState, interviewerTotals, lgaTotals, stateTotals],
   );
 
-  const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
+  const formatPercentage = (value: number) =>
+    `${Number.isFinite(value) ? value.toFixed(1) : "0.0"}%`;
 
   const renderPathCell = (
     count: number,
