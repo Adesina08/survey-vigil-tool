@@ -3,6 +3,9 @@
  * Maps raw Google Sheets data to dashboard-ready format
  */
 
+import { determineApprovalStatus as normaliseApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
+import { extractErrorCodes } from "@/utils/errors";
+
 // Type definitions matching your Google Sheets structure
 export interface RawSurveyRow {
   // Metadata
@@ -165,47 +168,14 @@ function getGenderValue(row: RawSurveyRow): "male" | "female" | "unknown" {
   return "unknown";
 }
 
-/**
- * Extract all error codes/flags from a row
- */
-function extractErrorCodes(row: RawSurveyRow): string[] {
-  const errors: string[] = [];
-  
-  // Check all QC_FLAG fields
-  Object.keys(row).forEach((key) => {
-    if (key.startsWith("QC_FLAG_") && isTruthy(row[key])) {
-      errors.push(key);
-    }
-    if (key.startsWith("QC_WARN_") && isTruthy(row[key])) {
-      errors.push(key);
-    }
-  });
-
-  return errors;
-}
+const isQualityFlag = (code: string) => /^QC_(FLAG|WARN)_/i.test(code);
 
 /**
- * Determine approval status based on QC flags
+ * Determine approval status using shared normalisation logic
  */
 function determineApprovalStatus(row: RawSurveyRow): "approved" | "not_approved" {
-  // Check explicit approval column first
-  const approvalField = getTextValue(row, ["Approval", "QC Status"]);
-  if (approvalField) {
-    const lower = approvalField.toLowerCase();
-    if (lower.includes("approve") || lower === "approved") return "approved";
-    if (lower.includes("reject") || lower === "not approved") return "not_approved";
-  }
-
-  // Check if there are any QC flags
-  const flagCount = parseNumber(row.QC_FLAG_COUNT);
-  if (flagCount > 0) return "not_approved";
-
-  // Check for any active flags
-  const hasFlags = Object.keys(row).some(
-    (key) => key.startsWith("QC_FLAG_") && isTruthy(row[key])
-  );
-
-  return hasFlags ? "not_approved" : "approved";
+  const status = normaliseApprovalStatus(row as unknown as Record<string, unknown>);
+  return status === "Approved" ? "approved" : "not_approved";
 }
 
 /**
@@ -228,16 +198,48 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
       const lga = getTextValue(row, ["A3. select the LGA", "A3. Select the LGA"]) || "Unknown";
       const state = getTextValue(row, ["State"]) || "Ogun";
 
+      const interviewerName =
+        getTextValue(row, [
+          "Enumerator Name",
+          "Interviewer Name",
+          "enumerator_name",
+          "interviewer_name",
+        ]) || interviewerId;
+
+      const interviewerLabel =
+        interviewerName && interviewerName !== interviewerId
+          ? `${interviewerId} · ${interviewerName}`
+          : interviewerId;
+
+      const approvalField = findApprovalFieldValue(row as unknown as Record<string, unknown>);
+      const status = determineApprovalStatus(row);
+      const approvalLabel = approvalField?.value ?? (status === "approved" ? "Approved" : "Not Approved");
+      const approvalSource = approvalField?.key ?? null;
+
+      const flags = extractErrorCodes(row as unknown as Record<string, unknown>);
+      const qualityFlags = flags.filter((code) => isQualityFlag(code));
+      const otherFlags = flags.filter((code) => !isQualityFlag(code));
+      const allFlags = [...qualityFlags, ...otherFlags];
+
       return {
         id: row._uuid || row._id || `submission-${Math.random()}`,
         lat: parseNumber(row["_A5. GPS Coordinates_latitude"]),
         lng: parseNumber(row["_A5. GPS Coordinates_longitude"]),
         interviewerId,
+        interviewerName,
+        interviewerLabel,
         lga,
         state,
-        errorTypes: extractErrorCodes(row),
-        timestamp: row._submission_time || row["A2. Date"] || new Date().toISOString(),
-        status: determineApprovalStatus(row),
+        errorTypes: allFlags,
+        qcFlags: qualityFlags,
+        otherFlags,
+        timestamp:
+          row._submission_time ||
+          row["A2. Date"] ||
+          new Date().toISOString(),
+        status,
+        approvalLabel,
+        approvalSource,
         ogstepPath: getOgstepPath(row),
         ogstepResponse: getTextValue(row, ["B2. Did you participate in OGSTEP?"]),
         directions: row.Direction || null,
