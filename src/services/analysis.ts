@@ -18,6 +18,7 @@ export interface AnalysisResult {
 
 export async function generateAnalysis(request: AnalysisRequest): Promise<AnalysisResult> {
   const { topBreak, variables, mode, limitCategories, bins, dropMissing, minCount } = request;
+  const shouldDropMissing = dropMissing ?? true;
 
   if (!variables.length) {
     throw new Error("Select at least one variable to analyse.");
@@ -31,7 +32,7 @@ export async function generateAnalysis(request: AnalysisRequest): Promise<Analys
       stat: mode,
       limitCategories,
       bins,
-      dropMissing,
+      dropMissing: shouldDropMissing,
       minCount,
     });
     tables.push(table);
