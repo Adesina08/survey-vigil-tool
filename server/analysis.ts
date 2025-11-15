@@ -65,6 +65,25 @@ const CURATED_TOP_BREAKS = [
 const SAMPLE_SIZE_LIMIT = 1000;
 const CATEGORY_LIMIT_DEFAULT = 12;
 
+const PLACEHOLDER_VALUES = new Set([
+  "unknown",
+  "unknown lga",
+  "unknown state",
+  "unknown ward",
+  "unknown age group",
+]);
+
+const isPlaceholderValue = (value: unknown): boolean => {
+  if (value === null || value === undefined) {
+    return true;
+  }
+  const text = String(value).trim();
+  if (!text) {
+    return true;
+  }
+  return PLACEHOLDER_VALUES.has(text.toLowerCase());
+};
+
 const inferFields = (rows: Record<string, unknown>[]): AnalysisField[] => {
   if (rows.length === 0) {
     return [];
@@ -117,13 +136,10 @@ const normalizeCategorical = (
   const counts = new Map<string, number>();
 
   for (const value of values) {
-    if (value === null || value === undefined) {
+    if (isPlaceholderValue(value)) {
       continue;
     }
     const text = String(value).trim();
-    if (!text) {
-      continue;
-    }
     counts.set(text, (counts.get(text) ?? 0) + 1);
   }
 
@@ -173,14 +189,14 @@ const buildCrossTab = ({
     const rawTop = row[topbreak];
     const rawVariable = row[variable];
 
-    if (rawTop === null || rawTop === undefined || rawVariable === null || rawVariable === undefined) {
+    if (isPlaceholderValue(rawTop) || isPlaceholderValue(rawVariable)) {
       continue;
     }
 
     const topText = String(rawTop).trim();
     const variableText = String(rawVariable).trim();
 
-    if (!topText || !variableText) {
+    if (isPlaceholderValue(topText) || isPlaceholderValue(variableText)) {
       continue;
     }
 
