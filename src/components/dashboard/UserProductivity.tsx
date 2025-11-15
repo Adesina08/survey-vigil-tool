@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Table,
   TableBody,
@@ -22,7 +23,7 @@ import {
   ChartLegend,
   ChartLegendContent,
 } from "@/components/ui/chart";
-import { cn, formatErrorLabel } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 interface InterviewerData {
   interviewerId: string;
@@ -39,12 +40,25 @@ interface InterviewerData {
 interface UserProductivityProps {
   data?: InterviewerData[];      // 👈 Optional
   errorTypes?: string[];
+  errorLabels?: Record<string, string>;
 }
 
-export function UserProductivity({ data = [], errorTypes = [] }: UserProductivityProps) {
+export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} }: UserProductivityProps) {
   // 👇 Safely handle undefined/null data
   const safeData = Array.isArray(data) ? data : [];
   const safeErrorTypes = Array.isArray(errorTypes) ? errorTypes : [];
+  const [rankingView, setRankingView] = useState<"top" | "bottom">("top");
+  const safeErrorLabelMap = useMemo(() => {
+    if (!errorLabels || typeof errorLabels !== "object") {
+      return {} as Record<string, string>;
+    }
+    return Object.entries(errorLabels).reduce<Record<string, string>>((acc, [key, value]) => {
+      if (typeof key === "string" && typeof value === "string" && key.length > 0) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {});
+  }, [errorLabels]);
 
   const rankedProductivity = useMemo(() => {
     if (safeData.length === 0) {
@@ -84,6 +98,14 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
 
     return normalised.sort(compare);
   }, [safeData]);
+
+  const rankById = useMemo(() => {
+    const map = new Map<string, number>();
+    rankedProductivity.forEach((row, index) => {
+      map.set(row.interviewerId, index + 1);
+    });
+    return map;
+  }, [rankedProductivity]);
 
   const [sortState, setSortState] = useState<{ column: string; direction: "asc" | "desc" }>(
     () => ({ column: "default", direction: "desc" })
@@ -234,20 +256,30 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
     [rankedProductivity],
   );
 
-  const topPerformers = rankedProductivity.slice(0, 10);
-  const topPerformer = topPerformers[0];
-  const remainingTopPerformers = topPerformers.slice(1);
-
   const overallApprovalRate =
     overallTotals.total > 0 ? (overallTotals.valid / overallTotals.total) * 100 : 0;
-  const topApprovalRate = topPerformer ? topPerformer.approvalRate : 0;
-  const topPerformerTotals = topPerformer
+  const topPerformers = useMemo(() => rankedProductivity.slice(0, 10), [rankedProductivity]);
+  const bottomPerformers = useMemo(() => {
+    const slice = rankedProductivity.slice(-10);
+    return slice.reverse();
+  }, [rankedProductivity]);
+
+  const activePerformers = rankingView === "top" ? topPerformers : bottomPerformers;
+  const primaryPerformer = activePerformers[0];
+  const remainingPerformers = activePerformers.slice(1);
+  const primaryApprovalRate = primaryPerformer ? primaryPerformer.approvalRate : 0;
+  const primaryTotals = primaryPerformer
     ? {
-        total: topPerformer.totalSubmissions,
-        valid: topPerformer.validSubmissions,
-        invalid: topPerformer.invalidSubmissions,
+        total: primaryPerformer.totalSubmissions,
+        valid: primaryPerformer.validSubmissions,
+        invalid: primaryPerformer.invalidSubmissions,
       }
     : { total: 0, valid: 0, invalid: 0 };
+
+  const performerLabel = rankingView === "top" ? "Top performer" : "Lowest performer";
+  const listLabel = rankingView === "top" ? "Top 10 interviewers" : "Bottom 10 interviewers";
+  const progressLabel =
+    rankingView === "top" ? "Top performer approval rate" : "Lowest performer approval rate";
 
   // 👇 Show empty state if no data
   if (safeData.length === 0) {
@@ -277,24 +309,49 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
     <div className="space-y-6 fade-in">
       <Card className="overflow-hidden border-none shadow-lg shadow-primary/20">
         <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
-          <CardTitle className="flex items-center gap-2 text-xl font-semibold">
-            <Users className="h-5 w-5" />
-            User Productivity Rankings
-          </CardTitle>
-          <p className="text-sm text-primary-foreground/80">
-            Track interviewer performance, highlight top performers, and quickly spot where support is needed.
-          </p>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+                <Users className="h-5 w-5" />
+                User Productivity Rankings
+              </CardTitle>
+              <p className="text-sm text-primary-foreground/80">
+                Track interviewer performance, highlight key performers, and quickly spot where support is needed.
+              </p>
+            </div>
+            <ToggleGroup
+              type="single"
+              value={rankingView}
+              onValueChange={(value) => {
+                if (value === "top" || value === "bottom") {
+                  setRankingView(value);
+                }
+              }}
+              className="self-start rounded-md border bg-primary-foreground/10 p-1 text-xs font-semibold uppercase tracking-wide text-primary-foreground"
+            >
+              <ToggleGroupItem value="top" className="px-3 py-1">
+                Top 10
+              </ToggleGroupItem>
+              <ToggleGroupItem value="bottom" className="px-3 py-1">
+                Last 10
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-6 bg-card/60 p-6 md:grid-cols-[2fr_1fr]">
           <div className="space-y-6 rounded-lg border bg-background p-6 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Top Performer</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{performerLabel}</p>
                 <div className="mt-2 flex items-center gap-3 text-lg font-semibold text-foreground">
-                  {topPerformer ? (
+                  {primaryPerformer ? (
                     <>
-                      <Crown className="h-5 w-5 text-yellow-400" />
-                      <span>{topPerformer.displayLabel || topPerformer.interviewerId}</span>
+                      {rankingView === "top" ? (
+                        <Crown className="h-5 w-5 text-yellow-400" />
+                      ) : (
+                        <ArrowDown className="h-5 w-5 text-destructive" />
+                      )}
+                      <span>{primaryPerformer.displayLabel || primaryPerformer.interviewerId}</span>
                     </>
                   ) : (
                     <span>No data available</span>
@@ -309,40 +366,45 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
               <div className="rounded-lg bg-muted/40 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total interviews</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">
-                  {topPerformerTotals.total.toLocaleString()}
+                  {primaryTotals.total.toLocaleString()}
                 </p>
               </div>
               <div className="rounded-lg bg-muted/40 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Approved</p>
                 <p className="mt-2 text-2xl font-semibold text-success">
-                  {topPerformerTotals.valid.toLocaleString()}
+                  {primaryTotals.valid.toLocaleString()}
                 </p>
               </div>
               <div className="rounded-lg bg-muted/40 p-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Flagged</p>
                 <p className="mt-2 text-2xl font-semibold text-destructive">
-                  {topPerformerTotals.invalid.toLocaleString()}
+                  {primaryTotals.invalid.toLocaleString()}
                 </p>
               </div>
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-muted-foreground">Top performer approval rate</span>
-                <span className="font-semibold text-foreground">{topApprovalRate.toFixed(1)}%</span>
+                <span className="font-medium text-muted-foreground">{progressLabel}</span>
+                <span className="font-semibold text-foreground">{primaryApprovalRate.toFixed(1)}%</span>
               </div>
-              <Progress value={topApprovalRate} className="h-3 bg-muted" />
+              <Progress value={primaryApprovalRate} className="h-3 bg-muted" />
             </div>
           </div>
           <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Top 10 interviewers</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{listLabel}</p>
             <ScrollArea className="h-[360px] rounded-lg border bg-background/60 p-1">
               <div className="space-y-3 p-2">
-                {remainingTopPerformers.length === 0 ? (
+                {remainingPerformers.length === 0 ? (
                   <div className="rounded-lg border bg-background/80 p-4 text-sm text-muted-foreground">
                     Not enough data to display additional rankings.
                   </div>
                 ) : (
-                  remainingTopPerformers.map((performer, index) => (
+                  remainingPerformers.map((performer, index) => {
+                    const globalRank = rankById.get(performer.interviewerId) ?? index + 2;
+                    const approvalClass =
+                      rankingView === "top" ? "text-success" : "text-destructive";
+                    const ApprovalIcon = rankingView === "top" ? TrendingUp : ArrowDown;
+                    return (
                     <div
                       key={performer.interviewerId}
                       className={cn(
@@ -354,7 +416,7 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="bg-primary/15 text-primary">
-                              #{index + 2}
+                              #{globalRank}
                             </Badge>
                             <span className="font-semibold text-foreground">{performer.displayLabel || performer.interviewerId}</span>
                           </div>
@@ -362,13 +424,14 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
                             {performer.validSubmissions.toLocaleString()} approved of {performer.totalSubmissions.toLocaleString()} interviews
                           </p>
                         </div>
-                        <div className="flex items-center gap-1 text-sm font-semibold text-success">
-                          <TrendingUp className="h-4 w-4" />
+                        <div className={cn("flex items-center gap-1 text-sm font-semibold", approvalClass)}>
+                          <ApprovalIcon className="h-4 w-4" />
                           {performer.approvalRate.toFixed(1)}%
                         </div>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </ScrollArea>
@@ -405,7 +468,7 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
                       <ComposedChart
                         data={chartData}
                         layout="vertical"
-                        margin={{ top: 48, right: 32, bottom: 24, left: 24 }}
+                        margin={{ top: 88, right: 32, bottom: 48, left: 24 }}
                         barCategoryGap={12}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" horizontal={false} />
@@ -451,7 +514,12 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
                             />
                           }
                         />
-                        <ChartLegend content={<ChartLegendContent />} />
+                        <ChartLegend
+                          verticalAlign="top"
+                          align="left"
+                          wrapperStyle={{ paddingBottom: 12 }}
+                          content={<ChartLegendContent verticalAlign="top" className="justify-start" />}
+                        />
                         <Bar
                           dataKey="approved"
                           stackId="status"
@@ -543,7 +611,7 @@ export function UserProductivity({ data = [], errorTypes = [] }: UserProductivit
                             onClick={() => handleSort(errorType, "number")}
                             className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-foreground sm:text-sm"
                           >
-                            <span>{formatErrorLabel(errorType)}</span>
+                            <span>{safeErrorLabelMap[errorType] ?? errorType}</span>
                             {renderSortIcon(errorType)}
                           </button>
                         </TableHead>
