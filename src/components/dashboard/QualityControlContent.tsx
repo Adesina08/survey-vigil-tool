@@ -57,6 +57,27 @@ const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
   return normaliseOgstepResponse(response);
 };
 
+const getGenderFromRow = (row: NormalisedRow): "male" | "female" | "unknown" => {
+  const value =
+    getFirstTextValue(row, [
+      "A7. Sex",
+      "a7_sex",
+      "Gender",
+      "gender",
+      "respondent_gender",
+      "respondent sex",
+    ]) ?? null;
+
+  if (!value) {
+    return "unknown";
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized.startsWith("m")) return "male";
+  if (normalized.startsWith("f")) return "female";
+  return "unknown";
+};
+
 interface QualityControlContentProps {
   dashboardData: DashboardData;
   selectedLga: string | null;
@@ -93,7 +114,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
   const {
     summary,
-    quotaProgress,
+    quotaSummary,
     statusBreakdown,
     productivity,
     errorBreakdown,
@@ -118,6 +139,8 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     let totalSubmissions = 0;
     let approvedCount = 0;
     let notApprovedCount = 0;
+    let maleCount = 0;
+    let femaleCount = 0;
 
     const pathTotals: Record<OgstepPath, number> = { treatment: 0, control: 0, unknown: 0 };
     const productivityMap = new Map<
@@ -194,6 +217,10 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       const ogstepPath = getOgstepPathFromRow(row);
 
       const key = `${interviewerId}::${interviewerName}`;
+
+      const genderValue = getGenderFromRow(row);
+      if (genderValue === "male") maleCount += 1;
+      else if (genderValue === "female") femaleCount += 1;
 
       if (!productivityMap.has(key)) {
         productivityMap.set(key, {
@@ -324,10 +351,21 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
     const approvedAgainstTarget = selectedLga
       ? relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0)
-      : 0;
+      : approvedCount;
 
-    const quotaProgress =
+    const completionRate =
       totalTarget > 0 ? Number(((approvedAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
+
+    const submissionsAgainstTarget = totalSubmissions;
+    const submissionProgressPercent =
+      totalTarget > 0 ? Number(((submissionsAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
+
+    const quotaSummary = {
+      achieved: submissionsAgainstTarget,
+      remaining: Math.max(totalTarget - submissionsAgainstTarget, 0),
+      target: totalTarget,
+      achievedPercent: submissionProgressPercent,
+    };
 
     const approvalRatePercent =
       totalSubmissions > 0 ? Number(((approvedCount / totalSubmissions) * 100).toFixed(1)) : 0;
@@ -342,10 +380,12 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       approvalRate: approvalRatePercent,
       notApprovedSubmissions: notApprovedCount,
       notApprovedRate: notApprovedRatePercent,
-      completionRate: quotaProgress,
+      completionRate,
       treatmentPathCount: pathTotals.treatment,
       controlPathCount: pathTotals.control,
       unknownPathCount: pathTotals.unknown,
+      maleCount,
+      femaleCount,
     };
 
     const totalErrors = Array.from(errorTotals.values()).reduce((sum, value) => sum + value, 0);
@@ -360,7 +400,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
     return {
       summary,
-      quotaProgress,
+      quotaSummary,
       statusBreakdown: { approved: approvedCount, notApproved: notApprovedCount },
       productivity,
       errorBreakdown,
@@ -389,7 +429,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       />
       <SummaryCards summary={summary} />
       <div className="grid gap-6 md:grid-cols-[2fr_1fr]">
-        <ProgressCharts quotaProgress={quotaProgress} statusBreakdown={statusBreakdown} />
+        <ProgressCharts quotaSummary={quotaSummary} statusBreakdown={statusBreakdown} />
         <QuotaTracker
           quotaByLGA={filteredQuotaByLGA}
           quotaByLGAAge={filteredQuotaByLGAAge}

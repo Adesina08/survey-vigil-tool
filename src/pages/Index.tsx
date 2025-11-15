@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { ExportBar } from "@/components/dashboard/ExportBar";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,36 @@ import QualityControl from "./QualityControl";
 
 const Index = () => {
   const [statusMessage, setStatusMessage] = useState("Loading…");
-  const { data: dashboardData, isLoading, isFetching, isError, error, refetch } = useDashboardData();
+  const {
+    data: dashboardData,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+    dataUpdatedAt,
+  } = useDashboardData();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedLga, setSelectedLga] = useState<string | null>(null);
+
+  const dateTimeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    [],
+  );
+
+  const lastRefreshedLabel = useMemo(() => {
+    if (!dataUpdatedAt) {
+      return null;
+    }
+    return dateTimeFormatter.format(new Date(dataUpdatedAt));
+  }, [dataUpdatedAt, dateTimeFormatter]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -19,8 +46,7 @@ const Index = () => {
     try {
       const result = await refetch();
       if (!result.error) {
-        const updatedLabel = result.data?.lastUpdated ?? new Date().toLocaleString();
-        setStatusMessage(`Last refreshed: ${updatedLabel}`);
+        setStatusMessage("Data loaded");
       } else {
         setStatusMessage("Refresh failed");
       }
@@ -41,16 +67,17 @@ const Index = () => {
   };
 
   useEffect(() => {
-    if (!dashboardData || isLoading || isFetching) {
+    if (!dashboardData || isLoading) {
       return;
     }
 
-    if (dashboardData.lastUpdated) {
-      setStatusMessage(`Last refreshed: ${dashboardData.lastUpdated}`);
-    } else {
-      setStatusMessage("Data loaded");
-    }
-  }, [dashboardData, isFetching, isLoading]);
+    setStatusMessage((current) => {
+      if (current === "Loading…" || current === "Refreshing…" || current === "Refresh failed") {
+        return "Data loaded";
+      }
+      return current;
+    });
+  }, [dashboardData, isLoading]);
 
   useEffect(() => {
     if (!selectedLga || !dashboardData) {
@@ -113,6 +140,7 @@ const Index = () => {
       <DashboardHeader
         statusMessage={statusMessage}
         lastUpdated={dashboardData?.lastUpdated ?? ""}
+        lastRefreshedAt={lastRefreshedLabel ?? undefined}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing || isFetching}
         exportRows={dashboardData.analysisRows}

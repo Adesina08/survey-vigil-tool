@@ -7,6 +7,8 @@ import type { DashboardData } from "@/types/dashboard";
  * Fetch raw survey data from Google Sheets and transform it into the
  * dashboard-friendly structure that powers the UI.
  */
+const DEFAULT_INTERVIEW_TARGET = 6000;
+
 export async function fetchDashboardData(): Promise<DashboardData> {
   console.log("🔄 Starting dashboard data fetch...");
 
@@ -20,7 +22,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       console.log("Sample row keys:", Object.keys(rawData[0] ?? {}));
     }
 
-    const dashboardData = transformGoogleSheetsData(rawData, 1000);
+    const dashboardData = transformGoogleSheetsData(rawData, DEFAULT_INTERVIEW_TARGET);
 
     console.groupEnd();
 
