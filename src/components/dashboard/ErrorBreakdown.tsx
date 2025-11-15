@@ -30,9 +30,11 @@ const shouldOmitErrorType = (row: ErrorData) => {
   return /^QC[\s_-]*(?:FLAG|WARN)[\s_-]*COUNT$/i.test(row.errorType.trim());
 };
 
+type SortableKey = "count" | "computedPercentage";
+
 export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof ErrorData;
+    key: SortableKey;
     direction: "asc" | "desc";
   }>({ key: "count", direction: "desc" });
 
@@ -41,14 +43,21 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
     [data],
   );
 
-  const sortedData = [...filteredData].sort((a, b) => {
-    if (sortConfig.direction === "asc") {
-      return a[sortConfig.key] > b[sortConfig.key] ? 1 : -1;
+  const totalErrors = filteredData.reduce((sum, item) => sum + item.count, 0);
+  const enrichedData = filteredData.map((row) => ({
+    ...row,
+    computedPercentage: totalErrors > 0 ? (row.count / totalErrors) * 100 : 0,
+  }));
+
+  const sortedData = [...enrichedData].sort((a, b) => {
+    const multiplier = sortConfig.direction === "asc" ? 1 : -1;
+    if (sortConfig.key === "computedPercentage") {
+      return (a.computedPercentage - b.computedPercentage) * multiplier;
     }
-    return a[sortConfig.key] < b[sortConfig.key] ? 1 : -1;
+    return (a.count - b.count) * multiplier;
   });
 
-  const handleSort = (key: keyof ErrorData) => {
+  const handleSort = (key: SortableKey) => {
     setSortConfig({
       key,
       direction:
@@ -56,8 +65,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
     });
   };
 
-  const totalErrors = filteredData.reduce((sum, item) => sum + item.count, 0);
-  const totalPercentageRaw = filteredData.reduce((sum, item) => sum + item.percentage, 0);
+  const totalPercentageRaw = enrichedData.reduce((sum, item) => sum + item.computedPercentage, 0);
   const totalPercentage = Math.min(Math.round(totalPercentageRaw * 10) / 10, 100);
 
   return (
@@ -90,8 +98,13 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
               >
                 Count {sortConfig.key === "count" && (sortConfig.direction === "desc" ? "↓" : "↑")}
               </TableHead>
-              <TableHead className="top-0 z-20 bg-background text-right text-xs font-semibold uppercase tracking-wide">
+              <TableHead
+                className="top-0 z-20 bg-background text-right text-xs font-semibold uppercase tracking-wide cursor-pointer"
+                onClick={() => handleSort("computedPercentage")}
+              >
                 Percentage
+                {sortConfig.key === "computedPercentage" &&
+                  ` ${sortConfig.direction === "desc" ? "↓" : "↑"}`}
               </TableHead>
             </TableRow>
           </TableHeader>
@@ -114,7 +127,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
                   {row.count.toLocaleString()}
                 </TableCell>
                 <TableCell className="text-right text-sm font-medium">
-                  {row.percentage.toFixed(1)}%
+                  {row.computedPercentage.toFixed(1)}%
                 </TableCell>
               </TableRow>
             ))}
