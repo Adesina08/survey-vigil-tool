@@ -397,7 +397,7 @@ const Analysis = () => {
                 </CardHeader>
                 <CardContent>
                   <div
-                    className="overflow-x-auto rounded-lg border"
+                    className="analysis-table-container overflow-x-auto rounded-lg border"
                     dangerouslySetInnerHTML={{ __html: table.html }}
                   />
                 </CardContent>

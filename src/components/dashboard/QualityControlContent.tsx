@@ -75,16 +75,18 @@ const matchesSelectedLga = (value: unknown, selectedLga: string): boolean => {
     return false;
   }
 
-  const baseCandidates = value
+  const normalisedCandidates = new Set<string>();
+
+  expandLgaVariants(value).forEach((variant) => normalisedCandidates.add(variant));
+
+  value
     .split(/[;,/]+/)
     .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-
-  const normalisedCandidates = new Set<string>();
-  baseCandidates.forEach((candidate) => {
-    const variants = expandLgaVariants(candidate);
-    variants.forEach((variant) => normalisedCandidates.add(variant));
-  });
+    .filter((part) => part.length > 0)
+    .forEach((candidate) => {
+      const variants = expandLgaVariants(candidate);
+      variants.forEach((variant) => normalisedCandidates.add(variant));
+    });
 
   return normalisedCandidates.has(target);
 };
