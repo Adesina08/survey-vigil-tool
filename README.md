@@ -48,6 +48,7 @@ This dashboard loads data directly from a Google Sheet using the Google Visualiz
 
 - `VITE_GOOGLE_SHEET_ID`: The ID of the Google Sheet to use as the data source.
 - `VITE_GOOGLE_SHEET_NAME`: The name of the sheet (tab) to use within the Google Sheet.
+- `VITE_GOOGLE_SHEET_GID` (optional): The numeric sheet identifier (`gid`) from the Google Sheet URL. If provided, it takes precedence over `VITE_GOOGLE_SHEET_NAME`.
 
 See the `.env.example` file for the format.
 
@@ -58,7 +59,7 @@ See the `.env.example` file for the format.
 1. Open your Google Sheet in the browser.
 2. The URL will look something like this: `https://docs.google.com/spreadsheets/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ/edit#gid=123456789`
 3. The **Sheet ID** is the long string of characters between `/d/` and `/edit`. In the example above, it's `1aBcDeFgHiJkLmNoPqRsTuVwXyZ`.
-4. The **Sheet Name** is the name of the tab at the bottom of the page. If you haven't renamed it, it's probably "Form Responses 1".
+4. The **Sheet Name** is the name of the tab at the bottom of the page. If you haven't renamed it, it's probably "Form Responses 1". Alternatively, you can copy the numeric `gid` value from the sheet URL (the part after `gid=`) and set it as `VITE_GOOGLE_SHEET_GID`.
 
 **"Failed to fetch Google Sheet" error:**
 

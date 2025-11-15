@@ -2,6 +2,7 @@
 
 const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID;
 const SHEET_NAME = import.meta.env.VITE_GOOGLE_SHEET_NAME ?? "Form Responses 1";
+const SHEET_GID = import.meta.env.VITE_GOOGLE_SHEET_GID;
 
 /**
  * Extract JSON payload from Google's gviz response format.
@@ -25,6 +26,30 @@ function extractJsonPayload(text: string): unknown {
  */
 function parseGvizJson(text: string): Record<string, unknown>[] {
   const payload = extractJsonPayload(text) as Record<string, unknown>;
+
+  if ((payload.status as string | undefined)?.toLowerCase() === "error") {
+    const errors = Array.isArray(payload.errors) ? payload.errors : [];
+    const message = errors
+      .map((error) => {
+        if (typeof error === "object" && error !== null) {
+          const detailed = (error as { detailed_message?: unknown }).detailed_message;
+          if (typeof detailed === "string" && detailed.trim().length > 0) {
+            return detailed.trim();
+          }
+
+          const basic = (error as { message?: unknown }).message;
+          if (typeof basic === "string" && basic.trim().length > 0) {
+            return basic.trim();
+          }
+        }
+
+        return "Unknown Google Sheets query error";
+      })
+      .join("; ");
+
+    throw new Error(message || "Google Sheets query returned an error");
+  }
+
   const table = (payload.table ?? {}) as Record<string, unknown>;
   const cols = (table.cols ?? []) as Array<{ label?: string; id?: string }>;
   const rows = (table.rows ?? []) as Array<{ c?: Array<{ v?: unknown }> }>;
@@ -51,9 +76,17 @@ export async function fetchFromGoogleSheets(): Promise<Record<string, unknown>[]
     throw new Error("VITE_GOOGLE_SHEET_ID environment variable is not set");
   }
 
+  const params = new URLSearchParams({ tqx: "out:json" });
+
+  if (SHEET_GID) {
+    params.set("gid", SHEET_GID);
+  } else {
+    params.set("sheet", SHEET_NAME);
+  }
+
   const url =
     `https://docs.google.com/spreadsheets/d/${encodeURIComponent(SHEET_ID)}` +
-    `/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+    `/gviz/tq?${params.toString()}`;
 
   const response = await fetch(url);
   if (!response.ok) {
