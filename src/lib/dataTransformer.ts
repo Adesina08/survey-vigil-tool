@@ -7,6 +7,20 @@ import { normaliseErrorType, type ErrorTypeInfo } from "./errorTypes";
 import { determineApprovalStatus as normaliseApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
 import { extractErrorCodes } from "@/utils/errors";
 
+const extractErrorTypes = (row: RawSurveyRow): ErrorTypeInfo[] => {
+  const codes = extractErrorCodes(row as Record<string, unknown>);
+  const unique = new Map<string, ErrorTypeInfo>();
+
+  codes.forEach((code) => {
+    const info = normaliseErrorType(code);
+    if (!unique.has(info.slug)) {
+      unique.set(info.slug, info);
+    }
+  });
+
+  return Array.from(unique.values());
+};
+
 // Type definitions matching your Google Sheets structure
 export interface RawSurveyRow {
   // Metadata
@@ -390,7 +404,7 @@ export function calculateAchievementsByLGA(rawData: RawSurveyRow[]) {
  * Calculate error breakdown
  */
 export function calculateErrorBreakdown(rawData: RawSurveyRow[]) {
-  const errorMap = new Map<string, number>();
+  const errorMap = new Map<string, { info: ErrorTypeInfo; count: number }>();
 
   rawData.forEach((row) => {
     const errors = extractErrorTypes(row);
