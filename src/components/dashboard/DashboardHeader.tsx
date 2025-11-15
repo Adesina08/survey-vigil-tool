@@ -10,6 +10,7 @@ import type { ErrorBreakdownRow } from "@/lib/dashboardData";
 interface DashboardHeaderProps {
   statusMessage: string;
   lastUpdated?: string;
+  lastRefreshedAt?: string;
   onRefresh: () => void;
   isRefreshing: boolean;
   exportRows?: DashboardExportRow[];
@@ -19,6 +20,7 @@ interface DashboardHeaderProps {
 export function DashboardHeader({
   statusMessage,
   lastUpdated,
+  lastRefreshedAt,
   onRefresh,
   isRefreshing,
   exportRows,
@@ -27,26 +29,29 @@ export function DashboardHeader({
   const versionLabel = typeof APP_VERSION_LABEL === "string" ? APP_VERSION_LABEL.trim() : "";
   const shouldShowVersion = versionLabel.length > 0;
 
-  const shouldShowLastUpdated = (() => {
-    if (!lastUpdated) {
+  const isDisplayableTimestamp = (value?: string) => {
+    if (!value) {
       return false;
     }
 
-    const parsed = new Date(lastUpdated);
+    const parsed = new Date(value);
     if (!Number.isNaN(parsed.getTime())) {
       return parsed.getFullYear() > 1970 || parsed.getTime() > 0;
     }
 
-    if (/1970/.test(lastUpdated)) {
+    if (/1970/.test(value)) {
       return false;
     }
 
-    if (/invalid/i.test(lastUpdated)) {
+    if (/invalid/i.test(value)) {
       return false;
     }
 
-    return true;
-  })();
+    return value.trim().length > 0;
+  };
+
+  const shouldShowLatestData = isDisplayableTimestamp(lastUpdated);
+  const shouldShowLastRefreshed = isDisplayableTimestamp(lastRefreshedAt);
 
   const hasExportRows = Array.isArray(exportRows) && exportRows.length > 0;
   const exporter = useMemo(
@@ -115,8 +120,11 @@ export function DashboardHeader({
             <div className="text-sm text-foreground sm:text-right">
               <div className="text-muted-foreground">Status</div>
               <div className="break-words font-medium">{statusMessage}</div>
-              {shouldShowLastUpdated ? (
-                <div className="text-xs text-muted-foreground">Latest submission: {lastUpdated}</div>
+              {shouldShowLastRefreshed ? (
+                <div className="text-xs text-muted-foreground">Last refreshed: {lastRefreshedAt}</div>
+              ) : null}
+              {shouldShowLatestData ? (
+                <div className="text-xs text-muted-foreground">Latest data sync: {lastUpdated}</div>
               ) : null}
               {shouldShowVersion ? (
                 <div className="text-xs text-muted-foreground">Version {versionLabel}</div>

@@ -43,10 +43,13 @@ interface SummaryData {
   approvalRate: number;
   notApprovedSubmissions: number;
   notApprovedRate: number;
+  completionRate: number;
   latestSubmissionTime?: string | null;
   treatmentPathCount: number;
   controlPathCount: number;
   unknownPathCount: number;
+  maleCount: number;
+  femaleCount: number;
 }
 
 interface StatusBreakdown {
@@ -457,6 +460,27 @@ const sanitiseText = (value: unknown): string | null => {
   return null;
 };
 
+const normaliseGenderValue = (value: unknown): "male" | "female" | null => {
+  if (typeof value === "string") {
+    const normalised = value.trim().toLowerCase();
+    if (normalised.startsWith("m")) {
+      return "male";
+    }
+    if (normalised.startsWith("f")) {
+      return "female";
+    }
+  }
+
+  if (value === "Male" || value === "male") {
+    return "male";
+  }
+  if (value === "Female" || value === "female") {
+    return "female";
+  }
+
+  return null;
+};
+
 const getLGA = (row: SheetSubmissionRow) => {
   const candidates = [
     row["A3. select the LGA"],
@@ -477,6 +501,26 @@ const getLGA = (row: SheetSubmissionRow) => {
 const getInterviewerId = (row: SheetSubmissionRow) => {
   const enumeratorId = sanitiseText(row["A1. Enumerator ID"]);
   return enumeratorId ?? "Unknown";
+};
+
+const getGender = (row: SheetSubmissionRow): "male" | "female" | null => {
+  const candidates: Array<unknown> = [
+    row.Gender,
+    (row as Record<string, unknown>)["A7. Sex"],
+    (row as Record<string, unknown>)["a7_sex"],
+    (row as Record<string, unknown>)["gender"],
+    (row as Record<string, unknown>)["respondent_gender"],
+    (row as Record<string, unknown>)["respondent sex"],
+  ];
+
+  for (const candidate of candidates) {
+    const gender = normaliseGenderValue(candidate);
+    if (gender) {
+      return gender;
+    }
+  }
+
+  return null;
 };
 
 const getInterviewerName = (row: SheetSubmissionRow) => {
@@ -585,6 +629,8 @@ export const buildDashboardData = ({
 
   const mapSubmissions: Array<MapSubmission & { sortKey: number }> = [];
   let latestTimestamp: Date | null = null;
+  let maleCount = 0;
+  let femaleCount = 0;
 
   processedSubmissions.forEach((row) => {
     const state = row.State ?? "Unknown State";
@@ -616,6 +662,13 @@ export const buildDashboardData = ({
       ),
     ).filter((flag) => !shouldIgnoreErrorType(flag));
     const { response: ogstepResponse, path: ogstepPath } = extractOgstepDetails(row);
+
+    const genderValue = getGender(row);
+    if (genderValue === "male") {
+      maleCount += 1;
+    } else if (genderValue === "female") {
+      femaleCount += 1;
+    }
 
     const lat = getCoordinate(row, "lat");
     const lng = getCoordinate(row, "lng");
@@ -960,9 +1013,12 @@ export const buildDashboardData = ({
     approvalRate: Number(approvalRate.toFixed(1)),
     notApprovedSubmissions: totalNotApproved,
     notApprovedRate: Number(notApprovedRate.toFixed(1)),
+    completionRate: Number(quotaProgress.toFixed(1)),
     treatmentPathCount: ogstepTotals.treatment,
     controlPathCount: ogstepTotals.control,
     unknownPathCount: ogstepTotals.unknown,
+    maleCount,
+    femaleCount,
   };
 
   const statusBreakdown: StatusBreakdown = {
@@ -1068,9 +1124,12 @@ function createEmptyDashboardData(): DashboardData {
       approvalRate: 0,
       notApprovedSubmissions: 0,
       notApprovedRate: 0,
+      completionRate: 0,
       treatmentPathCount: 0,
       controlPathCount: 0,
       unknownPathCount: 0,
+      maleCount: 0,
+      femaleCount: 0,
     },
     statusBreakdown: {
       approved: 0,

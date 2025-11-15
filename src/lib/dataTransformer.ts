@@ -144,6 +144,27 @@ function getOgstepPath(row: RawSurveyRow): "treatment" | "control" | "unknown" {
   return "unknown";
 }
 
+function getGenderValue(row: RawSurveyRow): "male" | "female" | "unknown" {
+  const value =
+    getTextValue(row, [
+      "A7. Sex",
+      "a7_sex",
+      "Gender",
+      "gender",
+      "respondent_gender",
+      "respondent sex",
+    ]) || null;
+
+  if (!value) {
+    return "unknown";
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized.startsWith("m")) return "male";
+  if (normalized.startsWith("f")) return "female";
+  return "unknown";
+}
+
 /**
  * Extract all error codes/flags from a row
  */
@@ -366,6 +387,8 @@ export function calculateSummary(rawData: RawSurveyRow[], overallTarget: number 
   let treatmentPathCount = 0;
   let controlPathCount = 0;
   let unknownPathCount = 0;
+  let maleCount = 0;
+  let femaleCount = 0;
 
   rawData.forEach((row) => {
     totalSubmissions += 1;
@@ -381,6 +404,10 @@ export function calculateSummary(rawData: RawSurveyRow[], overallTarget: number 
     if (path === "treatment") treatmentPathCount += 1;
     else if (path === "control") controlPathCount += 1;
     else unknownPathCount += 1;
+
+    const gender = getGenderValue(row);
+    if (gender === "male") maleCount += 1;
+    else if (gender === "female") femaleCount += 1;
   });
 
   const approvalRate = totalSubmissions > 0 ? (approvedSubmissions / totalSubmissions) * 100 : 0;
@@ -398,6 +425,8 @@ export function calculateSummary(rawData: RawSurveyRow[], overallTarget: number 
     treatmentPathCount,
     controlPathCount,
     unknownPathCount,
+    maleCount,
+    femaleCount,
   };
 }
 
