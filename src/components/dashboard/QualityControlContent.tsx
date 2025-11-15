@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { DashboardData } from "@/types/dashboard";
 import { determineApprovalStatus } from "@/utils/approval";
 import { extractErrorCodes, extractQualityIndicatorCounts } from "@/utils/errors";
+import { normaliseErrorType } from "@/lib/errorTypes";
 import { FilterControls } from "./FilterControls";
 import { SummaryCards } from "./SummaryCards";
 import { ProgressCharts } from "./ProgressCharts";
@@ -258,15 +259,17 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       const qualityCounts = extractQualityIndicatorCounts(row);
       Object.entries(qualityCounts).forEach(([code, value]) => {
         if (!value || !Number.isFinite(value)) return;
-        existing.errors[code] = (existing.errors[code] ?? 0) + value;
+        const info = normaliseErrorType(code);
+        existing.errors[info.label] = (existing.errors[info.label] ?? 0) + value;
         existing.totalErrors += value;
-        errorTotals.set(code, (errorTotals.get(code) ?? 0) + value);
+        errorTotals.set(info.slug, (errorTotals.get(info.slug) ?? 0) + value);
       });
 
       extractErrorCodes(row).forEach((code) => {
-        existing.errors[code] = (existing.errors[code] ?? 0) + 1;
+        const info = normaliseErrorType(code);
+        existing.errors[info.label] = (existing.errors[info.label] ?? 0) + 1;
         existing.totalErrors += 1;
-        errorTotals.set(code, (errorTotals.get(code) ?? 0) + 1);
+        errorTotals.set(info.slug, (errorTotals.get(info.slug) ?? 0) + 1);
       });
 
       // Achievements by interviewer
@@ -389,11 +392,16 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
     const errorBreakdown = Array.from(errorTotals.entries())
       .sort((a, b) => b[1] - a[1])
-      .map(([errorType, count]) => ({
-        errorType,
-        count,
-        percentage: totalErrors > 0 ? Number(((count / totalErrors) * 100).toFixed(1)) : 0,
-      }));
+      .map(([slug, count]) => {
+        const info = normaliseErrorType(slug);
+        return {
+          code: info.slug,
+          errorType: info.label,
+          relatedVariables: info.relatedVariables,
+          count,
+          percentage: totalErrors > 0 ? Number(((count / totalErrors) * 100).toFixed(1)) : 0,
+        };
+      });
 
     return {
       summary,

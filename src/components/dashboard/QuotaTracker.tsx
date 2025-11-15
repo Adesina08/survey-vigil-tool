@@ -211,6 +211,14 @@ const getSheetRows = (rows: QuotaRow[]) =>
 const headerCellClass = "border-l border-border/60 px-4 py-3 first:border-l-0";
 const bodyCellClass = "border-l border-border/50 px-4 py-3 first:border-l-0";
 
+const sanitizeSheetName = (label: string): string => {
+  const cleaned = label.replace(/[\\/?*\[\]:]/g, "-").trim();
+  if (!cleaned) {
+    return "Sheet";
+  }
+  return cleaned.length > 31 ? cleaned.slice(0, 31) : cleaned;
+};
+
 export function QuotaTracker() {
   const [activeTab, setActiveTab] = useState<string>(quotaTabs[0]?.value ?? "tvet");
 
@@ -223,10 +231,16 @@ export function QuotaTracker() {
     try {
       const XLSX = await loadSheetJS();
       const workbook = XLSX.utils.book_new();
-      const worksheet = XLSX.utils.json_to_sheet(getSheetRows(activeTabData.rows));
-      XLSX.utils.book_append_sheet(workbook, worksheet, activeTabData.label);
-      const timestamp = new Date().toISOString().split("T")[0];
-      XLSX.writeFile(workbook, `quota-tracker-${activeTabData.value}-${timestamp}.xlsx`);
+      quotaTabs.forEach((tab) => {
+        const worksheet = XLSX.utils.json_to_sheet(getSheetRows(tab.rows));
+        XLSX.utils.book_append_sheet(workbook, worksheet, sanitizeSheetName(tab.label));
+      });
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[:]/g, "")
+        .replace("T", "-")
+        .split(".")[0];
+      XLSX.writeFile(workbook, `quota-tracker-${timestamp}.xlsx`);
     } catch (error) {
       console.error("Failed to export quota data", error);
     }

@@ -40,6 +40,20 @@ const Index = () => {
     return dateTimeFormatter.format(new Date(dataUpdatedAt));
   }, [dataUpdatedAt, dateTimeFormatter]);
 
+  const latestSurveyLabel = useMemo(() => {
+    const raw = dashboardData?.lastUpdated;
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return dateTimeFormatter.format(parsed);
+    }
+
+    return typeof raw === "string" ? raw : null;
+  }, [dashboardData?.lastUpdated, dateTimeFormatter]);
+
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     setStatusMessage("Refreshing…");
@@ -139,7 +153,7 @@ const Index = () => {
     <div className="flex min-h-screen flex-col bg-background">
       <DashboardHeader
         statusMessage={statusMessage}
-        lastUpdated={dashboardData?.lastUpdated ?? ""}
+        lastUpdated={latestSurveyLabel ?? undefined}
         lastRefreshedAt={lastRefreshedLabel ?? undefined}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing || isFetching}

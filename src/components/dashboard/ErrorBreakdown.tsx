@@ -8,21 +8,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AlertTriangle } from "lucide-react";
-import { useState } from "react";
-import { formatErrorLabel } from "@/lib/utils";
+import { useMemo, useState } from "react";
 
 interface ErrorData {
   errorType: string;
   count: number;
   percentage: number;
+  relatedVariables?: string[];
+  code?: string;
 }
 
 interface ErrorBreakdownProps {
   data: ErrorData[];
 }
 
-const shouldOmitErrorType = (errorType: string) =>
-  /^QC[\s_-]*(?:FLAG|WARN)[\s_-]*COUNT$/i.test(errorType.trim());
+const shouldOmitErrorType = (row: ErrorData) => {
+  if (row.code) {
+    return /count$/i.test(row.code);
+  }
+  return /^QC[\s_-]*(?:FLAG|WARN)[\s_-]*COUNT$/i.test(row.errorType.trim());
+};
 
 export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
   const [sortConfig, setSortConfig] = useState<{
@@ -30,7 +35,10 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
     direction: "asc" | "desc";
   }>({ key: "count", direction: "desc" });
 
-  const filteredData = data.filter((item) => !shouldOmitErrorType(item.errorType));
+  const filteredData = useMemo(
+    () => data.filter((item) => !shouldOmitErrorType(item)),
+    [data],
+  );
 
   const sortedData = [...filteredData].sort((a, b) => {
     if (sortConfig.direction === "asc") {
@@ -61,42 +69,54 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
         <Table
-          containerClassName="max-h-[360px] overflow-auto"
-          className="min-w-[520px]"
+          containerClassName="overflow-x-auto overflow-y-visible"
+          className="min-w-[720px] text-[13px]"
         >
-            <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
-              <TableRow>
-                <TableHead className="sticky left-0 top-0 z-30 bg-background w-[55%] max-w-[340px]">
-                  Error Type
-                </TableHead>
-                <TableHead
-                  className="top-0 z-20 bg-background text-right hover:text-primary cursor-pointer w-[22%]"
-                  onClick={() => handleSort("count")}
-                >
-                  Count {sortConfig.key === "count" && (sortConfig.direction === "desc" ? "↓" : "↑")}
-                </TableHead>
-                <TableHead className="top-0 z-20 bg-background text-right w-[23%]">
-                  Percentage
-                </TableHead>
+          <TableHeader className="bg-background/95 backdrop-blur">
+            <TableRow>
+              <TableHead className="sticky left-0 top-0 z-30 bg-background text-xs font-semibold uppercase tracking-wide">
+                Error Type
+              </TableHead>
+              <TableHead className="top-0 z-20 bg-background text-xs font-semibold uppercase tracking-wide">
+                Related Variables
+              </TableHead>
+              <TableHead
+                className="top-0 z-20 bg-background text-right text-xs font-semibold uppercase tracking-wide cursor-pointer"
+                onClick={() => handleSort("count")}
+              >
+                Count {sortConfig.key === "count" && (sortConfig.direction === "desc" ? "↓" : "↑")}
+              </TableHead>
+              <TableHead className="top-0 z-20 bg-background text-right text-xs font-semibold uppercase tracking-wide">
+                Percentage
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedData.map((row) => (
+              <TableRow key={row.code ?? row.errorType} className="hover:bg-muted/40">
+                <TableCell className="sticky left-0 z-10 bg-background/95 font-medium text-foreground">
+                  {row.errorType}
+                </TableCell>
+                <TableCell className="whitespace-pre-wrap text-sm text-muted-foreground">
+                  {(row.relatedVariables && row.relatedVariables.length > 0
+                    ? row.relatedVariables
+                    : ["—"]
+                  ).join(", ")}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-destructive">
+                  {row.count.toLocaleString()}
+                </TableCell>
+                <TableCell className="text-right text-sm font-medium">
+                  {row.percentage.toFixed(1)}%
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedData.map((row) => (
-                <TableRow key={row.errorType}>
-                  <TableCell className="sticky left-0 z-10 bg-background font-medium pr-4 whitespace-normal break-words">
-                    {formatErrorLabel(row.errorType)}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold text-destructive">
-                    {row.count.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-right">{row.percentage.toFixed(1)}%</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
+            ))}
+          </TableBody>
         </Table>
-        <div className="mt-4 border-t pt-4">
-          <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] items-center gap-2 text-sm font-semibold">
+        <div className="mt-6 border-t pt-4">
+          <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_minmax(0,0.7fr)_minmax(0,0.7fr)] items-center gap-2 text-sm font-semibold">
             <span className="text-muted-foreground">Totals</span>
+            <span className="text-muted-foreground">&nbsp;</span>
             <span className="text-right text-destructive">{totalErrors.toLocaleString()}</span>
             <span className="text-right">{totalPercentage.toFixed(1)}%</span>
           </div>

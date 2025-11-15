@@ -2,6 +2,7 @@
  * Google Sheets Data Transformer for OGSTEP Survey Dashboard
  * Maps raw Google Sheets data to dashboard-ready format
  */
+import { normaliseErrorType, type ErrorTypeInfo } from "./errorTypes";
 
 import { determineApprovalStatus as normaliseApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
 import { extractErrorCodes } from "@/utils/errors";
@@ -169,6 +170,48 @@ function getGenderValue(row: RawSurveyRow): "male" | "female" | "unknown" {
 }
 
 const isQualityFlag = (code: string) => /^QC_(FLAG|WARN)_/i.test(code);
+
+const parseDateValue = (value: unknown): Date | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  // Attempt to coerce to ISO by appending Z if missing timezone
+  const coerced = new Date(`${trimmed}Z`);
+  if (!Number.isNaN(coerced.getTime())) {
+    return coerced;
+  }
+
+  return null;
+};
+
+const getRowTimestamp = (row: RawSurveyRow): Date | null => {
+  const candidates: Array<unknown> = [
+    row._submission_time,
+    row.end,
+    row.today,
+    row.start,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseDateValue(candidate);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
 
 /**
  * Determine approval status using shared normalisation logic
@@ -350,21 +393,80 @@ export function calculateErrorBreakdown(rawData: RawSurveyRow[]) {
   const errorMap = new Map<string, number>();
 
   rawData.forEach((row) => {
-    const errors = extractErrorCodes(row);
-    errors.forEach((error) => {
-      errorMap.set(error, (errorMap.get(error) || 0) + 1);
+    const errors = extractErrorTypes(row);
+    errors.forEach((info) => {
+      const existing = errorMap.get(info.slug);
+      if (existing) {
+        errorMap.set(info.slug, {
+          info: existing.info,
+          count: existing.count + 1,
+        });
+      } else {
+        errorMap.set(info.slug, {
+          info,
+          count: 1,
+        });
+      }
     });
   });
 
-  const totalErrors = Array.from(errorMap.values()).reduce((sum, count) => sum + count, 0);
+  const totals = Array.from(errorMap.values());
+  const totalErrors = totals.reduce((sum, entry) => sum + entry.count, 0);
 
-  return Array.from(errorMap.entries())
-    .map(([errorType, count]) => ({
-      errorType,
+  return totals
+    .map(({ info, count }) => ({
+      code: info.slug,
+      errorType: info.label,
+      relatedVariables: info.relatedVariables,
       count,
-      percentage: totalErrors > 0 ? (count / totalErrors) * 100 : 0,
+      percentage: totalErrors > 0 ? Number(((count / totalErrors) * 100).toFixed(1)) : 0,
     }))
     .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Calculate achievements by state
+ */
+export function calculateAchievementsByState(rawData: RawSurveyRow[]) {
+  const stateMap = new Map<string, any>();
+
+  rawData.forEach((row) => {
+    const state = getTextValue(row, ["State"]) || "Unknown";
+
+    if (!stateMap.has(state)) {
+      stateMap.set(state, {
+        state,
+        total: 0,
+        approved: 0,
+        notApproved: 0,
+        treatmentPathCount: 0,
+        controlPathCount: 0,
+        unknownPathCount: 0,
+      });
+    }
+
+    const entry = stateMap.get(state)!;
+    entry.total += 1;
+
+    const status = determineApprovalStatus(row);
+    if (status === "approved") {
+      entry.approved += 1;
+    } else {
+      entry.notApproved += 1;
+    }
+
+    const path = getOgstepPath(row);
+    if (path === "treatment") entry.treatmentPathCount += 1;
+    else if (path === "control") entry.controlPathCount += 1;
+    else entry.unknownPathCount += 1;
+  });
+
+  return Array.from(stateMap.values())
+    .map((entry) => ({
+      ...entry,
+      percentageApproved: entry.total > 0 ? (entry.approved / entry.total) * 100 : 0,
+    }))
+    .sort((a, b) => a.state.localeCompare(b.state));
 }
 
 /**
@@ -436,13 +538,31 @@ export function calculateSummary(rawData: RawSurveyRow[], overallTarget: number 
  * Main transformer function - converts raw Google Sheets data to dashboard format
  */
 export function transformGoogleSheetsData(rawData: RawSurveyRow[], overallTarget: number = 0) {
+  const achievementsByInterviewer = calculateAchievementsByInterviewer(rawData);
+  const achievementsByLGA = calculateAchievementsByLGA(rawData);
+  const achievementsByState = calculateAchievementsByState(rawData);
+  let latestSubmission: Date | null = null;
+
+  rawData.forEach((row) => {
+    const timestamp = getRowTimestamp(row);
+    if (timestamp && (!latestSubmission || timestamp > latestSubmission)) {
+      latestSubmission = timestamp;
+    }
+  });
+
   return {
     mapSubmissions: transformToMapSubmissions(rawData),
-    achievementsByInterviewer: calculateAchievementsByInterviewer(rawData),
-    achievementsByLGA: calculateAchievementsByLGA(rawData),
+    achievementsByInterviewer,
+    achievementsByLGA,
+    achievements: {
+      byState: achievementsByState,
+      byInterviewer: achievementsByInterviewer,
+      byLGA: achievementsByLGA,
+    },
     errorBreakdown: calculateErrorBreakdown(rawData),
     lgas: extractUniqueLGAs(rawData),
     summary: calculateSummary(rawData, overallTarget),
     analysisRows: rawData,
+    lastUpdated: latestSubmission ? latestSubmission.toISOString() : "",
   };
 }
