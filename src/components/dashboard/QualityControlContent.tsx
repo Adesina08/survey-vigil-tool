@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import type { DashboardData } from "@/types/dashboard";
 import { determineApprovalStatus } from "@/utils/approval";
 import {
+  QUALITY_INDICATOR_COUNT_REGEX,
+  QUALITY_INDICATOR_PREFIX_REGEX,
   extractErrorCodes,
   extractQualityIndicatorCounts,
   collectQualityIndicatorLabels,
