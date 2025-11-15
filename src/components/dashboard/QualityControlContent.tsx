@@ -422,7 +422,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
         onFilterChange={onFilterChange}
       />
       <SummaryCards summary={summary} />
-      <div className="grid gap-6 md:grid-cols-[2fr_1fr]">
+      <div className="space-y-6">
         <ProgressCharts quotaSummary={quotaSummary} statusBreakdown={statusBreakdown} />
         <QuotaTracker />
       </div>

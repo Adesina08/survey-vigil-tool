@@ -183,6 +183,9 @@ const getSheetRows = (rows: QuotaRow[]) =>
     "Youth Achieved": row.youth.achieved,
   }));
 
+const headerCellClass = "border-l border-border/60 px-4 py-3 first:border-l-0";
+const bodyCellClass = "border-l border-border/50 px-4 py-3 first:border-l-0";
+
 export function QuotaTracker() {
   const [activeTab, setActiveTab] = useState<string>(quotaTabs[0]?.value ?? "tvet");
 
@@ -231,81 +234,131 @@ export function QuotaTracker() {
           {quotaTabs.map((tab) => (
             <TabsContent key={tab.value} value={tab.value}>
               <div className="overflow-x-auto rounded-xl border bg-background/80">
-                <Table className="min-w-[960px]">
+                <Table className="min-w-[960px] border border-border/60 text-sm">
                   <TableHeader className="bg-background">
-                    <TableRow>
-                      <TableHead rowSpan={3} className="bg-background align-middle font-semibold">
+                    <TableRow className="divide-x divide-border/60 border-b border-border/60">
+                      <TableHead
+                        rowSpan={3}
+                        className={`${headerCellClass} bg-background align-middle font-semibold`}
+                      >
                         Arm
                       </TableHead>
-                      <TableHead colSpan={4} className="bg-background text-center text-sm font-semibold">
+                      <TableHead
+                        colSpan={4}
+                        className={`${headerCellClass} bg-background text-center text-sm font-semibold`}
+                      >
                         TVET / Skills
                       </TableHead>
-                      <TableHead colSpan={2} className="bg-background text-center text-sm font-semibold">
+                      <TableHead
+                        colSpan={2}
+                        className={`${headerCellClass} bg-background text-center text-sm font-semibold`}
+                      >
                         Agriculture
                       </TableHead>
-                      <TableHead colSpan={4} className="bg-background text-center text-sm font-semibold">
+                      <TableHead
+                        colSpan={4}
+                        className={`${headerCellClass} bg-background text-center text-sm font-semibold`}
+                      >
                         SMEs / Start-ups
                       </TableHead>
                     </TableRow>
-                    <TableRow>
-                      <TableHead colSpan={2} className="bg-background text-center text-xs uppercase tracking-wide">
+                    <TableRow className="divide-x divide-border/60 border-b border-border/60">
+                      <TableHead
+                        colSpan={2}
+                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
+                      >
                         Clusters
                       </TableHead>
-                      <TableHead colSpan={2} className="bg-background text-center text-xs uppercase tracking-wide">
+                      <TableHead
+                        colSpan={2}
+                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
+                      >
                         Avg/ Cluster
                       </TableHead>
-                      <TableHead colSpan={2} className="bg-background text-center text-xs uppercase tracking-wide">
+                      <TableHead
+                        colSpan={2}
+                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
+                      >
                         Sample (n)
                       </TableHead>
-                      <TableHead colSpan={2} className="bg-background text-center text-xs uppercase tracking-wide">
+                      <TableHead
+                        colSpan={2}
+                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
+                      >
                         Gender quota
                       </TableHead>
-                      <TableHead colSpan={2} className="bg-background text-center text-xs uppercase tracking-wide">
+                      <TableHead
+                        colSpan={2}
+                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
+                      >
                         Youth quota
                       </TableHead>
                     </TableRow>
-                    <TableRow>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                    <TableRow className="divide-x divide-border/60">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Target
                       </TableHead>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Achieved
                       </TableHead>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Target
                       </TableHead>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Achieved
                       </TableHead>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Target
                       </TableHead>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Achieved
                       </TableHead>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Male
                       </TableHead>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Female
                       </TableHead>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Target
                       </TableHead>
-                      <TableHead className="bg-background text-center text-[11px] font-medium uppercase tracking-wide">
+                      <TableHead
+                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                      >
                         Achieved
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {tab.rows.map((row) => (
-                      <TableRow key={`${tab.value}-${row.arm}`} className="bg-card/20">
-                        <TableCell className="font-semibold">{row.arm}</TableCell>
-                        <TableCell className="text-right font-medium">
+                      <TableRow
+                        key={`${tab.value}-${row.arm}`}
+                        className="bg-card/20 border-b border-border/60 last:border-b-0"
+                      >
+                        <TableCell className={`${bodyCellClass} font-semibold`}>{row.arm}</TableCell>
+                        <TableCell className={`${bodyCellClass} text-right font-medium`}>
                           {formatValue(row.clusters.target)}
                         </TableCell>
                         <TableCell
-                          className={`text-right ${
+                          className={`${bodyCellClass} text-right ${
                             typeof row.clusters.achieved === "number" && row.clusters.achieved > 0
                               ? "text-success"
                               : "text-muted-foreground"
@@ -313,11 +366,11 @@ export function QuotaTracker() {
                         >
                           {formatValue(row.clusters.achieved)}
                         </TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className={`${bodyCellClass} text-right font-medium`}>
                           {formatValue(row.averagePerCluster.target)}
                         </TableCell>
                         <TableCell
-                          className={`text-right ${
+                          className={`${bodyCellClass} text-right ${
                             typeof row.averagePerCluster.achieved === "number" &&
                             row.averagePerCluster.achieved > 0
                               ? "text-success"
@@ -326,11 +379,11 @@ export function QuotaTracker() {
                         >
                           {formatValue(row.averagePerCluster.achieved)}
                         </TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className={`${bodyCellClass} text-right font-medium`}>
                           {formatValue(row.sampleSize.target)}
                         </TableCell>
                         <TableCell
-                          className={`text-right ${
+                          className={`${bodyCellClass} text-right ${
                             typeof row.sampleSize.achieved === "number" && row.sampleSize.achieved > 0
                               ? "text-success"
                               : "text-muted-foreground"
@@ -338,17 +391,17 @@ export function QuotaTracker() {
                         >
                           {formatValue(row.sampleSize.achieved)}
                         </TableCell>
-                        <TableCell className="text-center text-muted-foreground">
+                        <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
                           {formatValue(row.gender.male)}
                         </TableCell>
-                        <TableCell className="text-center text-muted-foreground">
+                        <TableCell className={`${bodyCellClass} text-center text-muted-foreground`}>
                           {formatValue(row.gender.female)}
                         </TableCell>
-                        <TableCell className="text-right font-medium">
+                        <TableCell className={`${bodyCellClass} text-right font-medium`}>
                           {formatValue(row.youth.target)}
                         </TableCell>
                         <TableCell
-                          className={`text-right ${
+                          className={`${bodyCellClass} text-right ${
                             typeof row.youth.achieved === "number" && row.youth.achieved > 0
                               ? "text-success"
                               : "text-muted-foreground"
