@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -118,10 +118,15 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
   return (
     <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">
       <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
-        <CardTitle className="flex items-center gap-2">
-          <Award className="h-5 w-5" />
-          Achievements
-        </CardTitle>
+        <div className="space-y-1">
+          <CardTitle className="flex items-center gap-2">
+            <Award className="h-5 w-5" />
+            Achievements
+          </CardTitle>
+          <CardDescription className="text-primary-foreground/90">
+            Celebrate high performers and LGAs that are driving approvals while spotting where additional mobilisation is needed.
+          </CardDescription>
+        </div>
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
         <Tabs defaultValue="interviewer" className="w-full">

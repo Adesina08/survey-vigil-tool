@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 interface ProgressChartsProps {
@@ -50,6 +50,9 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
       <Card className="slide-in overflow-hidden border-none shadow-lg shadow-primary/10">
         <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
           <CardTitle>Quota Progress</CardTitle>
+          <CardDescription className="text-primary-foreground/90">
+            Monitor how fieldwork is tracking against the planned target and where effort should shift next.
+          </CardDescription>
         </CardHeader>
         <CardContent className="bg-card/60 p-6">
           <ResponsiveContainer width="100%" height={250}>
@@ -87,6 +90,9 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
       <Card className="slide-in overflow-hidden border-none shadow-lg shadow-primary/10">
         <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
           <CardTitle>Approval Breakdown</CardTitle>
+          <CardDescription className="text-primary-foreground/90">
+            See the balance between validated and flagged interviews to prioritise follow-up reviews.
+          </CardDescription>
         </CardHeader>
         <CardContent className="bg-card/60 p-6">
           <ResponsiveContainer width="100%" height={250}>

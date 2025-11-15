@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -66,6 +66,9 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
           <AlertTriangle className="h-5 w-5" />
           Error Breakdown
         </CardTitle>
+        <CardDescription className="text-primary-foreground/90">
+          Identify the most common data-quality flags and the questions they touch so you can guide enumerator coaching.
+        </CardDescription>
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
         <Table

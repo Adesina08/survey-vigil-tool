@@ -6,6 +6,7 @@ import type {
 } from "@/types/sheets";
 import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks";
 import { normaliseHeaderKey } from "./googleSheets";
+import { normaliseErrorType } from "./errorTypes";
 import { getSubmissionMetrics, type Row as MetricRow } from "@/utils/metrics";
 import { getErrorBreakdown, extractQualityIndicatorCounts } from "@/utils/errors";
 import { determineApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
@@ -16,6 +17,8 @@ import {
 } from "./mapMetadata";
 
 type OgstepPath = "treatment" | "control" | "unknown";
+
+const QC_FLAG_REGEX = /^QC_(FLAG|WARN)_/i;
 
 export type AnalysisRow = Record<string, unknown>;
 
@@ -38,6 +41,14 @@ interface MapSubmission {
   ogstepPath: OgstepPath;
   ogstepResponse: string | null;
   directions: string | null;
+  respondentName: string | null;
+  respondentPhone: string | null;
+  respondentGender: string | null;
+  respondentAge: string | null;
+  ward: string | null;
+  community: string | null;
+  consent: string | null;
+  qcStatus: string | null;
 }
 
 interface SummaryData {
@@ -466,6 +477,39 @@ const sanitiseText = (value: unknown): string | null => {
   return null;
 };
 
+const pickFirstText = (row: SheetSubmissionRow, keys: string[]): string | null => {
+  const record = row as Record<string, unknown>;
+  for (const key of keys) {
+    const value = record[key];
+    const cleaned = sanitiseText(value);
+    if (cleaned) {
+      return cleaned;
+    }
+  }
+  return null;
+};
+
+const collectQcFlagSlugs = (row: SheetSubmissionRow): string[] => {
+  const record = row as Record<string, unknown>;
+  const slugs = new Set<string>();
+
+  Object.entries(record).forEach(([key, value]) => {
+    if (!QC_FLAG_REGEX.test(key)) {
+      return;
+    }
+
+    const numericValue = parseNumeric(value);
+    if (numericValue && numericValue > 0) {
+      const slug = normaliseErrorType(key).slug;
+      if (slug.length > 0) {
+        slugs.add(slug);
+      }
+    }
+  });
+
+  return Array.from(slugs);
+};
+
 const normaliseGenderValue = (value: unknown): "male" | "female" | null => {
   if (typeof value === "string") {
     const normalised = value.trim().toLowerCase();
@@ -485,6 +529,24 @@ const normaliseGenderValue = (value: unknown): "male" | "female" | null => {
   }
 
   return null;
+};
+
+const getRespondentGenderLabel = (row: SheetSubmissionRow): string | null => {
+  const normalised = getGender(row);
+  if (normalised === "male") {
+    return "Male";
+  }
+  if (normalised === "female") {
+    return "Female";
+  }
+
+  return pickFirstText(row, [
+    "A7. Sex",
+    "Gender",
+    "gender",
+    "respondent_gender",
+    "respondent sex",
+  ]);
 };
 
 const getLGA = (row: SheetSubmissionRow) => {
@@ -559,8 +621,6 @@ const getApprovalStatus = (row: SheetSubmissionRow) =>
 
 const getApprovalField = (row: SheetSubmissionRow) =>
   findApprovalFieldValue(row as unknown as Record<string, unknown>);
-
-const isQualityFlag = (code: string) => /^QC_(FLAG|WARN)_/i.test(code);
 
 interface DashboardDataInput {
   submissions: SheetSubmissionRow[];
@@ -660,23 +720,47 @@ export const buildDashboardData = ({
     );
     const qualityIndicatorKeys = Object.keys(qualityIndicatorCounts);
 
+    const qcFlagSlugs = collectQcFlagSlugs(row);
     const manualErrorFlags = Array.isArray(row["Error Flags"])
       ? (row["Error Flags"] as unknown[])
       : [];
-    const errorFlags = Array.from(
-      new Set(
-        qualityIndicatorKeys.concat(
-          manualErrorFlags
-            .map((flag) => (typeof flag === "string" ? flag : String(flag ?? "")))
-            .filter((flag) => flag.length > 0 && !shouldIgnoreErrorType(flag)),
-        ),
-      ),
-    ).filter((flag) => !shouldIgnoreErrorType(flag));
+    const manualErrorSlugs = manualErrorFlags
+      .map((flag) => (typeof flag === "string" ? flag : String(flag ?? "")))
+      .filter((flag) => flag.length > 0 && !shouldIgnoreErrorType(flag))
+      .map((flag) => normaliseErrorType(flag).slug)
+      .filter((slug) => slug.length > 0);
+    const qualityIndicatorSlugs = qualityIndicatorKeys
+      .filter((key) => !shouldIgnoreErrorType(key))
+      .map((key) => normaliseErrorType(key).slug)
+      .filter((slug) => slug.length > 0);
 
-    const qualityFlags = errorFlags.filter((flag) => isQualityFlag(flag));
-    const otherFlags = errorFlags.filter((flag) => !isQualityFlag(flag));
-    const combinedFlags = [...qualityFlags, ...otherFlags];
+    const combinedFlagSet = new Set<string>();
+    qualityIndicatorSlugs.forEach((slug) => combinedFlagSet.add(slug));
+    manualErrorSlugs.forEach((slug) => combinedFlagSet.add(slug));
+    qcFlagSlugs.forEach((slug) => combinedFlagSet.add(slug));
+
+    const qualityFlags = Array.from(new Set(qcFlagSlugs));
+    const otherFlags = Array.from(combinedFlagSet).filter((slug) => !qualityFlags.includes(slug));
+    const combinedFlags = Array.from(combinedFlagSet);
     const { response: ogstepResponse, path: ogstepPath } = extractOgstepDetails(row);
+
+    const respondentName = pickFirstText(row, [
+      "Respondent name",
+      "respondent_name",
+      "Name of respondent",
+    ]);
+    const respondentPhone = pickFirstText(row, [
+      "Respondent phone number",
+      "respondent_phone_number",
+      "Respondent Phone",
+      "phone",
+    ]);
+    const respondentGenderLabel = getRespondentGenderLabel(row);
+    const respondentAge = pickFirstText(row, ["A8. Age", "respondent_age", "Age"]);
+    const wardName = pickFirstText(row, ["A3b. Select the Ward", "Ward"]);
+    const communityName = pickFirstText(row, ["A4. Community / Village", "Community", "Village"]);
+    const consentValue = pickFirstText(row, ["A6. Consent to participate", "Consent"]);
+    const qcStatusLabel = pickFirstText(row, ["QC Status", "qc_status"]);
 
     const genderValue = getGender(row);
     if (genderValue === "male") {
@@ -709,9 +793,9 @@ export const buildDashboardData = ({
     if (interviewerId && interviewerId.toLowerCase() !== "unknown") {
       interviewerSet.add(interviewerId);
     }
-    errorFlags
-      .filter((flag) => !shouldIgnoreErrorType(flag))
-      .forEach((flag) => errorTypeSet.add(flag));
+    combinedFlags
+      .filter((slug) => slug.length > 0)
+      .forEach((slug) => errorTypeSet.add(slug));
 
     incrementMap(totalsByState, state);
     incrementMap(totalsByInterviewer, interviewerId);
@@ -752,17 +836,21 @@ export const buildDashboardData = ({
       if (shouldIgnoreErrorType(errorType)) {
         return;
       }
-      errorCounts[errorType] = getNumber(errorCounts[errorType]) + value;
-      interviewerError[errorType] = getNumber(interviewerError[errorType]) + value;
+      const slug = normaliseErrorType(errorType).slug;
+      if (!slug) {
+        return;
+      }
+      errorCounts[slug] = getNumber(errorCounts[slug]) + value;
+      interviewerError[slug] = getNumber(interviewerError[slug]) + value;
     });
 
-    manualErrorFlags
-      .map((flag) => (typeof flag === "string" ? flag : String(flag ?? "")))
-      .filter((flag) => flag.length > 0 && !shouldIgnoreErrorType(flag))
-      .forEach((errorType) => {
-        errorCounts[errorType] = getNumber(errorCounts[errorType]) + 1;
-        interviewerError[errorType] = getNumber(interviewerError[errorType]) + 1;
-      });
+    manualErrorSlugs.forEach((slug) => {
+      if (!slug) {
+        return;
+      }
+      errorCounts[slug] = getNumber(errorCounts[slug]) + 1;
+      interviewerError[slug] = getNumber(interviewerError[slug]) + 1;
+    });
 
     interviewerErrors.set(interviewerId, interviewerError);
 
@@ -809,6 +897,14 @@ export const buildDashboardData = ({
         ogstepPath,
         ogstepResponse: ogstepResponse,
         directions: extractDirections(row),
+        respondentName: respondentName ?? null,
+        respondentPhone: respondentPhone ?? null,
+        respondentGender: respondentGenderLabel ?? null,
+        respondentAge: respondentAge ?? null,
+        ward: wardName ?? null,
+        community: communityName ?? null,
+        consent: consentValue ?? null,
+        qcStatus: qcStatusLabel ?? null,
       });
     }
   });

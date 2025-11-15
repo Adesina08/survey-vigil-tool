@@ -183,8 +183,6 @@ function getGenderValue(row: RawSurveyRow): "male" | "female" | "unknown" {
   return "unknown";
 }
 
-const isQualityFlag = (code: string) => /^QC_(FLAG|WARN)_/i.test(code);
-
 const parseDateValue = (value: unknown): Date | null => {
   if (typeof value !== "string") {
     return null;
@@ -238,6 +236,45 @@ function determineApprovalStatus(row: RawSurveyRow): "approved" | "not_approved"
 /**
  * Transform raw Google Sheets data to map submission format
  */
+const QC_FLAG_REGEX = /^QC_(FLAG|WARN)_/i;
+
+const getQcFlagSlugs = (row: RawSurveyRow): Set<string> => {
+  const slugs = new Set<string>();
+
+  Object.entries(row).forEach(([key, value]) => {
+    if (!QC_FLAG_REGEX.test(key)) {
+      return;
+    }
+
+    const numericValue = parseNumber(value);
+    if (numericValue > 0) {
+      slugs.add(normaliseErrorType(key).slug);
+    }
+  });
+
+  return slugs;
+};
+
+const normaliseGenderLabel = (value: string | null): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const lower = trimmed.toLowerCase();
+  if (lower.startsWith("m")) {
+    return "Male";
+  }
+  if (lower.startsWith("f")) {
+    return "Female";
+  }
+  return trimmed;
+};
+
 export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
   return rawData
     .filter((row) => {
@@ -273,10 +310,42 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
       const approvalLabel = approvalField?.value ?? (status === "approved" ? "Approved" : "Not Approved");
       const approvalSource = approvalField?.key ?? null;
 
-      const flags = extractErrorCodes(row as unknown as Record<string, unknown>);
-      const qualityFlags = flags.filter((code) => isQualityFlag(code));
-      const otherFlags = flags.filter((code) => !isQualityFlag(code));
-      const allFlags = [...qualityFlags, ...otherFlags];
+      const qcFlagSlugs = getQcFlagSlugs(row);
+
+      const combinedFlagSlugs = new Set<string>();
+      extractErrorCodes(row as unknown as Record<string, unknown>).forEach((code) => {
+        combinedFlagSlugs.add(normaliseErrorType(code).slug);
+      });
+      qcFlagSlugs.forEach((slug) => combinedFlagSlugs.add(slug));
+
+      const qcFlags = Array.from(qcFlagSlugs);
+      const otherFlags = Array.from(combinedFlagSlugs).filter((slug) => !qcFlagSlugs.has(slug));
+
+      const respondentName =
+        getTextValue(row, ["Respondent name", "respondent_name", "Name of respondent"]) ?? null;
+      const respondentPhone =
+        getTextValue(row, [
+          "Respondent phone number",
+          "respondent_phone_number",
+          "Respondent Phone",
+          "phone",
+        ]) ?? null;
+      const respondentGender = normaliseGenderLabel(
+        getTextValue(row, [
+          "A7. Sex",
+          "Gender",
+          "gender",
+          "respondent_gender",
+          "respondent sex",
+        ]) ?? null,
+      );
+      const respondentAge = getTextValue(row, ["A8. Age", "respondent_age", "Age"]);
+      const ward = getTextValue(row, ["A3b. Select the Ward", "Ward"]);
+      const community = getTextValue(row, ["A4. Community / Village", "Community", "Village"]);
+      const consent = getTextValue(row, ["A6. Consent to participate", "Consent"]);
+      const qcStatus = getTextValue(row, ["QC Status", "qc_status"]);
+
+      const allFlags = Array.from(combinedFlagSlugs);
 
       return {
         id: row._uuid || row._id || `submission-${Math.random()}`,
@@ -288,7 +357,7 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
         lga,
         state,
         errorTypes: allFlags,
-        qcFlags: qualityFlags,
+        qcFlags,
         otherFlags,
         timestamp:
           row._submission_time ||
@@ -300,6 +369,14 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
         ogstepPath: getOgstepPath(row),
         ogstepResponse: getTextValue(row, ["B2. Did you participate in OGSTEP?"]),
         directions: row.Direction || null,
+        respondentName,
+        respondentPhone,
+        respondentGender,
+        respondentAge,
+        ward,
+        community,
+        consent,
+        qcStatus,
       };
     });
 }
