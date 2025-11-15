@@ -8,7 +8,6 @@ import { createDashboardExcelExporter, type DashboardExportRow } from "@/lib/exp
 import type { ErrorBreakdownRow } from "@/lib/dashboardData";
 
 interface DashboardHeaderProps {
-  statusMessage: string;
   lastUpdated?: string;
   lastRefreshedAt?: string;
   onRefresh: () => void;
@@ -18,7 +17,6 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({
-  statusMessage,
   lastUpdated,
   lastRefreshedAt,
   onRefresh,
@@ -130,16 +128,28 @@ export function DashboardHeader({
 
           <div className="flex flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end sm:gap-4">
             <div className="text-sm text-foreground sm:text-right">
-              <div className="text-muted-foreground">Status</div>
-              <div className="break-words font-medium">{statusMessage}</div>
               {lastRefreshedDisplay ? (
-                <div className="text-xs text-muted-foreground">Last refreshed: {lastRefreshedDisplay}</div>
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Last refreshed
+                  </div>
+                  <div className="break-words font-medium">{lastRefreshedDisplay}</div>
+                </div>
               ) : null}
               {latestSurveyDisplay ? (
-                <div className="text-xs text-muted-foreground">Latest survey submission: {latestSurveyDisplay}</div>
+                <div className={`space-y-1 ${lastRefreshedDisplay ? "mt-2" : ""}`}>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Latest submission
+                  </div>
+                  <div className="break-words font-medium">{latestSurveyDisplay}</div>
+                </div>
               ) : null}
               {shouldShowVersion ? (
-                <div className="text-xs text-muted-foreground">Version {versionLabel}</div>
+                <div className={`text-xs text-muted-foreground ${
+                  lastRefreshedDisplay || latestSurveyDisplay ? "mt-2" : ""
+                }`}>
+                  Version {versionLabel}
+                </div>
               ) : null}
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">

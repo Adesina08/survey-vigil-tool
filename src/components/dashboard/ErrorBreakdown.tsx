@@ -76,7 +76,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
           className="min-w-[720px] text-[13px]"
         >
           <TableHeader className="bg-background/95 backdrop-blur">
-            <TableRow>
+            <TableRow className="divide-x divide-border/60">
               <TableHead className="sticky left-0 top-0 z-30 bg-background text-xs font-semibold uppercase tracking-wide">
                 Error Type
               </TableHead>
@@ -96,7 +96,10 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
           </TableHeader>
           <TableBody>
             {sortedData.map((row) => (
-              <TableRow key={row.code ?? row.errorType} className="hover:bg-muted/40">
+              <TableRow
+                key={row.code ?? row.errorType}
+                className="divide-x divide-border/50 hover:bg-muted/40"
+              >
                 <TableCell className="sticky left-0 z-10 bg-background/95 font-medium text-foreground">
                   {row.errorType}
                 </TableCell>

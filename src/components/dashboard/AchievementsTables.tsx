@@ -48,6 +48,8 @@ interface LGAAchievement {
   unknownPathCount: number;
 }
 
+type AchievementsExportType = "state" | "interviewer" | "lga";
+
 interface AchievementsTablesProps {
   byState?: StateAchievement[];
   byInterviewer: InterviewerAchievement[];
@@ -60,7 +62,7 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
   const safeByInterviewer = Array.isArray(byInterviewer) ? byInterviewer : [];
   const safeByLGA = Array.isArray(byLGA) ? byLGA : [];
 
-  const handleExport = (type: string) => {
+  const handleExport = (type: AchievementsExportType) => {
     console.log(`Exporting ${type} achievements...`);
   };
 
@@ -101,11 +103,20 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
 
   const interviewerTotals = calculateTotals(safeByInterviewer);
   const lgaTotals = calculateTotals(safeByLGA);
+  const stateTotals = calculateTotals(safeByState);
 
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
-  const renderPathCell = (count: number, variant: "treatment" | "control") => {
-    const label = variant === "treatment" ? "Treatment" : "Control";
+  const renderPathCell = (
+    count: number,
+    variant: "treatment" | "control" | "unknown",
+  ) => {
+    const label =
+      variant === "treatment"
+        ? "Treatment"
+        : variant === "control"
+          ? "Control"
+          : "Path unknown";
     return (
       <div className="flex items-center justify-end gap-2">
         <span className="text-right font-medium" aria-label={`${label} path submissions`}>
@@ -124,15 +135,17 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
             Achievements
           </CardTitle>
           <CardDescription className="text-primary-foreground/90">
-            Celebrate high performers and LGAs that are driving approvals while spotting where additional mobilisation is needed.
+            Track approvals by enumerator, LGA, and state using OGSTEP sheet identifiers to spot momentum and quickly plug any
+            coverage gaps.
           </CardDescription>
         </div>
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
         <Tabs defaultValue="interviewer" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="interviewer">By Interviewer</TabsTrigger>
             <TabsTrigger value="lga">By LGA</TabsTrigger>
+            <TabsTrigger value="state">By State</TabsTrigger>
           </TabsList>
 
           <TabsContent value="interviewer">
@@ -149,12 +162,13 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
               >
                   <TableHeader className="sticky top-0 z-20 bg-background">
                     <TableRow>
-                      <TableHead className="sticky left-0 top-0 z-30 bg-background">Interviewer ID</TableHead>
+                      <TableHead className="sticky left-0 top-0 z-30 bg-background">Interviewer</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Total</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Approved</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Not Approved</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Treatment</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Control</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Unknown</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">% Approved</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -169,7 +183,7 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
                       safeByInterviewer.map((row) => (
                         <TableRow key={row?.interviewerId ?? `interviewer-${Math.random()}`}>
                           <TableCell className="sticky left-0 z-10 bg-background font-semibold">
-                            {row?.interviewerId ?? "Unknown"}
+                            {row?.displayLabel ?? row?.interviewerId ?? "Unknown"}
                           </TableCell>
                           <TableCell className="text-right">{(row?.total ?? 0).toLocaleString()}</TableCell>
                           <TableCell className="text-right text-success">
@@ -183,6 +197,9 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
                           </TableCell>
                           <TableCell className="text-right">
                             {renderPathCell(row?.controlPathCount ?? 0, "control")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row?.unknownPathCount ?? 0, "unknown")}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {formatPercentage(row?.percentageApproved ?? 0)}
@@ -209,6 +226,9 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
                       <TableCell className="text-right">
                         {renderPathCell(interviewerTotals.controlPathCount, "control")}
                       </TableCell>
+                      <TableCell className="text-right">
+                        {renderPathCell(interviewerTotals.unknownPathCount, "unknown")}
+                      </TableCell>
                       <TableCell className="text-right font-bold">
                         {interviewerTotals.total > 0
                           ? formatPercentage((interviewerTotals.approved / interviewerTotals.total) * 100)
@@ -234,19 +254,21 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
               >
                   <TableHeader className="sticky top-0 z-20 bg-background">
                     <TableRow>
-                      <TableHead className="sticky left-0 top-0 z-30 bg-background">LGA</TableHead>
+                      <TableHead className="sticky left-0 top-0 z-30 bg-background">State</TableHead>
+                      <TableHead className="sticky left-[140px] top-0 z-30 bg-background">LGA</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Total</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Approved</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Not Approved</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Treatment</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Control</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Unknown</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">% Approved</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {safeByLGA.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                           No LGA data available
                         </TableCell>
                       </TableRow>
@@ -254,6 +276,9 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
                       safeByLGA.map((row, idx) => (
                         <TableRow key={`${row?.state ?? 'unknown'}-${row?.lga ?? idx}`}>
                           <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                            {row?.state ?? "Unknown"}
+                          </TableCell>
+                          <TableCell className="sticky left-[140px] z-10 bg-background font-medium">
                             {row?.lga ?? "Unknown"}
                           </TableCell>
                           <TableCell className="text-right">{(row?.total ?? 0).toLocaleString()}</TableCell>
@@ -269,6 +294,9 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
                           <TableCell className="text-right">
                             {renderPathCell(row?.controlPathCount ?? 0, "control")}
                           </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row?.unknownPathCount ?? 0, "unknown")}
+                          </TableCell>
                           <TableCell className="text-right font-semibold">
                             {formatPercentage(row?.percentageApproved ?? 0)}
                           </TableCell>
@@ -278,7 +306,9 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell className="sticky left-0 z-10 bg-background font-bold">Total</TableCell>
+                      <TableCell className="sticky left-0 z-10 bg-background font-bold" colSpan={2}>
+                        Total
+                      </TableCell>
                       <TableCell className="text-right font-bold">
                         {lgaTotals.total.toLocaleString()}
                       </TableCell>
@@ -294,9 +324,104 @@ export function AchievementsTables({ byState = [], byInterviewer, byLGA }: Achie
                       <TableCell className="text-right">
                         {renderPathCell(lgaTotals.controlPathCount, "control")}
                       </TableCell>
+                      <TableCell className="text-right">
+                        {renderPathCell(lgaTotals.unknownPathCount, "unknown")}
+                      </TableCell>
                       <TableCell className="text-right font-bold">
                         {lgaTotals.total > 0
                           ? formatPercentage((lgaTotals.approved / lgaTotals.total) * 100)
+                          : "0.0%"}
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="state">
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button onClick={() => handleExport("state")} variant="outline" size="sm" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Export State Data
+                </Button>
+              </div>
+              <Table
+                containerClassName="max-h-80 overflow-auto rounded-xl border bg-background/80"
+                className="min-w-[720px]"
+              >
+                  <TableHeader className="sticky top-0 z-20 bg-background">
+                    <TableRow>
+                      <TableHead className="sticky left-0 top-0 z-30 bg-background">State</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Total</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Approved</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Not Approved</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Treatment</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Control</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">Unknown</TableHead>
+                      <TableHead className="top-0 z-20 bg-background text-right">% Approved</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {safeByState.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                          No state data available
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      safeByState.map((row) => (
+                        <TableRow key={row?.state ?? `state-${Math.random()}`}>
+                          <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                            {row?.state ?? "Unknown"}
+                          </TableCell>
+                          <TableCell className="text-right">{(row?.total ?? 0).toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-success">
+                            {(row?.approved ?? 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right text-destructive">
+                            {(row?.notApproved ?? 0).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row?.treatmentPathCount ?? 0, "treatment")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row?.controlPathCount ?? 0, "control")}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {renderPathCell(row?.unknownPathCount ?? 0, "unknown")}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatPercentage(row?.percentageApproved ?? 0)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow>
+                      <TableCell className="sticky left-0 z-10 bg-background font-bold">Total</TableCell>
+                      <TableCell className="text-right font-bold">
+                        {stateTotals.total.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-success">
+                        {stateTotals.approved.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-destructive">
+                        {stateTotals.notApproved.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {renderPathCell(stateTotals.treatmentPathCount, "treatment")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {renderPathCell(stateTotals.controlPathCount, "control")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {renderPathCell(stateTotals.unknownPathCount, "unknown")}
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        {stateTotals.total > 0
+                          ? formatPercentage((stateTotals.approved / stateTotals.total) * 100)
                           : "0.0%"}
                       </TableCell>
                     </TableRow>

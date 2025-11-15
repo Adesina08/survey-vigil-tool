@@ -394,11 +394,22 @@ export function calculateAchievementsByInterviewer(rawData: RawSurveyRow[]) {
       "_submitted_by",
     ]) || "Unknown";
 
+    const interviewerName =
+      getTextValue(row, [
+        "Enumerator name",
+        "Interviewer Name",
+        "interviewer_name",
+        "username",
+      ]) || interviewerId;
+
     if (!interviewerMap.has(interviewerId)) {
       interviewerMap.set(interviewerId, {
         interviewerId,
-        interviewerName: interviewerId,
-        displayLabel: interviewerId,
+        interviewerName,
+        displayLabel:
+          interviewerName && interviewerName !== interviewerId
+            ? `${interviewerId} · ${interviewerName}`
+            : interviewerId,
         total: 0,
         approved: 0,
         notApproved: 0,
@@ -409,6 +420,11 @@ export function calculateAchievementsByInterviewer(rawData: RawSurveyRow[]) {
     }
 
     const entry = interviewerMap.get(interviewerId)!;
+    entry.interviewerName = interviewerName;
+    entry.displayLabel =
+      interviewerName && interviewerName !== interviewerId
+        ? `${interviewerId} · ${interviewerName}`
+        : interviewerId;
     entry.total += 1;
 
     const status = determineApprovalStatus(row);

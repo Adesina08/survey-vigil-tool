@@ -227,20 +227,14 @@ const createPopupHtml = (submission: Submission): string => {
   const lgaLabel = escapeHtml(submission.lga);
   const wardLabel = submission.ward ? escapeHtml(submission.ward) : null;
   const communityLabel = submission.community ? escapeHtml(submission.community) : null;
-  const timestampLabel = escapeHtml(submission.timestamp);
   const pathLabel = escapeHtml(pathMetadata.label);
   const approvalLabel = escapeHtml(submission.approvalLabel ?? statusLabel);
   const approvalSourceLabel = escapeHtml(
     submission.approvalSource ? formatColumnLabel(submission.approvalSource) : "Approval",
   );
-  const statusLabelEscaped = escapeHtml(statusLabel);
   const ogstepResponse = submission.ogstepResponse ? escapeHtml(submission.ogstepResponse) : null;
-  const qcStatus = submission.qcStatus ? escapeHtml(submission.qcStatus) : null;
-  const respondentName = submission.respondentName ? escapeHtml(submission.respondentName) : null;
   const respondentPhone = submission.respondentPhone ? escapeHtml(submission.respondentPhone) : null;
-  const respondentGender = submission.respondentGender ? escapeHtml(submission.respondentGender) : null;
   const respondentAge = submission.respondentAge ? escapeHtml(submission.respondentAge) : null;
-  const consent = submission.consent ? escapeHtml(submission.consent) : null;
   const rawDirection = submission.directions?.trim() ?? "";
   const directionsHtml =
     rawDirection.length > 0 && isLikelyUrl(rawDirection)
@@ -283,19 +277,13 @@ const createPopupHtml = (submission: Submission): string => {
 
   const details = [
     `<div><span style="font-weight:600;">${approvalSourceLabel}:</span> <span style="font-weight:700;color:${statusColor};">${approvalLabel}</span></div>`,
-    `<div><span style="font-weight:600;">Status (normalised):</span> <span style="font-weight:700;color:${statusColor};">${statusLabelEscaped}</span></div>`,
-    buildDetailRow("QC Status", qcStatus),
     buildDetailRow("OGSTEP Path", pathLabel, { isHtml: true }),
     buildDetailRow("OGSTEP Response", ogstepResponse),
-    buildDetailRow("Respondent", respondentName),
     buildDetailRow("Phone", respondentPhone),
-    buildDetailRow("Gender", respondentGender),
     buildDetailRow("Age", respondentAge),
-    buildDetailRow("Consent", consent),
     buildDetailRow("Ward", wardLabel),
     buildDetailRow("Community", communityLabel),
     buildDetailRow("Directions", directionsHtml, { isHtml: true }),
-    buildDetailRow("Submitted", timestampLabel),
   ]
     .filter((row) => row.length > 0)
     .join("\n");
