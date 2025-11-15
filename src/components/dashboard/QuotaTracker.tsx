@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -248,17 +248,24 @@ export function QuotaTracker() {
 
   return (
     <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">
-      <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
-        <CardTitle>Quota Tracker</CardTitle>
-        <Button
-          variant="secondary"
-          size="sm"
-          className="gap-2 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-          onClick={handleExport}
-        >
-          <Download className="h-4 w-4" />
-          Export Quota Data
-        </Button>
+      <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <CardTitle>Quota Tracker</CardTitle>
+            <CardDescription className="text-primary-foreground/90">
+              Compare planned sample sizes with live achievements by arm, gender, and youth targets to keep recruitment on track.
+            </CardDescription>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="gap-2 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+            onClick={handleExport}
+          >
+            <Download className="h-4 w-4" />
+            Export Quota Data
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

@@ -411,7 +411,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       errorBreakdown,
       achievementsByInterviewer,
       achievementsByLGA,
-      errorTypes: errorBreakdown.map((item) => item.errorType),
+      errorTypes: errorBreakdown.map((item) => item.code),
     };
   }, [
     dashboardData.quotaByLGA,
@@ -429,6 +429,14 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
         lgas={dashboardData.lgas || []}
         onFilterChange={onFilterChange}
       />
+      <div className="space-y-1">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+          Fieldwork Snapshot
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Review overall submissions, approvals, and OGSTEP paths at a glance to understand the survey pulse.
+        </p>
+      </div>
       <SummaryCards summary={summary} />
       <div className="space-y-6">
         <ProgressCharts quotaSummary={quotaSummary} statusBreakdown={statusBreakdown} />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Eye, EyeOff, MapPin } from "lucide-react";
 import {
@@ -13,6 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
+import { normaliseErrorType } from "@/lib/errorTypes";
 import { formatErrorLabel } from "@/lib/utils";
 import { normalizeMapMetadata, type NormalizedMapMetadata } from "@/lib/mapMetadata";
 import ogunLgaGeoJsonUrl from "@/assets/ogun-lga.geojson?url";
@@ -45,6 +46,14 @@ interface Submission {
   ogstepPath: "treatment" | "control" | "unknown";
   ogstepResponse: string | null;
   directions: string | null;
+  respondentName?: string | null;
+  respondentPhone?: string | null;
+  respondentGender?: string | null;
+  respondentAge?: string | null;
+  ward?: string | null;
+  community?: string | null;
+  consent?: string | null;
+  qcStatus?: string | null;
 }
 
 interface InterviewerOption {
@@ -66,17 +75,17 @@ const getPathMetadata = (submission: Submission) => {
   switch (submission.ogstepPath) {
     case "treatment":
       return {
-        color: "#2563eb",
+        color: "#8b5cf6",
         label: "Treatment path",
       } as const;
     case "control":
       return {
-        color: "#22c55e",
+        color: "#f97316",
         label: "Control path",
       } as const;
     default:
       return {
-        color: "#6b7280",
+        color: "#0ea5e9",
         label: "Path unavailable",
       } as const;
   }
@@ -92,8 +101,6 @@ const getApprovalMetadata = (submission: Submission) => {
 
 const getMarkerColor = (submission: Submission, mode: ColorMode) =>
   mode === "approval" ? getApprovalMetadata(submission).color : getPathMetadata(submission).color;
-
-const isQualityFlag = (code: string) => /^QC_(FLAG|WARN)_/i.test(code);
 
 const formatColumnLabel = (value: string) =>
   value
@@ -164,83 +171,6 @@ const filterFeaturesByLga = (
 
 const isLikelyUrl = (value: string) => /^https?:\/\//i.test(value.trim());
 
-const inlineComputedStyles = (source: Element, target: Element) => {
-  const computedStyle = window.getComputedStyle(source);
-  const styleString = Array.from(computedStyle)
-    .map((property) => `${property}:${computedStyle.getPropertyValue(property)};`)
-    .join("");
-
-  target.setAttribute("style", styleString);
-
-  Array.from(source.childNodes).forEach((child, index) => {
-    const targetChild = target.childNodes[index];
-    if (child.nodeType === Node.ELEMENT_NODE && targetChild?.nodeType === Node.ELEMENT_NODE) {
-      inlineComputedStyles(child as Element, targetChild as Element);
-    }
-  });
-};
-
-const cloneNodeWithStyles = (node: HTMLElement) => {
-  const clone = node.cloneNode(true) as HTMLElement;
-  inlineComputedStyles(node, clone);
-  clone.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-  clone.querySelectorAll("img").forEach((img) => {
-    img.setAttribute("crossorigin", "anonymous");
-  });
-  return clone;
-};
-
-const renderNodeToPng = async (node: HTMLElement): Promise<string> => {
-  const width = node.clientWidth;
-  const height = node.clientHeight;
-
-  if (width === 0 || height === 0) {
-    throw new Error("Map area has no size to export");
-  }
-
-  const clone = cloneNodeWithStyles(node);
-  const serialized = new XMLSerializer().serializeToString(clone);
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">\n  <foreignObject width="100%" height="100%">${serialized}</foreignObject>\n</svg>`;
-  const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
-
-  try {
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const image = new Image();
-      image.crossOrigin = "anonymous";
-      image.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const context = canvas.getContext("2d");
-          if (!context) {
-            reject(new Error("Unable to create canvas context"));
-            return;
-          }
-
-          const background = window.getComputedStyle(node).backgroundColor;
-          const fill = background && background !== "rgba(0, 0, 0, 0)" ? background : "#ffffff";
-          context.fillStyle = fill;
-          context.fillRect(0, 0, width, height);
-          context.drawImage(image, 0, 0);
-          resolve(canvas.toDataURL("image/png"));
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error(String(error)));
-        }
-      };
-      image.onerror = () => {
-        reject(new Error("Failed to render map for export"));
-      };
-      image.src = url;
-    });
-
-    return dataUrl;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-};
-
 const waitForTileLayerToRender = async (tileLayer: L.TileLayer | null) => {
   if (!tileLayer) {
     return;
@@ -295,6 +225,8 @@ const createPopupHtml = (submission: Submission): string => {
   );
   const stateLabel = escapeHtml(submission.state);
   const lgaLabel = escapeHtml(submission.lga);
+  const wardLabel = submission.ward ? escapeHtml(submission.ward) : null;
+  const communityLabel = submission.community ? escapeHtml(submission.community) : null;
   const timestampLabel = escapeHtml(submission.timestamp);
   const pathLabel = escapeHtml(pathMetadata.label);
   const approvalLabel = escapeHtml(submission.approvalLabel ?? statusLabel);
@@ -303,6 +235,12 @@ const createPopupHtml = (submission: Submission): string => {
   );
   const statusLabelEscaped = escapeHtml(statusLabel);
   const ogstepResponse = submission.ogstepResponse ? escapeHtml(submission.ogstepResponse) : null;
+  const qcStatus = submission.qcStatus ? escapeHtml(submission.qcStatus) : null;
+  const respondentName = submission.respondentName ? escapeHtml(submission.respondentName) : null;
+  const respondentPhone = submission.respondentPhone ? escapeHtml(submission.respondentPhone) : null;
+  const respondentGender = submission.respondentGender ? escapeHtml(submission.respondentGender) : null;
+  const respondentAge = submission.respondentAge ? escapeHtml(submission.respondentAge) : null;
+  const consent = submission.consent ? escapeHtml(submission.consent) : null;
   const rawDirection = submission.directions?.trim() ?? "";
   const directionsHtml =
     rawDirection.length > 0 && isLikelyUrl(rawDirection)
@@ -311,12 +249,15 @@ const createPopupHtml = (submission: Submission): string => {
         ? escapeHtml(rawDirection)
         : "<span>Direction link (unavailable)</span>";
 
-  const qcFlags = (submission.qcFlags ?? submission.errorTypes.filter((code) => isQualityFlag(code))).map(
-    (code) => formatErrorLabel(code),
-  );
-  const otherFlags = (submission.otherFlags ?? submission.errorTypes.filter((code) => !isQualityFlag(code))).map(
-    (code) => formatErrorLabel(code),
-  );
+  const qcFlags = Array.from(new Set(submission.qcFlags ?? [])).map((code) => formatErrorLabel(code));
+  const qcFlagSet = new Set(submission.qcFlags ?? []);
+  const otherFlags = Array.from(
+    new Set(
+      (submission.otherFlags && submission.otherFlags.length > 0
+        ? submission.otherFlags
+        : submission.errorTypes.filter((code) => !qcFlagSet.has(code))) ?? [],
+    ),
+  ).map((code) => formatErrorLabel(code));
 
   const renderFlagList = (title: string, items: string[]) =>
     items.length
@@ -335,24 +276,37 @@ const createPopupHtml = (submission: Submission): string => {
     .filter((section) => section.length > 0)
     .join("\n");
 
+  const buildDetailRow = (label: string, value: string | null, { isHtml = false } = {}) =>
+    value && value.length > 0
+      ? `<div><span style="font-weight:600;">${escapeHtml(label)}:</span> ${isHtml ? value : escapeHtml(value)}</div>`
+      : "";
+
+  const details = [
+    `<div><span style="font-weight:600;">${approvalSourceLabel}:</span> <span style="font-weight:700;color:${statusColor};">${approvalLabel}</span></div>`,
+    `<div><span style="font-weight:600;">Status (normalised):</span> <span style="font-weight:700;color:${statusColor};">${statusLabelEscaped}</span></div>`,
+    buildDetailRow("QC Status", qcStatus),
+    buildDetailRow("OGSTEP Path", pathLabel, { isHtml: true }),
+    buildDetailRow("OGSTEP Response", ogstepResponse),
+    buildDetailRow("Respondent", respondentName),
+    buildDetailRow("Phone", respondentPhone),
+    buildDetailRow("Gender", respondentGender),
+    buildDetailRow("Age", respondentAge),
+    buildDetailRow("Consent", consent),
+    buildDetailRow("Ward", wardLabel),
+    buildDetailRow("Community", communityLabel),
+    buildDetailRow("Directions", directionsHtml, { isHtml: true }),
+    buildDetailRow("Submitted", timestampLabel),
+  ]
+    .filter((row) => row.length > 0)
+    .join("\n");
+
   return `
-    <div style="min-width:240px;display:flex;flex-direction:column;gap:10px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
+    <div style="min-width:260px;display:flex;flex-direction:column;gap:10px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
       <div style="display:flex;flex-direction:column;gap:2px;">
-        <div style="font-weight:700;color:#2563eb;">${enumeratorLabel}</div>
+        <div style="font-weight:700;color:${pathMetadata.color};">${enumeratorLabel}</div>
         <div style="font-size:12px;color:#4b5563;">${stateLabel ? `${stateLabel} · ` : ""}${lgaLabel}</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px;">
-        <div><span style="font-weight:600;">${approvalSourceLabel}:</span> <span style="font-weight:700;color:${statusColor};">${approvalLabel}</span></div>
-        <div><span style="font-weight:600;">Status (normalised):</span> <span style="font-weight:700;color:${statusColor};">${statusLabelEscaped}</span></div>
-        <div><span style="font-weight:600;">OGSTEP Path:</span> <span style="font-weight:700;">${pathLabel}</span></div>
-        ${
-          ogstepResponse
-            ? `<div><span style='font-weight:600;'>OGSTEP Response:</span> ${ogstepResponse}</div>`
-            : ""
-        }
-        <div><span style="font-weight:600;">Directions:</span> ${directionsHtml}</div>
-        <div><span style="font-weight:600;">Submitted:</span> ${timestampLabel}</div>
-      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">${details}</div>
       ${flagsSection ? `<div style="display:flex;flex-direction:column;gap:6px;">${flagsSection}</div>` : ""}
     </div>
   `;
@@ -406,9 +360,9 @@ export function InteractiveMap({
     const set = new Set<string>();
 
     errorTypes
-      .map((type) => (typeof type === "string" ? type.trim() : ""))
-      .filter((type) => type.length > 0)
-      .forEach((type) => set.add(type));
+      .map((type) => normaliseErrorType(type).slug)
+      .filter((slug) => slug.length > 0)
+      .forEach((slug) => set.add(slug));
 
     baseSubmissions.forEach((submission) => {
       if (
@@ -416,8 +370,9 @@ export function InteractiveMap({
         (selectedInterviewer === "all" || submission.interviewerId === selectedInterviewer)
       ) {
         submission.errorTypes.forEach((type) => {
-          if (type && type.trim().length > 0) {
-            set.add(type.trim());
+          const slug = normaliseErrorType(type).slug;
+          if (slug.length > 0) {
+            set.add(slug);
           }
         });
       }
@@ -521,8 +476,18 @@ export function InteractiveMap({
 
     try {
       await waitForTileLayerToRender(tileLayerRef.current);
+      const { default: html2canvas } = await import("html2canvas");
+      const background = window.getComputedStyle(mapElement).backgroundColor;
+      const canvas = await html2canvas(mapElement, {
+        useCORS: true,
+        logging: false,
+        backgroundColor:
+          background && background !== "rgba(0, 0, 0, 0)" ? background : "#ffffff",
+        scale: Math.max(window.devicePixelRatio || 1, 1),
+        imageTimeout: 1500,
+      });
 
-      const dataUrl = await renderNodeToPng(mapElement);
+      const dataUrl = canvas.toDataURL("image/png");
       const sanitizedPrefix = sanitizeFilePrefix(normalizedMetadata.exportFilenamePrefix);
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 
@@ -787,6 +752,9 @@ export function InteractiveMap({
       : trimmedMetadataTitle && trimmedMetadataTitle.toLowerCase() !== "live submission map"
         ? trimmedMetadataTitle
         : "";
+  const defaultSubtitle =
+    "Explore live submissions on the map, filter by interviewers or QC flags, and download the current view.";
+  const resolvedSubtitle = headerSubtitle.length > 0 ? headerSubtitle : defaultSubtitle;
 
   return (
     <section className="space-y-6">
@@ -801,9 +769,9 @@ export function InteractiveMap({
                 <CardTitle className="text-left text-lg font-semibold text-primary-foreground">
                   Live Submission Map
                 </CardTitle>
-                {headerSubtitle ? (
-                  <p className="text-sm text-primary-foreground/90">{headerSubtitle}</p>
-                ) : null}
+                <CardDescription className="text-primary-foreground/90">
+                  {resolvedSubtitle}
+                </CardDescription>
               </div>
             </div>
             <div className="text-sm font-medium text-primary-foreground/90">
@@ -861,9 +829,9 @@ export function InteractiveMap({
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             {(colorMode === "path"
               ? [
-                  { label: "Treatment path (B2 = Yes)", color: "#2563eb" },
-                  { label: "Control path (B2 = No)", color: "#22c55e" },
-                  { label: "Path unavailable", color: "#6b7280" },
+                  { label: "Treatment path (B2 = Yes)", color: "#8b5cf6" },
+                  { label: "Control path (B2 = No)", color: "#f97316" },
+                  { label: "Path unavailable", color: "#0ea5e9" },
                 ]
               : [
                   { label: "Approved", color: "#16a34a" },
