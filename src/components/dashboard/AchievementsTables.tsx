@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -49,10 +50,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
   const safeByInterviewer = Array.isArray(byInterviewer) ? byInterviewer : [];
   const safeByLGA = Array.isArray(byLGA) ? byLGA : [];
 
-  const handleExport = (type: AchievementsExportType) => {
-    console.log(`Exporting ${type} achievements...`);
-  };
-
   const calculateTotals = <
     T extends {
       total: number;
@@ -90,6 +87,134 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
 
   const interviewerTotals = calculateTotals(safeByInterviewer);
   const lgaTotals = calculateTotals(safeByLGA);
+
+  const handleExport = useCallback(
+    async (type: AchievementsExportType) => {
+      let config: { label: string; headers: string[]; rows: SimpleExportRow[] } | null = null;
+
+      if (type === "interviewer") {
+        const headers = [
+          "Interviewer",
+          "Total",
+          "Approved",
+          "Not Approved",
+          "Treatment",
+          "Control",
+          "Unknown",
+          "% Approved",
+        ];
+
+        const rows: SimpleExportRow[] = safeByInterviewer.map((row) => ({
+          Interviewer: row?.displayLabel ?? row?.interviewerId ?? "Unknown",
+          Total: row?.total ?? 0,
+          Approved: row?.approved ?? 0,
+          "Not Approved": row?.notApproved ?? 0,
+          Treatment: row?.treatmentPathCount ?? 0,
+          Control: row?.controlPathCount ?? 0,
+          Unknown: row?.unknownPathCount ?? 0,
+          "% Approved": toOneDecimal(row?.percentageApproved ?? 0),
+        }));
+
+        rows.push({
+          Interviewer: "Total",
+          Total: interviewerTotals.total,
+          Approved: interviewerTotals.approved,
+          "Not Approved": interviewerTotals.notApproved,
+          Treatment: interviewerTotals.treatmentPathCount,
+          Control: interviewerTotals.controlPathCount,
+          Unknown: interviewerTotals.unknownPathCount,
+          "% Approved":
+            interviewerTotals.total > 0
+              ? toOneDecimal((interviewerTotals.approved / interviewerTotals.total) * 100)
+              : 0,
+        });
+
+        config = { label: "Interviewer", headers, rows };
+      } else if (type === "lga") {
+        const headers = [
+          "State",
+          "LGA",
+          "Total",
+          "Approved",
+          "Not Approved",
+          "Treatment",
+          "Control",
+          "Unknown",
+          "% Approved",
+        ];
+
+        const rows: SimpleExportRow[] = safeByLGA.map((row) => ({
+          State: row?.state ?? "Unknown",
+          LGA: row?.lga ?? "Unknown",
+          Total: row?.total ?? 0,
+          Approved: row?.approved ?? 0,
+          "Not Approved": row?.notApproved ?? 0,
+          Treatment: row?.treatmentPathCount ?? 0,
+          Control: row?.controlPathCount ?? 0,
+          Unknown: row?.unknownPathCount ?? 0,
+          "% Approved": toOneDecimal(row?.percentageApproved ?? 0),
+        }));
+
+        rows.push({
+          State: "Total",
+          LGA: "",
+          Total: lgaTotals.total,
+          Approved: lgaTotals.approved,
+          "Not Approved": lgaTotals.notApproved,
+          Treatment: lgaTotals.treatmentPathCount,
+          Control: lgaTotals.controlPathCount,
+          Unknown: lgaTotals.unknownPathCount,
+          "% Approved":
+            lgaTotals.total > 0 ? toOneDecimal((lgaTotals.approved / lgaTotals.total) * 100) : 0,
+        });
+
+        config = { label: "LGA", headers, rows };
+      } else if (type === "state") {
+        const headers = [
+          "State",
+          "Total",
+          "Approved",
+          "Not Approved",
+          "Treatment",
+          "Control",
+          "Unknown",
+          "% Approved",
+        ];
+
+        const rows: SimpleExportRow[] = safeByState.map((row) => ({
+          State: row?.state ?? "Unknown",
+          Total: row?.total ?? 0,
+          Approved: row?.approved ?? 0,
+          "Not Approved": row?.notApproved ?? 0,
+          Treatment: row?.treatmentPathCount ?? 0,
+          Control: row?.controlPathCount ?? 0,
+          Unknown: row?.unknownPathCount ?? 0,
+          "% Approved": toOneDecimal(row?.percentageApproved ?? 0),
+        }));
+
+        rows.push({
+          State: "Total",
+          Total: stateTotals.total,
+          Approved: stateTotals.approved,
+          "Not Approved": stateTotals.notApproved,
+          Treatment: stateTotals.treatmentPathCount,
+          Control: stateTotals.controlPathCount,
+          Unknown: stateTotals.unknownPathCount,
+          "% Approved":
+            stateTotals.total > 0 ? toOneDecimal((stateTotals.approved / stateTotals.total) * 100) : 0,
+        });
+
+        config = { label: "State", headers, rows };
+      }
+
+      if (!config) {
+        return;
+      }
+
+      await downloadAchievementsWorkbook(config.label, config.headers, config.rows);
+    },
+    [safeByInterviewer, safeByLGA, safeByState, interviewerTotals, lgaTotals, stateTotals],
+  );
 
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
 
@@ -136,7 +261,7 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           <TabsContent value="interviewer">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={() => handleExport("interviewer")} variant="outline" size="sm" className="gap-2">
+                <Button onClick={() => void handleExport("interviewer")} variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export Interviewer Data
                 </Button>
@@ -228,7 +353,7 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           <TabsContent value="lga">
             <div className="space-y-4">
               <div className="flex justify-end">
-                <Button onClick={() => handleExport("lga")} variant="outline" size="sm" className="gap-2">
+                <Button onClick={() => void handleExport("lga")} variant="outline" size="sm" className="gap-2">
                   <Download className="h-4 w-4" />
                   Export LGA Data
                 </Button>

@@ -118,6 +118,31 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     });
   }, [dashboardData.analysisRows, selectedLga]);
 
+  const allQualityFlagSlugs = useMemo(() => {
+    const slugs = new Set<string>();
+    const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
+
+    rows.forEach((row) => {
+      if (!row || typeof row !== "object") {
+        return;
+      }
+
+      Object.keys(row).forEach((key) => {
+        const trimmedKey = key.trim();
+        if (QUALITY_INDICATOR_COUNT_REGEX.test(trimmedKey)) {
+          return;
+        }
+
+        if (QUALITY_INDICATOR_PREFIX_REGEX.test(trimmedKey)) {
+          const info = normaliseErrorType(trimmedKey);
+          slugs.add(info.slug);
+        }
+      });
+    });
+
+    return Array.from(slugs);
+  }, [dashboardData.analysisRows]);
+
   const {
     summary,
     quotaSummary,
@@ -199,14 +224,15 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
       const interviewerId =
         getFirstTextValue(row, [
-          "interviewer_id",
-          "Interviewer ID",
-          "INTERVIEWER_ID",
-          "a1_interviewer_id",
-          "a1. Interviewer ID",
           "A1. Enumerator ID",
+          "a1_enumerator_id",
           "Enumerator ID",
           "enumerator_id",
+          "a1. Interviewer ID",
+          "a1_interviewer_id",
+          "Interviewer ID",
+          "interviewer_id",
+          "INTERVIEWER_ID",
         ]) ?? "Unknown";
 
       const interviewerName =
@@ -414,10 +440,21 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       femaleCount,
     };
 
+    const ensuredSlugs = new Set<string>(allQualityFlagSlugs);
+    (dashboardData.filters?.errorTypes ?? []).forEach((raw) => {
+      const slug = normaliseErrorType(raw).slug;
+      ensuredSlugs.add(slug);
+    });
+
+    ensuredSlugs.forEach((slug) => {
+      if (!errorTotals.has(slug)) {
+        errorTotals.set(slug, 0);
+      }
+    });
+
     const totalErrors = Array.from(errorTotals.values()).reduce((sum, value) => sum + value, 0);
 
     const errorBreakdown = Array.from(errorTotals.entries())
-      .sort((a, b) => b[1] - a[1])
       .map(([slug, count]) => {
         const info = normaliseErrorType(slug);
         const displayLabel = errorLabels.get(info.slug) ?? info.label;
@@ -428,6 +465,12 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
           count,
           percentage: totalErrors > 0 ? Number(((count / totalErrors) * 100).toFixed(1)) : 0,
         };
+      })
+      .sort((a, b) => {
+        if (b.count !== a.count) {
+          return b.count - a.count;
+        }
+        return a.errorType.localeCompare(b.errorType);
       });
 
     const errorLabelLookup = Object.fromEntries(
@@ -452,13 +495,19 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     dashboardData.summary,
     filteredAnalysisRows,
     selectedLga,
+    allQualityFlagSlugs,
+    dashboardData.filters?.errorTypes,
   ]);
 
   return (
     <div className="space-y-8">
       <FilterControls
         selectedLga={selectedLga}
-        lgas={dashboardData.lgas || []}
+        lgas={
+          Array.isArray(dashboardData.lgas) && dashboardData.lgas.length > 0
+            ? dashboardData.lgas
+            : dashboardData.filters?.lgas || []
+        }
         onFilterChange={onFilterChange}
       />
       <div className="space-y-1">

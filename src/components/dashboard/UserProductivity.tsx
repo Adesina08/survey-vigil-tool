@@ -210,7 +210,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
     });
     return Array.from(unique)
       .filter((value): value is string => typeof value === "string" && value.length > 0)
-      .sort((a, b) => a.localeCompare(b));
+      .sort((a, b) => formatErrorLabel(a).localeCompare(formatErrorLabel(b)));
   }, [safeData, safeErrorTypes]);
 
   const chartData = useMemo(
