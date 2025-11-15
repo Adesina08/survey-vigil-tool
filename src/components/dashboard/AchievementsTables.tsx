@@ -395,7 +395,7 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
               >
                   <TableHeader className="sticky top-0 z-20 bg-background">
                     <TableRow>
-                      <TableHead className="sticky left-0 top-0 z-30 bg-background">Interviewer</TableHead>
+                      <TableHead className="z-30 bg-background md:sticky md:left-0 md:top-0">Interviewer</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Total</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Approved</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Not Approved</TableHead>
@@ -415,7 +415,7 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
                     ) : (
                       safeByInterviewer.map((row) => (
                         <TableRow key={row?.interviewerId ?? `interviewer-${Math.random()}`}>
-                          <TableCell className="sticky left-0 z-10 bg-background font-semibold">
+                          <TableCell className="z-10 bg-background font-semibold md:sticky md:left-0">
                             {row?.displayLabel ?? row?.interviewerId ?? "Unknown"}
                           </TableCell>
                           <TableCell className="text-right">{(row?.total ?? 0).toLocaleString()}</TableCell>
@@ -443,7 +443,7 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell className="sticky left-0 z-10 bg-background font-bold">Total</TableCell>
+                      <TableCell className="z-10 bg-background font-bold md:sticky md:left-0">Total</TableCell>
                       <TableCell className="text-right font-bold">
                         {interviewerTotals.total.toLocaleString()}
                       </TableCell>
@@ -487,7 +487,7 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
               >
                   <TableHeader className="sticky top-0 z-20 bg-background">
                     <TableRow>
-                      <TableHead className="sticky left-0 top-0 z-30 bg-background">LGA</TableHead>
+                      <TableHead className="z-30 bg-background md:sticky md:left-0 md:top-0">LGA</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Total</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Approved</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Not Approved</TableHead>
@@ -507,7 +507,7 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
                     ) : (
                       safeByLGA.map((row, idx) => (
                         <TableRow key={`${row?.state ?? 'unknown'}-${row?.lga ?? idx}`}>
-                          <TableCell className="sticky left-0 z-10 bg-background font-medium">
+                          <TableCell className="z-10 bg-background font-medium md:sticky md:left-0">
                             {row?.lga ?? "Unknown"}
                           </TableCell>
                           <TableCell className="text-right">{(row?.total ?? 0).toLocaleString()}</TableCell>
@@ -535,7 +535,7 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell className="sticky left-0 z-10 bg-background font-bold">Total</TableCell>
+                      <TableCell className="z-10 bg-background font-bold md:sticky md:left-0">Total</TableCell>
                       <TableCell className="text-right font-bold">
                         {lgaTotals.total.toLocaleString()}
                       </TableCell>

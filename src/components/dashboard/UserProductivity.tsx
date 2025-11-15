@@ -559,7 +559,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
                   <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
                     <TableRow className="bg-muted/60">
                       <TableHead
-                        className="sticky left-0 top-0 z-30 w-[26%] bg-background"
+                        className="z-30 w-[26%] bg-background md:sticky md:left-0 md:top-0"
                         aria-sort={getAriaSort("interviewerId")}
                       >
                         <button
@@ -631,7 +631,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
                   <TableBody>
                     {tableData.map((row) => (
                       <TableRow key={row.interviewerId} className="group transition-colors hover:bg-primary/5">
-                        <TableCell className="sticky left-0 z-10 bg-background font-semibold">
+                        <TableCell className="z-10 bg-background font-semibold md:sticky md:left-0">
                           {row.displayLabel || row.interviewerId}
                         </TableCell>
                         <TableCell className="text-right">

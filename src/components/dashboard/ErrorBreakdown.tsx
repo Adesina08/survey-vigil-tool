@@ -86,7 +86,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
         >
           <TableHeader className="bg-background/95 backdrop-blur">
             <TableRow className="divide-x divide-border/60">
-              <TableHead className="sticky left-0 top-0 z-30 bg-background text-xs font-semibold uppercase tracking-wide">
+              <TableHead className="z-30 bg-background text-xs font-semibold uppercase tracking-wide md:sticky md:left-0 md:top-0">
                 Error Type
               </TableHead>
               <TableHead className="top-0 z-20 bg-background text-xs font-semibold uppercase tracking-wide">
@@ -114,7 +114,7 @@ export function ErrorBreakdown({ data }: ErrorBreakdownProps) {
                 key={row.code ?? row.errorType}
                 className="divide-x divide-border/50 hover:bg-muted/40"
               >
-                <TableCell className="sticky left-0 z-10 bg-background/95 font-medium text-foreground">
+                <TableCell className="z-10 bg-background/95 font-medium text-foreground md:sticky md:left-0">
                   {formatErrorLabel(row.errorType)}
                 </TableCell>
                 <TableCell className="whitespace-pre-wrap text-sm text-muted-foreground">
