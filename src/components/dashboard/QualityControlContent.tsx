@@ -33,15 +33,60 @@ const getFirstTextValue = (row: NormalisedRow, keys: string[]): string | null =>
   return null;
 };
 
+const normaliseLgaValue = (input: string) =>
+  input
+    .replace(/\bLGA\b/gi, "")
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const expandLgaVariants = (raw: string) => {
+  const variants = new Set<string>();
+  const trimmed = raw.trim();
+  if (!trimmed) return variants;
+
+  const normalised = normaliseLgaValue(trimmed);
+  if (normalised) {
+    variants.add(normalised);
+  }
+
+  const parentheticalMatch = trimmed.match(/^(.*?)\((.*?)\)$/);
+  if (parentheticalMatch) {
+    const outside = parentheticalMatch[1]?.trim();
+    const inside = parentheticalMatch[2]?.trim();
+    if (outside) {
+      const value = normaliseLgaValue(outside);
+      if (value) variants.add(value);
+    }
+    if (inside) {
+      const value = normaliseLgaValue(inside);
+      if (value) variants.add(value);
+    }
+  }
+
+  return variants;
+};
+
 const matchesSelectedLga = (value: unknown, selectedLga: string): boolean => {
   if (typeof value !== "string") return false;
-  const normalise = (s: string) => s.trim().toLowerCase();
-  const target = normalise(selectedLga);
-  const candidates = value
+  const target = normaliseLgaValue(selectedLga);
+  if (!target) {
+    return false;
+  }
+
+  const baseCandidates = value
     .split(/[;,/]+/)
-    .map((part) => normalise(part))
+    .map((part) => part.trim())
     .filter((part) => part.length > 0);
-  return candidates.includes(target);
+
+  const normalisedCandidates = new Set<string>();
+  baseCandidates.forEach((candidate) => {
+    const variants = expandLgaVariants(candidate);
+    variants.forEach((variant) => normalisedCandidates.add(variant));
+  });
+
+  return normalisedCandidates.has(target);
 };
 
 const normaliseOgstepResponse = (value: string | null): OgstepPath => {
@@ -84,6 +129,21 @@ const getGenderFromRow = (row: NormalisedRow): "male" | "female" | "unknown" => 
   if (normalized.startsWith("m")) return "male";
   if (normalized.startsWith("f")) return "female";
   return "unknown";
+};
+
+const buildInterviewerDisplayLabel = (name: string, id: string) => {
+  const safeId = id?.trim() ?? "";
+  const safeName = name?.trim() ?? "";
+
+  if (!safeName || safeName.toLowerCase() === "unknown") {
+    return safeId || "Unknown";
+  }
+
+  if (!safeId || safeId.toLowerCase() === safeName.toLowerCase()) {
+    return safeName;
+  }
+
+  return `${safeName} (${safeId})`;
 };
 
 interface QualityControlContentProps {
@@ -271,7 +331,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
         productivityMap.set(key, {
           interviewerId,
           interviewerName,
-          displayLabel: interviewerName === "Unknown" ? interviewerId : `${interviewerName} (${interviewerId})`,
+          displayLabel: buildInterviewerDisplayLabel(interviewerName, interviewerId),
           totalSubmissions: 0,
           validSubmissions: 0,
           invalidSubmissions: 0,

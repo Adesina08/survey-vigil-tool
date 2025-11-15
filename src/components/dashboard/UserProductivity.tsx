@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { AriaAttributes } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -209,7 +209,14 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
       }
     });
     return Array.from(unique)
-      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+      .filter((value) => {
+        const formatted = formatErrorLabel(value);
+        if (!formatted) {
+          return false;
+        }
+        return formatted.toLowerCase() !== "count";
+      })
       .sort((a, b) => formatErrorLabel(a).localeCompare(formatErrorLabel(b)));
   }, [safeData, safeErrorTypes]);
 
@@ -226,7 +233,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
   );
 
   const chartBaseHeight = 52;
-  const chartHeight = Math.max(chartData.length * chartBaseHeight + 120, chartBaseHeight * 6);
+  const chartHeight = Math.max(chartData.length * chartBaseHeight + 80, chartBaseHeight * 6);
 
   const chartConfig = useMemo(
     () => ({
@@ -445,6 +452,9 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
             <Users className="h-5 w-5" />
             Submission quality overview
           </CardTitle>
+          <CardDescription className="text-primary-foreground/90">
+            Monitor interviewer throughput and approvals to focus coaching where it will have the biggest impact.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 bg-card/60 p-6">
           <Tabs defaultValue="chart" className="w-full">
@@ -453,7 +463,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
               <TabsTrigger value="table">Table</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="chart" className="mt-6">
+            <TabsContent value="chart" className="mt-4">
               <div className="mb-4 text-center text-sm font-semibold text-muted-foreground">
                 Submission status by interviewer
               </div>
@@ -468,7 +478,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
                       <ComposedChart
                         data={chartData}
                         layout="vertical"
-                        margin={{ top: 72, right: 32, bottom: 96, left: 24 }}
+                        margin={{ top: 32, right: 24, bottom: 56, left: 24 }}
                         barCategoryGap={12}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground) / 0.2)" horizontal={false} />
@@ -541,7 +551,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
               </div>
             </TabsContent>
 
-            <TabsContent value="table" className="mt-6">
+            <TabsContent value="table" className="mt-4">
               <Table
                 containerClassName="max-h-[420px] overflow-auto rounded-2xl border bg-background/80"
                 className="min-w-[960px]"
