@@ -1,54 +1,28 @@
-# Welcome to your Lovable project
+# Survey Vigil Dashboard
 
 ## Project info
 
-**URL**: https://lovable.dev/projects/e281e3e3-daa2-46dd-b066-99dee0aa1b39
+This repository contains the OGSTEP Survey dashboard, a Vite + React application for monitoring survey quality metrics.
 
 ## How can I edit this code?
 
-There are several ways of editing your application.
+You can work on the project locally using any preferred workflow:
 
-**Use Lovable**
+1. **Clone the repository**
+   ```sh
+   git clone <YOUR_GIT_URL>
+   cd <YOUR_PROJECT_NAME>
+   ```
+2. **Install dependencies**
+   ```sh
+   npm install
+   ```
+3. **Start the development server**
+   ```sh
+   npm run dev
+   ```
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/e281e3e3-daa2-46dd-b066-99dee0aa1b39) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+You can also edit files directly on GitHub or within GitHub Codespaces if you prefer a browser-based environment.
 
 ## What technologies are used for this project?
 
@@ -62,11 +36,15 @@ This project is built with:
 
 ## How can I deploy this project?
 
-Simply open [Lovable](https://lovable.dev/projects/e281e3e3-daa2-46dd-b066-99dee0aa1b39) and click on Share -> Publish.
+Deploy the built assets to your preferred static hosting provider. The default build command is:
+
+```sh
+npm run build
+```
 
 ## Configuring the Google Sheets Data Source
 
-This dashboard now loads data directly from a Google Sheet using the Google Visualization API. To configure the data source, you'll need to create a `.env` file in the root of the project and add the following environment variables:
+This dashboard loads data directly from a Google Sheet using the Google Visualization API. To configure the data source, create a `.env` file in the root of the project with the following environment variables:
 
 - `VITE_GOOGLE_SHEET_ID`: The ID of the Google Sheet to use as the data source.
 - `VITE_GOOGLE_SHEET_NAME`: The name of the sheet (tab) to use within the Google Sheet.
@@ -77,22 +55,18 @@ See the `.env.example` file for the format.
 
 **How to get the Google Sheet ID and Name:**
 
-1.  Open your Google Sheet in the browser.
-2.  The URL will look something like this: `https://docs.google.com/spreadsheets/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ/edit#gid=123456789`
-3.  The **Sheet ID** is the long string of characters between `/d/` and `/edit`. In the example above, it's `1aBcDeFgHiJkLmNoPqRsTuVwXyZ`.
-4.  The **Sheet Name** is the name of the tab at the bottom of the page. If you haven't renamed it, it's probably "Form Responses 1".
+1. Open your Google Sheet in the browser.
+2. The URL will look something like this: `https://docs.google.com/spreadsheets/d/1aBcDeFgHiJkLmNoPqRsTuVwXyZ/edit#gid=123456789`
+3. The **Sheet ID** is the long string of characters between `/d/` and `/edit`. In the example above, it's `1aBcDeFgHiJkLmNoPqRsTuVwXyZ`.
+4. The **Sheet Name** is the name of the tab at the bottom of the page. If you haven't renamed it, it's probably "Form Responses 1".
 
 **"Failed to fetch Google Sheet" error:**
 
-If you see an error message in the dashboard that says "Failed to fetch Google Sheet," it's likely due to one of the following reasons:
+If you see an error message in the dashboard that says "Failed to fetch Google Sheet," check the following:
 
-- The `VITE_GOOGLE_SHEET_ID` or `VITE_GOOGLE_SHEET_NAME` in your `.env` file is incorrect.
-- The Google Sheet is not publicly accessible. To fix this, click the "Share" button in the top right of the Google Sheet, and in the "General access" section, select "Anyone with the link."
+- Ensure the `VITE_GOOGLE_SHEET_ID` or `VITE_GOOGLE_SHEET_NAME` in your `.env` file is correct.
+- Verify that the Google Sheet is publicly accessible. Click the "Share" button in the top right of the Google Sheet, and in the "General access" section, select "Anyone with the link".
 
-## Can I connect a custom domain to my Lovable project?
+## Custom domains
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+When deploying to a hosting provider, follow their documentation for configuring custom domains.
