@@ -63,7 +63,6 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     icon: LucideIcon;
     variant: string;
     metrics: CardMetric[];
-    colSpan?: string;
     footer?: string;
   }
 
@@ -99,7 +98,6 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       title: "Interview outcomes",
       icon: CheckCircle,
       variant: "success",
-      colSpan: "xl:col-span-2",
       metrics: [
         {
           label: "Approved",
@@ -121,7 +119,6 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       title: "OGSTEP paths",
       icon: Circle,
       variant: "treatment",
-      colSpan: "xl:col-span-2",
       metrics: [
         {
           label: "Treatment",
@@ -208,11 +205,11 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
       {cards.map((card) => (
         <Card
           key={card.title}
-          className={`count-up ${getCardStyles(card.variant)} ${card.colSpan ?? ""}`.trim()}
+          className={`count-up h-full ${getCardStyles(card.variant)}`.trim()}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
