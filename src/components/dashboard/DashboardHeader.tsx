@@ -53,6 +53,18 @@ export function DashboardHeader({
   const shouldShowLatestData = isDisplayableTimestamp(lastUpdated);
   const shouldShowLastRefreshed = isDisplayableTimestamp(lastRefreshedAt);
 
+  const lastRefreshedDisplay = shouldShowLastRefreshed
+    ? lastRefreshedAt?.trim()
+    : lastRefreshedAt && lastRefreshedAt.trim().length > 0
+      ? lastRefreshedAt.trim()
+      : null;
+
+  const latestSurveyDisplay = shouldShowLatestData
+    ? lastUpdated?.trim()
+    : lastUpdated && lastUpdated.trim().length > 0
+      ? lastUpdated.trim()
+      : null;
+
   const hasExportRows = Array.isArray(exportRows) && exportRows.length > 0;
   const exporter = useMemo(
     () =>
@@ -120,11 +132,11 @@ export function DashboardHeader({
             <div className="text-sm text-foreground sm:text-right">
               <div className="text-muted-foreground">Status</div>
               <div className="break-words font-medium">{statusMessage}</div>
-              {shouldShowLastRefreshed ? (
-                <div className="text-xs text-muted-foreground">Last refreshed: {lastRefreshedAt}</div>
+              {lastRefreshedDisplay ? (
+                <div className="text-xs text-muted-foreground">Last refreshed: {lastRefreshedDisplay}</div>
               ) : null}
-              {shouldShowLatestData ? (
-                <div className="text-xs text-muted-foreground">Latest data sync: {lastUpdated}</div>
+              {latestSurveyDisplay ? (
+                <div className="text-xs text-muted-foreground">Latest survey submission: {latestSurveyDisplay}</div>
               ) : null}
               {shouldShowVersion ? (
                 <div className="text-xs text-muted-foreground">Version {versionLabel}</div>

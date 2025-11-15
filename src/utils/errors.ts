@@ -1,3 +1,5 @@
+import { normaliseErrorType } from "@/lib/errorTypes";
+
 const DELIMITER_REGEX = /[;|,\n]/;
 
 const ERROR_FIELD_CANDIDATES = [
@@ -82,7 +84,7 @@ export const extractErrorCodes = (row: Record<string, unknown>): string[] => {
           ? Number(val)
           : 0;
       if (Number.isFinite(num) && num > 0) {
-        perRow.add(key);
+        perRow.add(normaliseErrorType(key).slug);
       }
     }
   });
@@ -106,7 +108,7 @@ export const extractErrorCodes = (row: Record<string, unknown>): string[] => {
     .flatMap((value) => toArray(value))
     .map((value) => normaliseErrorCode(value))
     .filter((value): value is string => Boolean(value))
-    .forEach((code) => perRow.add(code));
+    .forEach((code) => perRow.add(normaliseErrorType(code).slug));
 
   return Array.from(perRow);
 };
@@ -123,15 +125,15 @@ export function getErrorBreakdown(rows: Record<string, unknown>[]) {
       rawRow as Record<string, unknown>,
     );
     Object.entries(indicatorCounts).forEach(([code, value]) => {
-      counts[code] = (counts[code] ?? 0) + value;
+      const normalised = normaliseErrorType(code).slug;
+      counts[normalised] = (counts[normalised] ?? 0) + value;
     });
 
     const codes = extractErrorCodes(rawRow as Record<string, unknown>);
-    codes
-      .filter((code) => !/^QC_(FLAG|WARN)_/i.test(code))
-      .forEach((code) => {
-        counts[code] = (counts[code] ?? 0) + 1;
-      });
+    codes.forEach((code) => {
+      const normalised = normaliseErrorType(code).slug;
+      counts[normalised] = (counts[normalised] ?? 0) + 1;
+    });
   });
 
   return counts;
@@ -163,7 +165,8 @@ export const extractQualityIndicatorCounts = (
 
     if (numericValue && Number.isFinite(numericValue) && numericValue > 0) {
       const normalisedKey = key.trim();
-      counts[normalisedKey] = (counts[normalisedKey] ?? 0) + numericValue;
+      const slug = normaliseErrorType(normalisedKey).slug;
+      counts[slug] = (counts[slug] ?? 0) + numericValue;
     }
   });
 

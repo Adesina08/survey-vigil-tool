@@ -158,6 +158,8 @@ export interface ErrorBreakdownRow {
   errorType: string;
   count: number;
   percentage: number;
+  relatedVariables?: string[];
+  code?: string;
 }
 
 interface AchievementRow {

@@ -229,9 +229,12 @@ export const createDashboardExcelExporter = ({
   };
 
   const downloadErrorBreakdown = () => {
-    const headers = ["Error Type", "Count", "Percentage"];
+    const headers = ["Error Type", "Related Variables", "Count", "Percentage"];
     const rowsForExport = (errorBreakdown ?? []).map((row) => ({
       "Error Type": formatErrorLabel(row.errorType),
+      "Related Variables": Array.isArray(row.relatedVariables)
+        ? row.relatedVariables.join(", ")
+        : "",
       Count: row.count,
       Percentage: `${row.percentage.toFixed(1)}%`,
     }));
