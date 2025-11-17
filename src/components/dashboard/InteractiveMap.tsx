@@ -67,6 +67,8 @@ interface InteractiveMapProps {
   interviewers?: InterviewerOption[];
   errorTypes?: string[];
   metadata?: NormalizedMapMetadata;
+  selectedLga?: string | null;
+  onLgaChange?: (value: string) => void;
 }
 
 type ColorMode = "path" | "approval";
@@ -253,18 +255,35 @@ const createPopupHtml = (submission: Submission): string => {
     ),
   ).map((code) => formatErrorLabel(code));
 
-  const renderFlagList = (title: string, items: string[]) =>
-    items.length
-      ? `<div style="display:flex;flex-direction:column;gap:4px;">
-           <div style="font-weight:600;">${escapeHtml(title)} (${items.length})</div>
-           <ul style="margin:0 0 0 16px;padding:0;display:flex;flex-direction:column;gap:2px;font-size:12px;">
-             ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
-           </ul>
-         </div>`
-      : "";
+  const renderFlagList = (title: string, items: string[], options?: { inline?: boolean }) => {
+    if (!items.length) return "";
+
+    if (options?.inline) {
+      return `
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px;line-height:1.5;">
+          <span style="font-weight:700;color:#0f172a;">${escapeHtml(title)}:</span>
+          <span style="color:#0f172a;">${items.map((item) => `<span style="font-weight:600;">${escapeHtml(item)}</span>`).join(", ")}</span>
+        </div>
+      `;
+    }
+
+    return `
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="font-weight:700;color:#0f172a;">${escapeHtml(title)} (${items.length})</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${items
+            .map(
+              (item) =>
+                `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:9999px;background:#e0f2fe;color:#0f172a;font-weight:600;font-size:12px;">${escapeHtml(item)}</span>`,
+            )
+            .join("")}
+        </div>
+      </div>
+    `;
+  };
 
   const flagsSection = [
-    renderFlagList("QC Flags", qcFlags),
+    renderFlagList("QC Flags", qcFlags, { inline: true }),
     renderFlagList("Other Flags", otherFlags),
   ]
     .filter((section) => section.length > 0)
@@ -272,11 +291,17 @@ const createPopupHtml = (submission: Submission): string => {
 
   const buildDetailRow = (label: string, value: string | null, { isHtml = false } = {}) =>
     value && value.length > 0
-      ? `<div><span style="font-weight:600;">${escapeHtml(label)}:</span> ${isHtml ? value : escapeHtml(value)}</div>`
+      ? `<div style="display:flex;gap:8px;line-height:1.5;">
+            <span style="min-width:110px;font-weight:700;color:#0f172a;">${escapeHtml(label)}:</span>
+            <span style="color:#0b172a;">${isHtml ? value : escapeHtml(value)}</span>
+         </div>`
       : "";
 
   const details = [
-    `<div><span style="font-weight:600;">${approvalSourceLabel}:</span> <span style="font-weight:700;color:${statusColor};">${approvalLabel}</span></div>`,
+    `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <span style="font-weight:700;color:#0f172a;">${approvalSourceLabel}:</span>
+        <span style="padding:6px 10px;border-radius:9999px;background:${statusColor}1a;color:${statusColor};font-weight:700;">${approvalLabel}</span>
+     </div>`,
     buildDetailRow("OGSTEP Path", pathLabel, { isHtml: true }),
     buildDetailRow("OGSTEP Response", ogstepResponse),
     buildDetailRow("Phone", respondentPhone),
@@ -289,13 +314,18 @@ const createPopupHtml = (submission: Submission): string => {
     .join("\n");
 
   return `
-    <div style="min-width:260px;display:flex;flex-direction:column;gap:10px;font-size:14px;font-family:Inter,system-ui,sans-serif;">
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        <div style="font-weight:700;color:${pathMetadata.color};">${enumeratorLabel}</div>
-        <div style="font-size:12px;color:#4b5563;">${stateLabel ? `${stateLabel} · ` : ""}${lgaLabel}</div>
+    <div style="min-width:280px;max-width:360px;display:flex;flex-direction:column;gap:12px;font-size:14px;font-family:Inter,system-ui,sans-serif;color:#0f172a;padding:12px;border-radius:14px;background:linear-gradient(135deg,#ffffff 0%,#f8fbff 100%);box-shadow:0 12px 30px rgba(0,0,0,0.12);">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="font-weight:800;font-size:15px;color:${pathMetadata.color};">${enumeratorLabel}</div>
+          <div style="font-size:12px;color:#475569;">${stateLabel ? `${stateLabel} · ` : ""}${lgaLabel}</div>
+        </div>
+        <span style="padding:6px 10px;border-radius:10px;background:${pathMetadata.color}18;color:${pathMetadata.color};font-weight:700;font-size:12px;">${pathLabel}</span>
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px;">${details}</div>
-      ${flagsSection ? `<div style="display:flex;flex-direction:column;gap:6px;">${flagsSection}</div>` : ""}
+      <div style="border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;background:#fff;display:flex;flex-direction:column;gap:8px;">
+        ${details}
+      </div>
+      ${flagsSection ? `<div style="border:1px solid #cbd5e1;border-radius:12px;padding:10px 12px;background:#f8fafc;display:flex;flex-direction:column;gap:10px;">${flagsSection}</div>` : ""}
     </div>
   `;
 };
@@ -305,11 +335,13 @@ export function InteractiveMap({
   interviewers = [],
   errorTypes = [],
   metadata,
+  selectedLga: externalSelectedLga = null,
+  onLgaChange,
 }: InteractiveMapProps) {
   const normalizedMetadata = metadata ?? normalizeMapMetadata();
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
-  const [selectedLga, setSelectedLga] = useState("all");
+  const [selectedLga, setSelectedLga] = useState(externalSelectedLga ?? "all");
   const [colorMode, setColorMode] = useState<ColorMode>("path");
   const [showLgaLabels, setShowLgaLabels] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -322,6 +354,10 @@ export function InteractiveMap({
   const [geoJsonFeatures, setGeoJsonFeatures] = useState<
     Feature<Geometry, Record<string, unknown>>[]
   >([]);
+  useEffect(() => {
+    const normalized = externalSelectedLga && externalSelectedLga !== "all" ? externalSelectedLga : "all";
+    setSelectedLga((previous) => (previous === normalized ? previous : normalized));
+  }, [externalSelectedLga]);
   const baseSubmissions = useMemo(() => (Array.isArray(submissions) ? submissions : []), [submissions]);
   const interviewerLookup = useMemo(() => {
     const map = new Map<string, InterviewerOption>();
@@ -402,15 +438,23 @@ export function InteractiveMap({
     setShowLgaLabels((previous) => !previous);
   };
 
+  const handleLgaChange = useCallback(
+    (value: string) => {
+      setSelectedLga(value);
+      onLgaChange?.(value);
+    },
+    [onLgaChange],
+  );
+
   useEffect(() => {
     if (selectedLga === "all") {
       return;
     }
 
     if (!availableLgas.includes(selectedLga)) {
-      setSelectedLga("all");
+      handleLgaChange("all");
     }
-  }, [availableLgas, selectedLga]);
+  }, [availableLgas, handleLgaChange, selectedLga]);
 
   useEffect(() => {
     if (selectedInterviewer === "all") {
@@ -577,9 +621,10 @@ export function InteractiveMap({
         style: () => {
           const isAll = selectedLga === "all";
           return {
-            weight: isAll ? 1.2 : 2,
-            color: isAll ? "#3388ff" : "#1d4ed8",
-            fillOpacity: isAll ? 0.08 : 0.18,
+            weight: isAll ? 1.8 : 3.2,
+            color: isAll ? "#1e3a8a" : "#1d4ed8",
+            opacity: 0.95,
+            fillOpacity: isAll ? 0.12 : 0.22,
             fillColor: isAll ? "#c7d2fe" : "#93c5fd",
           };
         },
@@ -769,7 +814,7 @@ export function InteractiveMap({
         </CardHeader>
         <CardContent className="space-y-6 bg-card/60 p-6">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <Select value={selectedLga} onValueChange={setSelectedLga}>
+            <Select value={selectedLga} onValueChange={handleLgaChange}>
               <SelectTrigger className="w-full min-w-[180px]">
                 <SelectValue placeholder="All LGAs" />
               </SelectTrigger>
