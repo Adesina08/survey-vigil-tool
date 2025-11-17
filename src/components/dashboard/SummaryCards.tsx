@@ -19,13 +19,19 @@ interface SummaryData {
 
 interface SummaryCardsProps {
   summary: SummaryData;
+  selectedLga?: string | null;
 }
 
-export function SummaryCards({ summary }: SummaryCardsProps) {
+export function SummaryCards({ summary, selectedLga }: SummaryCardsProps) {
   const formatNumber = (value: number) => value.toLocaleString();
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
   const knownPathTotal = Math.max(summary.treatmentPathCount + summary.controlPathCount, 0);
   const knownGenderTotal = Math.max(summary.maleCount + summary.femaleCount, 0);
+
+  const activeLgaLabel =
+    !selectedLga || selectedLga === "all"
+      ? "All LGAs"
+      : selectedLga;
 
   const formatPathHelper = (count: number) => {
     if (knownPathTotal === 0) {
@@ -205,47 +211,54 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-      {cards.map((card) => (
-        <Card
-          key={card.title}
-          className={`count-up h-full ${getCardStyles(card.variant)}`.trim()}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-            <card.icon className={`h-4 w-4 ${getIconStyles(card.variant)}`} />
-          </CardHeader>
-          <CardContent>
-            <div
-              className={
-                card.metrics.length > 1
-                  ? "grid grid-cols-1 gap-4 sm:grid-cols-2"
-                  : "space-y-3"
-              }
-            >
-              {card.metrics.map((metric) => (
-                <div key={metric.label} className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {metric.icon ? (
-                      <metric.icon className={`h-4 w-4 ${getMetricToneStyles(metric.tone)}`} />
+    <div className="space-y-2">
+      <div className="text-xs text-muted-foreground">
+        <span className="font-semibold">Current LGA filter:</span>{" "}
+        <span>{activeLgaLabel}</span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {cards.map((card) => (
+          <Card
+            key={card.title}
+            className={`count-up h-full ${getCardStyles(card.variant)}`.trim()}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+              <card.icon className={`h-4 w-4 ${getIconStyles(card.variant)}`} />
+            </CardHeader>
+            <CardContent>
+              <div
+                className={
+                  card.metrics.length > 1
+                    ? "grid grid-cols-1 gap-4 sm:grid-cols-2"
+                    : "space-y-3"
+                }
+              >
+                {card.metrics.map((metric) => (
+                  <div key={metric.label} className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {metric.icon ? (
+                        <metric.icon className={`h-4 w-4 ${getMetricToneStyles(metric.tone)}`} />
+                      ) : null}
+                      <span>{metric.label}</span>
+                    </div>
+                    <div className={`text-xl font-semibold ${getMetricToneStyles(metric.tone)}`}>
+                      {metric.value}
+                    </div>
+                    {metric.helper ? (
+                      <div className="text-xs text-muted-foreground">{metric.helper}</div>
                     ) : null}
-                    <span>{metric.label}</span>
                   </div>
-                  <div className={`text-xl font-semibold ${getMetricToneStyles(metric.tone)}`}>
-                    {metric.value}
-                  </div>
-                  {metric.helper ? (
-                    <div className="text-xs text-muted-foreground">{metric.helper}</div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-            {card.footer ? (
-              <div className="mt-4 border-t pt-3 text-xs text-muted-foreground">{card.footer}</div>
-            ) : null}
-          </CardContent>
-        </Card>
-      ))}
+                ))}
+              </div>
+              {card.footer ? (
+                <div className="mt-4 border-t pt-3 text-xs text-muted-foreground">{card.footer}</div>
+              ) : null}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

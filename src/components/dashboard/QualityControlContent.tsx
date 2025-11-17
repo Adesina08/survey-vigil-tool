@@ -589,9 +589,13 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
           Review overall submissions, approvals, and OGSTEP paths at a glance to understand the survey pulse.
         </p>
       </div>
-      <SummaryCards summary={summary} />
+      <SummaryCards summary={summary} selectedLga={selectedLga} />
       <div className="space-y-6">
-        <ProgressCharts quotaSummary={quotaSummary} statusBreakdown={statusBreakdown} />
+        <ProgressCharts
+          quotaSummary={quotaSummary}
+          statusBreakdown={statusBreakdown}
+          selectedLga={selectedLga}
+        />
         <QuotaTracker />
       </div>
       <InteractiveMap

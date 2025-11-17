@@ -12,9 +12,10 @@ interface ProgressChartsProps {
     approved: number;
     notApproved: number;
   };
+  selectedLga?: string | null;
 }
 
-export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressChartsProps) {
+export function ProgressCharts({ quotaSummary, statusBreakdown, selectedLga }: ProgressChartsProps) {
   const safeQuota = {
     achieved: Math.max(quotaSummary?.achieved ?? 0, 0),
     remaining: Math.max(quotaSummary?.remaining ?? 0, 0),
@@ -45,6 +46,11 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
   const formatNumber = (value: number) => value.toLocaleString();
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
 
+  const activeLgaLabel =
+    !selectedLga || selectedLga === "all"
+      ? "All LGAs"
+      : selectedLga;
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card className="slide-in overflow-hidden border-none shadow-lg shadow-primary/10">
@@ -53,6 +59,10 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
           <CardDescription className="text-primary-foreground/90">
             Monitor how fieldwork is tracking against the planned target and where effort should shift next.
           </CardDescription>
+          <p className="mt-1 text-xs text-primary-foreground/80">
+            <span className="font-semibold">Current LGA filter:</span>{" "}
+            <span>{activeLgaLabel}</span>
+          </p>
         </CardHeader>
         <CardContent className="bg-card/60 p-6">
           <ResponsiveContainer width="100%" height={250}>
@@ -93,6 +103,10 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
           <CardDescription className="text-primary-foreground/90">
             See the balance between validated and flagged interviews to prioritise follow-up reviews.
           </CardDescription>
+          <p className="mt-1 text-xs text-primary-foreground/80">
+            <span className="font-semibold">Current LGA filter:</span>{" "}
+            <span>{activeLgaLabel}</span>
+          </p>
         </CardHeader>
         <CardContent className="bg-card/60 p-6">
           <ResponsiveContainer width="100%" height={250}>
