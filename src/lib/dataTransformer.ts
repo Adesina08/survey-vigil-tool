@@ -30,6 +30,19 @@ export interface RawSurveyRow {
   _validation_status?: string;
   _status?: string;
   _submitted_by?: string;
+  _notes?: unknown;
+  __version__?: string;
+  _tags?: string | string[];
+  _index?: string | number;
+  start?: string;
+  end?: string;
+  today?: string;
+  username?: string;
+  phonenumber?: string;
+  deviceid?: string;
+  imei?: string;
+  subscriberid?: string;
+  simserial?: string;
 
   // Identifiers
   "A1. Enumerator ID"?: string;

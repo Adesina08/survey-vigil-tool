@@ -23,6 +23,7 @@ export interface SheetSubmissionRow {
   "Submission Time": string;
   start?: string;
   end?: string;
+  today?: string;
   starttime?: string;
   endtime?: string;
   "A1. Enumerator ID": string;
@@ -30,6 +31,7 @@ export interface SheetSubmissionRow {
   "Interviewer ID"?: string;
   "Interviewer Name"?: string;
   username?: string;
+  phonenumber?: string;
   interviewer?: string;
   State: string;
   "A3. select the LGA": string;
@@ -53,6 +55,11 @@ export interface SheetSubmissionRow {
   Latitude?: number;
   Longitude?: number;
   "B2. Did you participate in OGSTEP?"?: string;
+  _validation_status?: string;
+  _status?: string;
+  _notes?: unknown;
+  __version__?: string;
+  _tags?: string | string[];
 }
 
 export interface SheetStateTargetRow {
