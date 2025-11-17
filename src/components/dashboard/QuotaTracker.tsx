@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -19,23 +19,21 @@ interface QuotaMetric {
   achieved: QuotaValue;
 }
 
-interface GenderQuotaBreakdown {
-  male: QuotaValue;
-  female: QuotaValue;
+interface DemographicQuota {
+  female: QuotaMetric;
+  male: QuotaMetric;
 }
 
-interface GenderQuota {
-  target: GenderQuotaBreakdown;
-  achieved: GenderQuotaBreakdown;
+interface AgeQuota {
+  youth: QuotaMetric;
+  adult: QuotaMetric;
 }
 
 interface QuotaRow {
-  arm: string;
-  clusters: QuotaMetric;
-  averagePerCluster: QuotaMetric;
-  sampleSize: QuotaMetric;
-  gender: GenderQuota;
-  youth: QuotaMetric;
+  panel: string;
+  sampleSize: QuotaValue;
+  gender: DemographicQuota;
+  age: AgeQuota;
 }
 
 interface QuotaTabDefinition {
@@ -55,86 +53,86 @@ type SheetJS = {
 
 const quotaTabs: QuotaTabDefinition[] = [
   {
-    value: "tvet",
-    label: "TVET / Skills",
+    value: "treatment",
+    label: "Treatment",
     rows: [
       {
-        arm: "Treatment",
-        clusters: { target: 16, achieved: null },
-        averagePerCluster: { target: 50, achieved: null },
-        sampleSize: { target: 1000, achieved: null },
+        panel: "TVET",
+        sampleSize: 2000,
         gender: {
-          target: { male: null, female: null },
-          achieved: { male: null, female: null },
+          female: { target: 400, achieved: null },
+          male: { target: 600, achieved: null },
         },
-        youth: { target: 400, achieved: null },
+        age: {
+          youth: { target: 400, achieved: null },
+          adult: { target: 600, achieved: null },
+        },
       },
       {
-        arm: "Comparison",
-        clusters: { target: 16, achieved: null },
-        averagePerCluster: { target: 50, achieved: null },
-        sampleSize: { target: 1000, achieved: null },
+        panel: "Agric",
+        sampleSize: 2600,
         gender: {
-          target: { male: null, female: null },
-          achieved: { male: null, female: null },
+          female: { target: 400, achieved: null },
+          male: { target: 600, achieved: null },
         },
-        youth: { target: 400, achieved: null },
+        age: {
+          youth: { target: 400, achieved: null },
+          adult: { target: 600, achieved: null },
+        },
+      },
+      {
+        panel: "COFDO",
+        sampleSize: 780,
+        gender: {
+          female: { target: 200, achieved: null },
+          male: { target: 200, achieved: null },
+        },
+        age: {
+          youth: { target: 200, achieved: null },
+          adult: { target: 200, achieved: null },
+        },
       },
     ],
   },
   {
-    value: "agriculture",
-    label: "Agriculture",
+    value: "control",
+    label: "Control",
     rows: [
       {
-        arm: "Treatment",
-        clusters: { target: 22, achieved: null },
-        averagePerCluster: { target: 50, achieved: null },
-        sampleSize: { target: 1300, achieved: null },
+        panel: "TVET",
+        sampleSize: 2000,
         gender: {
-          target: { male: null, female: null },
-          achieved: { male: null, female: null },
+          female: { target: 400, achieved: null },
+          male: { target: 600, achieved: null },
         },
-        youth: { target: 550, achieved: null },
+        age: {
+          youth: { target: 400, achieved: null },
+          adult: { target: 600, achieved: null },
+        },
       },
       {
-        arm: "Comparison",
-        clusters: { target: 22, achieved: null },
-        averagePerCluster: { target: 50, achieved: null },
-        sampleSize: { target: 1300, achieved: null },
+        panel: "Agric",
+        sampleSize: 2600,
         gender: {
-          target: { male: null, female: null },
-          achieved: { male: null, female: null },
+          female: { target: 400, achieved: null },
+          male: { target: 600, achieved: null },
         },
-        youth: { target: 550, achieved: null },
-      },
-    ],
-  },
-  {
-    value: "smes",
-    label: "SMEs / Start-ups",
-    rows: [
-      {
-        arm: "Treatment",
-        clusters: { target: 10, achieved: null },
-        averagePerCluster: { target: 40, achieved: null },
-        sampleSize: { target: 400, achieved: null },
-        gender: {
-          target: { male: null, female: null },
-          achieved: { male: null, female: null },
+        age: {
+          youth: { target: 400, achieved: null },
+          adult: { target: 600, achieved: null },
         },
-        youth: { target: 400, achieved: null },
       },
       {
-        arm: "Comparison",
-        clusters: { target: 10, achieved: null },
-        averagePerCluster: { target: 40, achieved: null },
-        sampleSize: { target: 400, achieved: null },
+        panel: "COFDO",
+        sampleSize: 780,
         gender: {
-          target: { male: null, female: null },
-          achieved: { male: null, female: null },
+          female: { target: 200, achieved: null },
+          male: { target: 200, achieved: null },
         },
-        youth: { target: 400, achieved: null },
+        age: {
+          youth: { target: 200, achieved: null },
+          adult: { target: 200, achieved: null },
+        },
       },
     ],
   },
@@ -155,7 +153,7 @@ const loadSheetJS = async (): Promise<SheetJS> => {
       existingScript.addEventListener(
         "load",
         () => resolve((window as unknown as { XLSX: SheetJS }).XLSX),
-        { once: true }
+        { once: true },
       );
       existingScript.addEventListener("error", reject, { once: true });
     });
@@ -191,21 +189,52 @@ const formatValue = (value: QuotaValue): string => {
   return value;
 };
 
+const safeSum = (values: QuotaValue[]): number | null => {
+  const numericValues = values.filter((value): value is number => typeof value === "number");
+  if (!numericValues.length) {
+    return null;
+  }
+
+  return numericValues.reduce((total, current) => total + current, 0);
+};
+
+const calculateTotals = (rows: QuotaRow[]): QuotaRow => ({
+  panel: "Total",
+  sampleSize: safeSum(rows.map((row) => row.sampleSize)),
+  gender: {
+    female: {
+      target: safeSum(rows.map((row) => row.gender.female.target)),
+      achieved: safeSum(rows.map((row) => row.gender.female.achieved)),
+    },
+    male: {
+      target: safeSum(rows.map((row) => row.gender.male.target)),
+      achieved: safeSum(rows.map((row) => row.gender.male.achieved)),
+    },
+  },
+  age: {
+    youth: {
+      target: safeSum(rows.map((row) => row.age.youth.target)),
+      achieved: safeSum(rows.map((row) => row.age.youth.achieved)),
+    },
+    adult: {
+      target: safeSum(rows.map((row) => row.age.adult.target)),
+      achieved: safeSum(rows.map((row) => row.age.adult.achieved)),
+    },
+  },
+});
+
 const getSheetRows = (rows: QuotaRow[]) =>
   rows.map((row) => ({
-    Arm: row.arm,
-    "Clusters Target": row.clusters.target,
-    "Clusters Achieved": row.clusters.achieved,
-    "Avg/Cluster Target": row.averagePerCluster.target,
-    "Avg/Cluster Achieved": row.averagePerCluster.achieved,
-    "Sample Target": row.sampleSize.target,
-    "Sample Achieved": row.sampleSize.achieved,
-    "Gender Target (Male)": row.gender.target.male,
-    "Gender Target (Female)": row.gender.target.female,
-    "Gender Achieved (Male)": row.gender.achieved.male,
-    "Gender Achieved (Female)": row.gender.achieved.female,
-    "Youth Target": row.youth.target,
-    "Youth Achieved": row.youth.achieved,
+    Panel: row.panel,
+    "Sample Size (N)": row.sampleSize,
+    "Gender Target (Female)": row.gender.female.target,
+    "Gender Achieved (Female)": row.gender.female.achieved,
+    "Gender Target (Male)": row.gender.male.target,
+    "Gender Achieved (Male)": row.gender.male.achieved,
+    "Age Target (15-25)": row.age.youth.target,
+    "Age Achieved (15-25)": row.age.youth.achieved,
+    "Age Target (>25)": row.age.adult.target,
+    "Age Achieved (>25)": row.age.adult.achieved,
   }));
 
 const headerCellClass = "border-l border-border/60 px-4 py-3 first:border-l-0";
@@ -227,19 +256,15 @@ const sanitizeSheetName = (label: string): string => {
 };
 
 export function QuotaTracker() {
-  const [activeTab, setActiveTab] = useState<string>(quotaTabs[0]?.value ?? "tvet");
-
-  const activeTabData = useMemo(
-    () => quotaTabs.find((tab) => tab.value === activeTab) ?? quotaTabs[0],
-    [activeTab],
-  );
+  const [activeTab, setActiveTab] = useState<string>(quotaTabs[0]?.value ?? "treatment");
 
   const handleExport = async () => {
     try {
       const XLSX = await loadSheetJS();
       const workbook = XLSX.utils.book_new();
       quotaTabs.forEach((tab) => {
-        const worksheet = XLSX.utils.json_to_sheet(getSheetRows(tab.rows));
+        const rowsWithTotals = [...tab.rows, calculateTotals(tab.rows)];
+        const worksheet = XLSX.utils.json_to_sheet(getSheetRows(rowsWithTotals));
         XLSX.utils.book_append_sheet(workbook, worksheet, sanitizeSheetName(tab.label));
       });
       const timestamp = new Date()
@@ -253,19 +278,6 @@ export function QuotaTracker() {
     }
   };
 
-  const renderGenderBreakdown = (values: GenderQuotaBreakdown) => (
-    <div className="flex flex-col items-end gap-1 text-xs uppercase tracking-wide text-muted-foreground">
-      <span className="flex items-center gap-2">
-        <span className="font-medium">Male</span>
-        <span className="font-semibold text-foreground">{formatValue(values.male)}</span>
-      </span>
-      <span className="flex items-center gap-2">
-        <span className="font-medium">Female</span>
-        <span className="font-semibold text-foreground">{formatValue(values.female)}</span>
-      </span>
-    </div>
-  );
-
   return (
     <Card className="fade-in overflow-hidden border-none shadow-lg shadow-primary/15">
       <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
@@ -273,7 +285,7 @@ export function QuotaTracker() {
           <div className="space-y-1">
             <CardTitle>Quota Tracker</CardTitle>
             <CardDescription className="text-primary-foreground/90">
-              Compare planned sample sizes with live achievements by arm, gender, and youth targets to keep recruitment on track.
+              Track targets and live achievements by arm, gender, and age to keep recruitment on track.
             </CardDescription>
           </div>
           <Button
@@ -289,7 +301,7 @@ export function QuotaTracker() {
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             {quotaTabs.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>
                 {tab.label}
@@ -297,171 +309,125 @@ export function QuotaTracker() {
             ))}
           </TabsList>
 
-          {quotaTabs.map((tab) => (
-            <TabsContent key={tab.value} value={tab.value}>
-              <div className="overflow-x-auto rounded-xl border bg-background/80">
-                <Table className="min-w-[1040px] border border-border/60 text-sm">
-                  <TableHeader className="bg-background">
-                    <TableRow className="divide-x divide-border/60 border-b border-border/60">
-                      <TableHead
-                        rowSpan={2}
-                        className={`${headerCellClass} bg-background align-middle font-semibold`}
-                      >
-                        Arm
-                      </TableHead>
-                      <TableHead
-                        colSpan={2}
-                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
-                      >
-                        Clusters
-                      </TableHead>
-                      <TableHead
-                        colSpan={2}
-                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
-                      >
-                        Avg/ Cluster
-                      </TableHead>
-                      <TableHead
-                        colSpan={2}
-                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
-                      >
-                        Sample (n)
-                      </TableHead>
-                      <TableHead
-                        colSpan={2}
-                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
-                      >
-                        Gender quota
-                      </TableHead>
-                      <TableHead
-                        colSpan={2}
-                        className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
-                      >
-                        Youth quota
-                      </TableHead>
-                    </TableRow>
-                    <TableRow className="divide-x divide-border/60 border-b border-border/60">
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Target
-                      </TableHead>
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Achieved
-                      </TableHead>
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Target
-                      </TableHead>
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Achieved
-                      </TableHead>
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Target
-                      </TableHead>
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Achieved
-                      </TableHead>
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Target
-                      </TableHead>
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Achieved
-                      </TableHead>
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Target
-                      </TableHead>
-                      <TableHead
-                        className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
-                      >
-                        Achieved
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tab.rows.map((row) => (
-                      <TableRow
-                        key={`${tab.value}-${row.arm}`}
-                        className="bg-card/20 border-b border-border/60 last:border-b-0"
-                      >
-                        <TableCell className={`${bodyCellClass} font-semibold`}>{row.arm}</TableCell>
-                        <TableCell className={`${bodyCellClass} text-right font-medium`}>
-                          {formatValue(row.clusters.target)}
-                        </TableCell>
-                        <TableCell
-                          className={`${bodyCellClass} text-right ${
-                            typeof row.clusters.achieved === "number" && row.clusters.achieved > 0
-                              ? "text-success"
-                              : "text-muted-foreground"
-                          }`}
+          {quotaTabs.map((tab) => {
+            const rowsWithTotals = [...tab.rows, calculateTotals(tab.rows)];
+            return (
+              <TabsContent key={tab.value} value={tab.value}>
+                <div className="overflow-x-auto rounded-xl border bg-background/80">
+                  <Table className="min-w-[1040px] border border-border/60 text-sm">
+                    <TableHeader className="bg-background">
+                      <TableRow className="divide-x divide-border/60 border-b border-border/60">
+                        <TableHead
+                          rowSpan={3}
+                          className={`${headerCellClass} bg-background align-middle font-semibold`}
                         >
-                          {formatValue(row.clusters.achieved)}
-                        </TableCell>
-                        <TableCell className={`${bodyCellClass} text-right font-medium`}>
-                          {formatValue(row.averagePerCluster.target)}
-                        </TableCell>
-                        <TableCell
-                          className={`${bodyCellClass} text-right ${
-                            typeof row.averagePerCluster.achieved === "number" &&
-                            row.averagePerCluster.achieved > 0
-                              ? "text-success"
-                              : "text-muted-foreground"
-                          }`}
+                          Panel
+                        </TableHead>
+                        <TableHead
+                          rowSpan={3}
+                          className={`${headerCellClass} bg-background text-center align-middle font-semibold`}
                         >
-                          {formatValue(row.averagePerCluster.achieved)}
-                        </TableCell>
-                        <TableCell className={`${bodyCellClass} text-right font-medium`}>
-                          {formatValue(row.sampleSize.target)}
-                        </TableCell>
-                        <TableCell
-                          className={`${bodyCellClass} text-right ${
-                            typeof row.sampleSize.achieved === "number" && row.sampleSize.achieved > 0
-                              ? "text-success"
-                              : "text-muted-foreground"
-                          }`}
+                          N
+                        </TableHead>
+                        <TableHead
+                          colSpan={4}
+                          className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
                         >
-                          {formatValue(row.sampleSize.achieved)}
-                        </TableCell>
-                        <TableCell className={`${bodyCellClass} text-right`}>
-                          {renderGenderBreakdown(row.gender.target)}
-                        </TableCell>
-                        <TableCell className={`${bodyCellClass} text-right`}>
-                          {renderGenderBreakdown(row.gender.achieved)}
-                        </TableCell>
-                        <TableCell className={`${bodyCellClass} text-right font-medium`}>
-                          {formatValue(row.youth.target)}
-                        </TableCell>
-                        <TableCell
-                          className={`${bodyCellClass} text-right ${
-                            typeof row.youth.achieved === "number" && row.youth.achieved > 0
-                              ? "text-success"
-                              : "text-muted-foreground"
-                          }`}
+                          Gender
+                        </TableHead>
+                        <TableHead
+                          colSpan={4}
+                          className={`${headerCellClass} bg-background text-center text-xs uppercase tracking-wide`}
                         >
-                          {formatValue(row.youth.achieved)}
-                        </TableCell>
+                          Age
+                        </TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-          ))}
+                      <TableRow className="divide-x divide-border/60 border-b border-border/60">
+                        <TableHead
+                          colSpan={2}
+                          className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                        >
+                          Target
+                        </TableHead>
+                        <TableHead
+                          colSpan={2}
+                          className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                        >
+                          Achieved
+                        </TableHead>
+                        <TableHead
+                          colSpan={2}
+                          className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                        >
+                          Target
+                        </TableHead>
+                        <TableHead
+                          colSpan={2}
+                          className={`${headerCellClass} bg-background text-center text-[11px] font-medium uppercase tracking-wide`}
+                        >
+                          Achieved
+                        </TableHead>
+                      </TableRow>
+                      <TableRow className="divide-x divide-border/60 border-b border-border/60 text-[11px] uppercase tracking-wide">
+                        <TableHead className={`${headerCellClass} bg-background text-center`}>Female</TableHead>
+                        <TableHead className={`${headerCellClass} bg-background text-center`}>Male</TableHead>
+                        <TableHead className={`${headerCellClass} bg-background text-center`}>Female</TableHead>
+                        <TableHead className={`${headerCellClass} bg-background text-center`}>Male</TableHead>
+                        <TableHead className={`${headerCellClass} bg-background text-center`}>15-25 (Youth)</TableHead>
+                        <TableHead className={`${headerCellClass} bg-background text-center`}>&gt;25 Years</TableHead>
+                        <TableHead className={`${headerCellClass} bg-background text-center`}>15-25 (Youth)</TableHead>
+                        <TableHead className={`${headerCellClass} bg-background text-center`}>&gt;25 Years</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rowsWithTotals.map((row) => {
+                        const isTotal = row.panel === "Total";
+                        const textClass = isTotal ? "font-semibold" : "";
+                        const achievedTextClass = (value: QuotaValue) =>
+                          typeof value === "number" && value > 0 ? "text-success" : "text-muted-foreground";
+
+                        return (
+                          <TableRow
+                            key={`${tab.value}-${row.panel}`}
+                            className={`bg-card/20 border-b border-border/60 ${isTotal ? "bg-muted/30" : ""} last:border-b-0`}
+                          >
+                            <TableCell className={`${bodyCellClass} ${textClass}`}>{row.panel}</TableCell>
+                            <TableCell className={`${bodyCellClass} text-right ${textClass}`}>
+                              {formatValue(row.sampleSize)}
+                            </TableCell>
+                            <TableCell className={`${bodyCellClass} text-right font-medium`}>
+                              {formatValue(row.gender.female.target)}
+                            </TableCell>
+                            <TableCell className={`${bodyCellClass} text-right font-medium`}>
+                              {formatValue(row.gender.male.target)}
+                            </TableCell>
+                            <TableCell className={`${bodyCellClass} text-right ${achievedTextClass(row.gender.female.achieved)}`}>
+                              {formatValue(row.gender.female.achieved)}
+                            </TableCell>
+                            <TableCell className={`${bodyCellClass} text-right ${achievedTextClass(row.gender.male.achieved)}`}>
+                              {formatValue(row.gender.male.achieved)}
+                            </TableCell>
+                            <TableCell className={`${bodyCellClass} text-right font-medium`}>
+                              {formatValue(row.age.youth.target)}
+                            </TableCell>
+                            <TableCell className={`${bodyCellClass} text-right font-medium`}>
+                              {formatValue(row.age.adult.target)}
+                            </TableCell>
+                            <TableCell className={`${bodyCellClass} text-right ${achievedTextClass(row.age.youth.achieved)}`}>
+                              {formatValue(row.age.youth.achieved)}
+                            </TableCell>
+                            <TableCell className={`${bodyCellClass} text-right ${achievedTextClass(row.age.adult.achieved)}`}>
+                              {formatValue(row.age.adult.achieved)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            );
+          })}
         </Tabs>
       </CardContent>
     </Card>
