@@ -69,7 +69,7 @@ const quotaTabs: QuotaTabDefinition[] = [
         },
       },
       {
-        panel: "Agric",
+        panel: "VCDF",
         sampleSize: 2600,
         gender: {
           female: { target: 400, achieved: null },
@@ -81,7 +81,7 @@ const quotaTabs: QuotaTabDefinition[] = [
         },
       },
       {
-        panel: "COFDO",
+        panel: "COFO",
         sampleSize: 780,
         gender: {
           female: { target: 200, achieved: null },
@@ -111,7 +111,7 @@ const quotaTabs: QuotaTabDefinition[] = [
         },
       },
       {
-        panel: "Agric",
+        panel: "VCDF",
         sampleSize: 2600,
         gender: {
           female: { target: 400, achieved: null },
@@ -123,7 +123,7 @@ const quotaTabs: QuotaTabDefinition[] = [
         },
       },
       {
-        panel: "COFDO",
+        panel: "COFO",
         sampleSize: 780,
         gender: {
           female: { target: 200, achieved: null },
@@ -300,6 +300,20 @@ export function QuotaTracker() {
         </div>
       </CardHeader>
       <CardContent className="bg-card/60 p-6">
+        <div className="mb-6 space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-4 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">
+            Ensure gender and age achievements for each arm are recorded using the respondent&apos;s OGSTEP pillar.
+          </p>
+          <p>
+            Interviewers should assign respondents to the correct pillar so targets and KPI cards stay aligned:
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>TVET (Treatment / Control)</li>
+            <li>VCDF (Treatment / Control)</li>
+            <li>COFO (Treatment / Control)</li>
+            <li>Unqualified respondent</li>
+          </ul>
+        </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             {quotaTabs.map((tab) => (
