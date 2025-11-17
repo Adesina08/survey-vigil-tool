@@ -599,6 +599,8 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
         interviewers={dashboardData.filters?.interviewers || []}
         errorTypes={dashboardData.filters?.errorTypes || []}
         metadata={dashboardData.mapMetadata}
+        selectedLga={selectedLga}
+        onLgaChange={(value) => onFilterChange("lga", value)}
       />
       <UserProductivity
         data={productivity}

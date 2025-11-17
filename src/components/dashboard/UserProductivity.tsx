@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { AriaAttributes } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CartesianGrid, ComposedChart, Bar, XAxis, YAxis, Label } from "recharts";
-import { ArrowDown, ArrowUp, ArrowUpDown, Crown, TrendingUp, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Crown, Download, TrendingUp, Users } from "lucide-react";
 import {
   ChartContainer,
   ChartTooltip,
@@ -24,6 +25,16 @@ import {
   ChartLegendContent,
 } from "@/components/ui/chart";
 import { cn, formatErrorLabel } from "@/lib/utils";
+
+type SheetJS = typeof import("xlsx");
+
+const sanitizeFileName = (value: string) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/--+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 interface InterviewerData {
   interviewerId: string;
@@ -219,6 +230,44 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
       })
       .sort((a, b) => formatErrorLabel(a).localeCompare(formatErrorLabel(b)));
   }, [safeData, safeErrorTypes]);
+
+  const handleExportTable = async () => {
+    if (tableData.length === 0) {
+      return;
+    }
+
+    try {
+      const module = (await import("xlsx")) as SheetJS & { default?: SheetJS };
+      const XLSX = module.default ?? module;
+
+      const rows = tableData.map((row) => {
+        const base: Record<string, string | number> = {
+          Interviewer: row.displayLabel || row.interviewerId,
+          "Total interviews": row.totalSubmissions,
+          "Approved interviews": row.validSubmissions,
+          "Flagged interviews": row.invalidSubmissions,
+        };
+
+        errorColumns.forEach((column) => {
+          const label = formatErrorLabel(safeErrorLabelMap[column] ?? column);
+          base[label] = row.errors?.[column] ?? 0;
+        });
+
+        return base;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Submission quality");
+
+      const timestamp = new Date().toISOString().split("T")[0];
+      const filename = `submission-quality-${sanitizeFileName(timestamp || "today") || "export"}.xlsx`;
+
+      XLSX.writeFile(workbook, filename, { bookType: "xlsx" });
+    } catch (error) {
+      console.error("Failed to export submission quality table", error);
+    }
+  };
 
   const chartData = useMemo(
     () =>
@@ -448,13 +497,27 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
 
       <Card className="overflow-hidden border-none shadow-lg shadow-primary/15">
         <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Users className="h-5 w-5" />
-            Submission quality overview
-          </CardTitle>
-          <CardDescription className="text-primary-foreground/90">
-            Monitor interviewer throughput and approvals to focus coaching where it will have the biggest impact.
-          </CardDescription>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+                <Users className="h-5 w-5" />
+                Submission quality overview
+              </CardTitle>
+              <CardDescription className="text-primary-foreground/90">
+                Monitor interviewer throughput and approvals to focus coaching where it will have the biggest impact.
+              </CardDescription>
+            </div>
+            <Button
+              type="button"
+              onClick={handleExportTable}
+              variant="secondary"
+              size="sm"
+              className="gap-2 bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/25"
+              disabled={tableData.length === 0}
+            >
+              <Download className="h-4 w-4" /> Export table
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6 bg-card/60 p-6">
           <Tabs defaultValue="chart" className="w-full">
