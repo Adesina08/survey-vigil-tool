@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { DashboardData } from "@/lib/dashboardData";
 
 type QuotaValue = number | string | null;
 
@@ -39,8 +40,10 @@ interface QuotaRow {
 interface QuotaTabDefinition {
   value: string;
   label: string;
-  rows: QuotaRow[];
 }
+
+type QuotaSubmission = DashboardData["mapSubmissions"][number];
+type HydratedQuotaTab = QuotaTabDefinition & { rows: QuotaRow[] };
 
 type SheetJS = {
   utils: {
@@ -52,91 +55,131 @@ type SheetJS = {
 };
 
 const quotaTabs: QuotaTabDefinition[] = [
+  { value: "treatment", label: "Treatment" },
+  { value: "control", label: "Control" },
+];
+
+const baseQuotaRows: QuotaRow[] = [
   {
-    value: "treatment",
-    label: "Treatment",
-    rows: [
-      {
-        panel: "TVET",
-        sampleSize: 2000,
-        gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
-        },
-        age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
-        },
-      },
-      {
-        panel: "Agric",
-        sampleSize: 2600,
-        gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
-        },
-        age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
-        },
-      },
-      {
-        panel: "COFDO",
-        sampleSize: 780,
-        gender: {
-          female: { target: 200, achieved: null },
-          male: { target: 200, achieved: null },
-        },
-        age: {
-          youth: { target: 200, achieved: null },
-          adult: { target: 200, achieved: null },
-        },
-      },
-    ],
+    panel: "TVET",
+    sampleSize: 2000,
+    gender: {
+      female: { target: 400, achieved: null },
+      male: { target: 600, achieved: null },
+    },
+    age: {
+      youth: { target: 400, achieved: null },
+      adult: { target: 600, achieved: null },
+    },
   },
   {
-    value: "control",
-    label: "Control",
-    rows: [
-      {
-        panel: "TVET",
-        sampleSize: 2000,
-        gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
-        },
-        age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
-        },
-      },
-      {
-        panel: "Agric",
-        sampleSize: 2600,
-        gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
-        },
-        age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
-        },
-      },
-      {
-        panel: "COFDO",
-        sampleSize: 780,
-        gender: {
-          female: { target: 200, achieved: null },
-          male: { target: 200, achieved: null },
-        },
-        age: {
-          youth: { target: 200, achieved: null },
-          adult: { target: 200, achieved: null },
-        },
-      },
-    ],
+    panel: "VCDF",
+    sampleSize: 2600,
+    gender: {
+      female: { target: 400, achieved: null },
+      male: { target: 600, achieved: null },
+    },
+    age: {
+      youth: { target: 400, achieved: null },
+      adult: { target: 600, achieved: null },
+    },
+  },
+  {
+    panel: "COFO",
+    sampleSize: 780,
+    gender: {
+      female: { target: 200, achieved: null },
+      male: { target: 200, achieved: null },
+    },
+    age: {
+      youth: { target: 200, achieved: null },
+      adult: { target: 200, achieved: null },
+    },
+  },
+  {
+    panel: "Unqualified Respondent",
+    sampleSize: null,
+    gender: {
+      female: { target: null, achieved: null },
+      male: { target: null, achieved: null },
+    },
+    age: {
+      youth: { target: null, achieved: null },
+      adult: { target: null, achieved: null },
+    },
   },
 ];
+
+const normalisePillar = (value: string | null | undefined): string => {
+  const normalised = (value ?? "").trim().toUpperCase();
+  if (normalised.includes("TVET")) return "TVET";
+  if (normalised.includes("VCDF")) return "VCDF";
+  if (normalised.includes("COFO")) return "COFO";
+  if (normalised.includes("UNQUALIFIED")) return "UNQUALIFIED RESPONDENT";
+  return "UNQUALIFIED RESPONDENT";
+};
+
+const normaliseGender = (value: string | null | undefined): "female" | "male" | null => {
+  if (!value) return null;
+  const lower = value.trim().toLowerCase();
+  if (lower.startsWith("f")) return "female";
+  if (lower.startsWith("m")) return "male";
+  return null;
+};
+
+const parseAgeValue = (value: string | null | undefined): number | null => {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const match = String(value).match(/(\d+(?:\.\d+)?)/);
+  if (match) {
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const normaliseAgeGroup = (value: string | null | undefined): "youth" | "adult" | null => {
+  const age = parseAgeValue(value);
+  if (age === null) return null;
+  if (age <= 25) return "youth";
+  return "adult";
+};
+
+const buildAchievementsByPillar = (
+  submissions: QuotaSubmission[],
+  path: "treatment" | "control",
+): Map<string, { female: number; male: number; youth: number; adult: number }> => {
+  const achievements = new Map<string, { female: number; male: number; youth: number; adult: number }>();
+
+  submissions.forEach((submission) => {
+    if (!submission || submission.ogstepPath !== path || submission.status !== "approved") {
+      return;
+    }
+
+    const pillarKey = normalisePillar(submission.pillar ?? null);
+    const gender = normaliseGender(submission.respondentGender);
+    const ageGroup = normaliseAgeGroup(submission.respondentAge);
+
+    if (gender === null && ageGroup === null) {
+      return;
+    }
+
+    const existing = achievements.get(pillarKey) ?? { female: 0, male: 0, youth: 0, adult: 0 };
+    if (gender === "female") existing.female += 1;
+    if (gender === "male") existing.male += 1;
+    if (ageGroup === "youth") existing.youth += 1;
+    if (ageGroup === "adult") existing.adult += 1;
+
+    achievements.set(pillarKey, existing);
+  });
+
+  return achievements;
+};
 
 const loadSheetJS = async (): Promise<SheetJS> => {
   if (typeof window === "undefined") {
@@ -255,14 +298,45 @@ const sanitizeSheetName = (label: string): string => {
   return cleaned.length > 31 ? cleaned.slice(0, 31) : cleaned;
 };
 
-export function QuotaTracker() {
+export function QuotaTracker({ submissions }: { submissions: QuotaSubmission[] }) {
   const [activeTab, setActiveTab] = useState<string>(quotaTabs[0]?.value ?? "treatment");
+
+  const hydratedTabs = useMemo<HydratedQuotaTab[]>(() => {
+    const achievementsByTab = {
+      treatment: buildAchievementsByPillar(submissions ?? [], "treatment"),
+      control: buildAchievementsByPillar(submissions ?? [], "control"),
+    };
+
+    return quotaTabs.map((tab) => {
+      const path = tab.value === "control" ? "control" : "treatment";
+      const achievementLookup = achievementsByTab[path];
+
+      const rowsWithAchievements = baseQuotaRows.map((row) => {
+        const pillarKey = normalisePillar(row.panel);
+        const stats = achievementLookup.get(pillarKey) ?? { female: 0, male: 0, youth: 0, adult: 0 };
+
+        return {
+          ...row,
+          gender: {
+            female: { ...row.gender.female, achieved: stats.female },
+            male: { ...row.gender.male, achieved: stats.male },
+          },
+          age: {
+            youth: { ...row.age.youth, achieved: stats.youth },
+            adult: { ...row.age.adult, achieved: stats.adult },
+          },
+        };
+      });
+
+      return { ...tab, rows: rowsWithAchievements };
+    });
+  }, [submissions]);
 
   const handleExport = async () => {
     try {
       const XLSX = await loadSheetJS();
       const workbook = XLSX.utils.book_new();
-      quotaTabs.forEach((tab) => {
+      hydratedTabs.forEach((tab) => {
         const rowsWithTotals = [...tab.rows, calculateTotals(tab.rows)];
         const worksheet = XLSX.utils.json_to_sheet(getSheetRows(rowsWithTotals));
         XLSX.utils.book_append_sheet(workbook, worksheet, sanitizeSheetName(tab.label));
@@ -302,14 +376,14 @@ export function QuotaTracker() {
       <CardContent className="bg-card/60 p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            {quotaTabs.map((tab) => (
+            {hydratedTabs.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>
                 {tab.label}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          {quotaTabs.map((tab) => {
+          {hydratedTabs.map((tab) => {
             const rowsWithTotals = [...tab.rows, calculateTotals(tab.rows)];
             return (
               <TabsContent key={tab.value} value={tab.value}>

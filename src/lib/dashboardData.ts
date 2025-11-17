@@ -23,6 +23,8 @@ import {
 type OgstepPath = "treatment" | "control" | "unknown";
 
 const QC_FLAG_REGEX = /^QC_(FLAG|WARN)_/i;
+const PILLAR_LABELS = ["TVET", "VCDF", "COFO", "UNQUALIFIED RESPONDENT"] as const;
+type PillarLabel = (typeof PILLAR_LABELS)[number];
 
 export type AnalysisRow = Record<string, unknown>;
 
@@ -49,6 +51,7 @@ interface MapSubmission {
   respondentPhone: string | null;
   respondentGender: string | null;
   respondentAge: string | null;
+  pillar: PillarLabel | null;
   ward: string | null;
   community: string | null;
   consent: string | null;
@@ -355,6 +358,18 @@ const determineOgstepPath = (response?: string | null): OgstepPath => {
   }
 
   return "unknown";
+};
+
+const derivePillarLabel = (value: string | null | undefined): PillarLabel | null => {
+  const normalised = (value ?? "").trim().toUpperCase();
+  if (!normalised) return null;
+
+  if (normalised.includes("TVET")) return "TVET";
+  if (normalised.includes("VCDF")) return "VCDF";
+  if (normalised.includes("COFO")) return "COFO";
+  if (normalised.includes("UNQUALIFIED")) return "UNQUALIFIED RESPONDENT";
+
+  return null;
 };
 
 const extractOgstepDetails = (row: SheetSubmissionRow): { response: string | null; path: OgstepPath } => {
@@ -812,6 +827,16 @@ export const buildDashboardData = ({
     ]);
     const respondentGenderLabel = getRespondentGenderLabel(row);
     const respondentAge = pickFirstText(row, ["A8. Age", "respondent_age", "Age"]);
+    const pillarLabel = derivePillarLabel(
+      pickFirstText(row, [
+        "Pillar",
+        "pillar",
+        "Target Variable",
+        "target_variable",
+        "target variable",
+        "Target VARIABLE",
+      ]),
+    );
     const wardName = pickFirstText(row, ["A3b. Select the Ward", "Ward"]);
     const communityName = pickFirstText(row, ["A4. Community / Village", "Community", "Village"]);
     const consentValue = pickFirstText(row, ["A6. Consent to participate", "Consent"]);
@@ -968,6 +993,7 @@ export const buildDashboardData = ({
         respondentPhone: respondentPhone ?? null,
         respondentGender: respondentGenderLabel ?? null,
         respondentAge: respondentAge ?? null,
+        pillar: pillarLabel ?? null,
         ward: wardName ?? null,
         community: communityName ?? null,
         consent: consentValue ?? null,

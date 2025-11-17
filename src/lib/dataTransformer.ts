@@ -288,6 +288,24 @@ const normaliseGenderLabel = (value: string | null): string | null => {
   return trimmed;
 };
 
+const derivePillarLabel = (value: string | null): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const normalised = value.trim().toUpperCase();
+  if (!normalised) {
+    return null;
+  }
+
+  if (normalised.includes("TVET")) return "TVET";
+  if (normalised.includes("VCDF")) return "VCDF";
+  if (normalised.includes("COFO")) return "COFO";
+  if (normalised.includes("UNQUALIFIED")) return "UNQUALIFIED RESPONDENT";
+
+  return null;
+};
+
 export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
   return rawData
     .filter((row) => {
@@ -353,6 +371,9 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
         ]) ?? null,
       );
       const respondentAge = getTextValue(row, ["A8. Age", "respondent_age", "Age"]);
+      const pillar = derivePillarLabel(
+        getTextValue(row, ["Pillar", "pillar", "Target Variable", "target_variable", "target variable"]),
+      );
       const ward = getTextValue(row, ["A3b. Select the Ward", "Ward"]);
       const community = getTextValue(row, ["A4. Community / Village", "Community", "Village"]);
       const consent = getTextValue(row, ["A6. Consent to participate", "Consent"]);
@@ -386,6 +407,7 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
         respondentPhone,
         respondentGender,
         respondentAge,
+        pillar,
         ward,
         community,
         consent,

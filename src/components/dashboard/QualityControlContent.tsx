@@ -592,7 +592,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       <SummaryCards summary={summary} />
       <div className="space-y-6">
         <ProgressCharts quotaSummary={quotaSummary} statusBreakdown={statusBreakdown} />
-        <QuotaTracker />
+        <QuotaTracker submissions={dashboardData.mapSubmissions || []} />
       </div>
       <InteractiveMap
         submissions={filteredMapSubmissions}
