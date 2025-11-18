@@ -159,19 +159,21 @@ function isTruthy(value: any): boolean {
 }
 
 /**
- * Determine OGSTEP path from B2 response
+ * Determine OGSTEP path from the Pillar field
  */
 function getOgstepPath(row: RawSurveyRow): "treatment" | "control" | "unknown" {
-  const response = getTextValue(row, [
-    "B2. Did you participate in OGSTEP?",
-    "b2_did_you_participate_in_ogstep",
+  const pillar = getTextValue(row, [
+    "Pillar. Interviewers, kindly recruit the respondent into the right Pillar according to your target",
+    "Pillar",
+    "pillar",
   ]);
 
-  if (!response) return "unknown";
+  if (!pillar) return "unknown";
 
-  const lower = response.toLowerCase().trim();
-  if (lower.startsWith("y") || lower === "1" || lower === "yes") return "treatment";
-  if (lower.startsWith("n") || lower === "0" || lower === "no") return "control";
+  const normalised = pillar.toUpperCase();
+  if (normalised.includes("TREATMENT")) return "treatment";
+  if (normalised.includes("CONTROL")) return "control";
+
   return "unknown";
 }
 

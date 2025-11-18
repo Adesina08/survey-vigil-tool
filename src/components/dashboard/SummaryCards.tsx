@@ -122,11 +122,11 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           helper: formatPathHelper(summary.controlPathCount),
           tone: "control",
         },
+        {
+          label: "Unqualified Respondent",
+          value: formatNumber(summary.unknownPathCount),
+        },
       ],
-      footer:
-        summary.unknownPathCount > 0
-          ? `${formatNumber(summary.unknownPathCount)} submissions without OGSTEP path`
-          : undefined,
     },
     {
       title: "Gender distribution",

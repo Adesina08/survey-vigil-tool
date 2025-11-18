@@ -336,21 +336,21 @@ const shouldIgnoreErrorType = (code: string): boolean => {
   return /^QC[\s_]*(?:FLAG|WARN)[\s_]*COUNT$/i.test(code.trim());
 };
 
-const determineOgstepPath = (response?: string | null): OgstepPath => {
-  if (!response) {
+const determineOgstepPath = (pillar?: string | null): OgstepPath => {
+  if (!pillar) {
     return "unknown";
   }
 
-  const lower = response.trim().toLowerCase();
-  if (!lower) {
+  const upper = pillar.trim().toUpperCase();
+  if (!upper) {
     return "unknown";
   }
 
-  if (lower.startsWith("y") || lower === "1" || lower === "yes" || lower === "true") {
+  if (upper.includes("TREATMENT")) {
     return "treatment";
   }
 
-  if (lower.startsWith("n") || lower === "0" || lower === "no" || lower === "false") {
+  if (upper.includes("CONTROL")) {
     return "control";
   }
 
@@ -358,14 +358,20 @@ const determineOgstepPath = (response?: string | null): OgstepPath => {
 };
 
 const extractOgstepDetails = (row: SheetSubmissionRow): { response: string | null; path: OgstepPath } => {
-  const raw = row["B2. Did you participate in OGSTEP?"];
-  if (raw === undefined || raw === null) {
-    return { response: null, path: "unknown" };
+  const rawResponse = row["B2. Did you participate in OGSTEP?"];
+  const pillar = pickFirstText(row, [
+    "Pillar. Interviewers, kindly recruit the respondent into the right Pillar according to your target",
+    "Pillar",
+    "pillar",
+  ]);
+
+  if (rawResponse === undefined || rawResponse === null) {
+    return { response: null, path: determineOgstepPath(pillar) };
   }
 
-  const response = String(raw).trim();
+  const response = String(rawResponse).trim();
   const normalised = response.length > 0 ? response : null;
-  return { response: normalised, path: determineOgstepPath(normalised) };
+  return { response: normalised, path: determineOgstepPath(pillar) };
 };
 
 const extractDirections = (row: SheetSubmissionRow): string | null => {
