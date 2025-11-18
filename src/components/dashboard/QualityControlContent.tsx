@@ -10,7 +10,6 @@ import {
 } from "@/utils/errors";
 import { normaliseErrorType } from "@/lib/errorTypes";
 import { formatErrorLabel } from "@/lib/utils";
-import { FilterControls } from "./FilterControls";
 import { SummaryCards } from "./SummaryCards";
 import { ProgressCharts } from "./ProgressCharts";
 import { InteractiveMap } from "./InteractiveMap";
@@ -216,41 +215,10 @@ const buildInterviewerDisplayLabel = (name: string, id: string) => {
 interface QualityControlContentProps {
   dashboardData: DashboardData;
   selectedLga: string | null;
-  onFilterChange: (filterType: string, value: string) => void;
 }
 
-export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChange }: QualityControlContentProps) => {
+export const QualityControlContent = ({ dashboardData, selectedLga }: QualityControlContentProps) => {
   console.log('QualityControlContent render:', { selectedLga, hasData: !!dashboardData.analysisRows });
-  
-  // Compute available LGAs from ALL analysis rows (unfiltered)
-  const availableLgas = useMemo(() => {
-    const fromPayload = dashboardData.lgas ?? dashboardData.filters?.lgas ?? [];
-    if (Array.isArray(fromPayload) && fromPayload.length > 0) {
-      return fromPayload;
-    }
-
-    const set = new Set<string>();
-    const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
-
-    rows.forEach((row) => {
-      const lgaValue =
-        getFirstTextValue(row, [
-          "A3. select the LGA",
-          "A3. Select the LGA",
-          "a3_select_the_lga",
-          "lga",
-          "local_government_area",
-          "local_government",
-          "location_lga",
-        ]) ?? "";
-
-      if (lgaValue && lgaValue.trim().length > 0) {
-        set.add(lgaValue.trim());
-      }
-    });
-
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [dashboardData.analysisRows, dashboardData.filters?.lgas, dashboardData.lgas]);
 
   // Map submissions - ALWAYS unfiltered (not affected by LGA filter)
   const filteredMapSubmissions = useMemo(() => {
@@ -783,11 +751,6 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
   return (
     <div className="space-y-8">
-      <FilterControls
-        selectedLga={selectedLga}
-        lgas={availableLgas}
-        onFilterChange={onFilterChange}
-      />
       <div className="space-y-1">
         <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
           Fieldwork Snapshot
