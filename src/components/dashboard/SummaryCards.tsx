@@ -57,6 +57,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     value: string;
     helper?: string;
     tone?: MetricTone;
+    colSpan?: number;
   }
 
   interface CardConfig {
@@ -89,16 +90,15 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             summary.overallTarget > 0
               ? `${formatPercentage(totalSubmissionRate)} of target volume`
               : undefined,
-        },
-        {
-          label: "Wrong version flags",
-          value: formatNumber(summary.wrongVersionFlagCount),
-          helper: "Submissions flagged for using the wrong survey version",
+          colSpan: 2,
         },
         {
           label: "Terminated interviews",
           value: formatNumber(summary.terminatedInterviews),
-          helper: "Consent declined (A6 answered No)",
+        },
+        {
+          label: "Wrong version flags",
+          value: formatNumber(summary.wrongVersionFlagCount),
         },
       ],
     },
@@ -224,13 +224,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           <CardContent className="space-y-4">
             <div
               className={
-                card.metrics.length > 1
-                  ? "grid grid-cols-2 gap-6"
-                  : "space-y-3"
+                card.metrics.length > 1 ? "grid grid-cols-2 gap-6" : "space-y-3"
               }
             >
               {card.metrics.map((metric) => (
-                <div key={metric.label} className="space-y-1">
+                <div
+                  key={metric.label}
+                  className={`space-y-1 ${metric.colSpan ? `col-span-${metric.colSpan}` : ""}`.trim()}
+                >
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                     {metric.label}
                   </div>

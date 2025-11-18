@@ -316,7 +316,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       relevantQuotaCount: relevantQuotaByLGA.length 
     });
     
-    let totalSubmissions = 0;
+    let totalRows = 0;
     let approvedCount = 0;
     let flaggedCount = 0;
     let canceledCount = 0;
@@ -335,7 +335,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     const wrongVersionSlug = normaliseErrorType("wrong_version").slug;
 
     rows.forEach((row) => {
-      totalSubmissions += 1;
+      totalRows += 1;
 
       const ogstepPath = getOgstepPathFromRow(row);
       const genderValue = getGenderFromRow(row);
@@ -399,6 +399,8 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       }
     });
 
+    const collectedInterviews = Math.max(totalRows - terminatedInterviews - wrongVersionFlagCount, 0);
+
     const totalTarget = shouldFilter
       ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
       : dashboardData.summary?.overallTarget || 0;
@@ -410,7 +412,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     const completionRate =
       totalTarget > 0 ? Number(((approvedAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
 
-    const submissionsAgainstTarget = totalSubmissions;
+    const submissionsAgainstTarget = collectedInterviews;
     const submissionProgressPercent =
       totalTarget > 0 ? Number(((submissionsAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
 
@@ -422,17 +424,17 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     };
 
     const approvalRatePercent =
-      totalSubmissions > 0 ? Number(((approvedCount / totalSubmissions) * 100).toFixed(1)) : 0;
+      totalRows > 0 ? Number(((approvedCount / totalRows) * 100).toFixed(1)) : 0;
 
     const flaggedRatePercent =
-      totalSubmissions > 0 ? Number(((flaggedCount / totalSubmissions) * 100).toFixed(1)) : 0;
+      totalRows > 0 ? Number(((flaggedCount / totalRows) * 100).toFixed(1)) : 0;
 
     const canceledRatePercent =
-      totalSubmissions > 0 ? Number(((canceledCount / totalSubmissions) * 100).toFixed(1)) : 0;
+      totalRows > 0 ? Number(((canceledCount / totalRows) * 100).toFixed(1)) : 0;
 
     const summary = {
       overallTarget: totalTarget,
-      totalSubmissions,
+      totalSubmissions: collectedInterviews,
       approvedSubmissions: approvedCount,
       approvalRate: approvalRatePercent,
       flaggedSubmissions: flaggedCount,
