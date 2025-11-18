@@ -67,8 +67,6 @@ interface InteractiveMapProps {
   interviewers?: InterviewerOption[];
   errorTypes?: string[];
   metadata?: NormalizedMapMetadata;
-  selectedLga?: string | null;
-  onLgaChange?: (value: string) => void;
 }
 
 type ColorMode = "path" | "approval";
@@ -335,13 +333,11 @@ export function InteractiveMap({
   interviewers = [],
   errorTypes = [],
   metadata,
-  selectedLga: externalSelectedLga = null,
-  onLgaChange,
 }: InteractiveMapProps) {
   const normalizedMetadata = metadata ?? normalizeMapMetadata();
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
-  const [selectedLga, setSelectedLga] = useState(externalSelectedLga ?? "all");
+  const [selectedLga, setSelectedLga] = useState("all");
   const [colorMode, setColorMode] = useState<ColorMode>("path");
   const [showLgaLabels, setShowLgaLabels] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -354,10 +350,6 @@ export function InteractiveMap({
   const [geoJsonFeatures, setGeoJsonFeatures] = useState<
     Feature<Geometry, Record<string, unknown>>[]
   >([]);
-  useEffect(() => {
-    const normalized = externalSelectedLga && externalSelectedLga !== "all" ? externalSelectedLga : "all";
-    setSelectedLga((previous) => (previous === normalized ? previous : normalized));
-  }, [externalSelectedLga]);
   const baseSubmissions = useMemo(() => (Array.isArray(submissions) ? submissions : []), [submissions]);
   const interviewerLookup = useMemo(() => {
     const map = new Map<string, InterviewerOption>();
@@ -438,13 +430,9 @@ export function InteractiveMap({
     setShowLgaLabels((previous) => !previous);
   };
 
-  const handleLgaChange = useCallback(
-    (value: string) => {
-      setSelectedLga(value);
-      onLgaChange?.(value);
-    },
-    [onLgaChange],
-  );
+  const handleLgaChange = useCallback((value: string) => {
+    setSelectedLga(value);
+  }, []);
 
   useEffect(() => {
     if (selectedLga === "all") {
