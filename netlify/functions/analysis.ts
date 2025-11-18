@@ -12,6 +12,29 @@ const jsonResponse = (statusCode: number, payload: unknown) => ({
   body: JSON.stringify(payload),
 });
 
+const readTopbreaks = (params: Record<string, string | undefined>): string[] => {
+  const candidateKeys = new Set(["topbreak", "topbreaks", "topbreak[]", "topBreak", "topBreaks"]);
+
+  Object.keys(params).forEach((key) => {
+    if (/topbreak/i.test(key)) {
+      candidateKeys.add(key);
+    }
+  });
+
+  const rawValues = Array.from(candidateKeys)
+    .map((key) => params[key])
+    .filter((value): value is string => Boolean(value));
+
+  const splitValues = rawValues.flatMap((value) =>
+    value
+      .split(",")
+      .map((part) => part?.trim())
+      .filter((part): part is string => Boolean(part)),
+  );
+
+  return Array.from(new Set(splitValues));
+};
+
 export const handler = async (event: { path?: string; queryStringParameters?: Record<string, string> }) => {
   try {
     const path = event.path || "";
@@ -23,8 +46,9 @@ export const handler = async (event: { path?: string; queryStringParameters?: Re
 
     if (path.endsWith("/table")) {
       const params = event.queryStringParameters || {};
+      const topbreaks = readTopbreaks(params);
       const table = await generateAnalysisTable({
-        topbreak: params.topbreak ?? null,
+        topbreaks: topbreaks.length > 0 ? topbreaks : null,
         variable: params.variable ?? null,
         stat: params.stat ?? null,
         limitCategories: params.limit_categories ?? null,
