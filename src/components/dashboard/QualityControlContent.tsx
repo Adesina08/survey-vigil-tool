@@ -318,7 +318,6 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     
     let totalRows = 0;
     let approvedCount = 0;
-    let flaggedCount = 0;
     let canceledCount = 0;
     let notApprovedCount = 0;
     let maleCount = 0;
@@ -370,9 +369,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
         notApprovedCount += 1;
       }
 
-      if (approvalCategory === "flagged") {
-        flaggedCount += 1;
-      } else if (approvalCategory === "canceled") {
+      if (approvalCategory === "canceled") {
         canceledCount += 1;
       }
 
@@ -426,8 +423,8 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     const approvalRatePercent =
       totalRows > 0 ? Number(((approvedCount / totalRows) * 100).toFixed(1)) : 0;
 
-    const flaggedRatePercent =
-      totalRows > 0 ? Number(((flaggedCount / totalRows) * 100).toFixed(1)) : 0;
+    const notApprovedRatePercent =
+      totalRows > 0 ? Number(((notApprovedCount / totalRows) * 100).toFixed(1)) : 0;
 
     const canceledRatePercent =
       totalRows > 0 ? Number(((canceledCount / totalRows) * 100).toFixed(1)) : 0;
@@ -437,8 +434,8 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       totalSubmissions: collectedInterviews,
       approvedSubmissions: approvedCount,
       approvalRate: approvalRatePercent,
-      flaggedSubmissions: flaggedCount,
-      flaggedRate: flaggedRatePercent,
+      notApprovedSubmissions: notApprovedCount,
+      notApprovedRate: notApprovedRatePercent,
       canceledSubmissions: canceledCount,
       canceledRate: canceledRatePercent,
       wrongVersionFlagCount,
