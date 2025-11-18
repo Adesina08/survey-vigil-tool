@@ -22,6 +22,62 @@ import { AchievementsTables } from "./AchievementsTables";
 type NormalisedRow = Record<string, unknown>;
 type OgstepPath = "treatment" | "control" | "unknown";
 
+// NEW: read Pillar from the row
+const getPillarFromRow = (row: NormalisedRow): string | null =>
+  getFirstTextValue(row, [
+    "Pillar. Interviewers, kindly recruit the respondent into the right Pillar according to your target",
+    "Pillar",
+    "pillar",
+  ]);
+
+// NEW: parse panel + path from Pillar
+const parsePillar = (value: string | null): { panel: string; path: OgstepPath } => {
+  if (!value) return { panel: "UNKNOWN", path: "unknown" };
+
+  const lower = value.toLowerCase();
+
+  let panel = "UNKNOWN";
+  if (lower.includes("tvet")) panel = "TVET";
+  else if (lower.includes("vcdf")) panel = "VCDF";
+  else if (lower.includes("cofo") || lower.includes("cofdo")) panel = "COFO";
+  else if (lower.includes("unqualified")) panel = "UNQUALIFIED RESPONDENT";
+
+  let path: OgstepPath = "unknown";
+  if (lower.includes("treatment")) path = "treatment";
+  else if (lower.includes("control")) path = "control";
+
+  return { panel, path };
+};
+
+// NEW: collapse detailed age to youth / adult
+const getAgeBucketFromRow = (row: NormalisedRow): "youth" | "adult" | "unknown" => {
+  const raw =
+    getFirstTextValue(row, ["Age Group", "age_group"]) ??
+    getFirstTextValue(row, ["A8. Age", "a8_age"]);
+
+  if (!raw) return "unknown";
+  const lower = raw.toLowerCase();
+
+  if (
+    lower.includes("15-24") ||
+    lower.includes("25-34") ||
+    lower.includes("15-35")
+  ) {
+    return "youth";
+  }
+
+  if (
+    lower.includes("35-44") ||
+    lower.includes("45+") ||
+    lower.includes("35-49") ||
+    lower.includes("50+")
+  ) {
+    return "adult";
+  }
+
+  return "unknown";
+};
+
 // Utility functions
 const getFirstTextValue = (row: NormalisedRow, keys: string[]): string | null => {
   for (const key of keys) {
@@ -100,6 +156,16 @@ const normaliseOgstepResponse = (value: string | null): OgstepPath => {
 };
 
 const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
+  // 1) Prefer the Pillar field
+  const pillar = getPillarFromRow(row);
+  if (pillar) {
+    const { path } = parsePillar(pillar);
+    if (path !== "unknown") {
+      return path;
+    }
+  }
+
+  // 2) Fallback to the OGSTEP participation question
   const response =
     getFirstTextValue(row, [
       "B2. Did you participate in OGSTEP?",
@@ -109,6 +175,7 @@ const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
       "ogstep_participation",
       "ogstep_response",
     ]) ?? null;
+
   return normaliseOgstepResponse(response);
 };
 
@@ -208,6 +275,16 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     return Array.from(slugs);
   }, [dashboardData.analysisRows]);
 
+  type QuotaAchievementsByPillar = {
+    [tab in "treatment" | "control"]?: {
+      [panel: string]: {
+        sampleSize: number;
+        gender: { female: number; male: number };
+        age: { youth: number; adult: number };
+      };
+    };
+  };
+
   const {
     summary,
     quotaSummary,
@@ -218,6 +295,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     achievementsByLGA,
     errorTypes,
     errorLabels,
+    quotaAchievementsByPillar,
   } = useMemo(() => {
     const relevantQuotaByLGA = selectedLga
       ? (dashboardData.quotaByLGA || []).filter((row) => matchesSelectedLga(row.lga, selectedLga))
@@ -237,6 +315,12 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     let femaleCount = 0;
 
     const pathTotals: Record<OgstepPath, number> = { treatment: 0, control: 0, unknown: 0 };
+
+    // NEW: quota achievements per panel & tab (treatment / control)
+    const quotaAchievements: QuotaAchievementsByPillar = {
+      treatment: {},
+      control: {},
+    };
     const productivityMap = new Map<
       string,
       {
@@ -328,6 +412,33 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       const genderValue = getGenderFromRow(row);
       if (genderValue === "male") maleCount += 1;
       else if (genderValue === "female") femaleCount += 1;
+
+      // NEW: Quota achievements (by Pillar, for Quota Tracker)
+      const pillarRaw = getPillarFromRow(row);
+      const { panel, path } = parsePillar(pillarRaw);
+
+      if (path === "treatment" || path === "control") {
+        // skip UNQUALIFIED / unknown panels in the quota tracker
+        if (panel === "TVET" || panel === "VCDF" || panel === "COFO") {
+          const tabKey = path;
+          const panelMap = (quotaAchievements[tabKey] ||= {});
+          const bucket =
+            (panelMap[panel] ||= {
+              sampleSize: 0,
+              gender: { female: 0, male: 0 },
+              age: { youth: 0, adult: 0 },
+            });
+
+          bucket.sampleSize += 1;
+
+          if (genderValue === "female") bucket.gender.female += 1;
+          else if (genderValue === "male") bucket.gender.male += 1;
+
+          const ageBucket = getAgeBucketFromRow(row);
+          if (ageBucket === "youth") bucket.age.youth += 1;
+          else if (ageBucket === "adult") bucket.age.adult += 1;
+        }
+      }
 
       if (!productivityMap.has(key)) {
         productivityMap.set(key, {
@@ -558,6 +669,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       achievementsByLGA,
       errorTypes: errorBreakdown.map((item) => item.code),
       errorLabels: errorLabelLookup,
+      quotaAchievementsByPillar: quotaAchievements, // NEW
     };
   }, [
     dashboardData.quotaByLGA,
@@ -592,7 +704,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       <SummaryCards summary={summary} />
       <div className="space-y-6">
         <ProgressCharts quotaSummary={quotaSummary} statusBreakdown={statusBreakdown} />
-        <QuotaTracker />
+        <QuotaTracker achievements={quotaAchievementsByPillar} />
       </div>
       <InteractiveMap
         submissions={filteredMapSubmissions}
