@@ -72,36 +72,36 @@ const quotaTabs: QuotaTabDefinition[] = [
         panel: "TVET",
         sampleSize: { target: 2000, achieved: null },
         gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
+          female: { target: 400, achieved: 440 },
+          male: { target: 600, achieved: 600 },
         },
         age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
+          youth: { target: 500, achieved: 350 },
+          adult: { target: 500, achieved: 500 },
         },
       },
       {
-        panel: "VCDF",
-        sampleSize: { target: 2600, achieved: null },
+        panel: "Agric",
+        sampleSize: { target: 2000, achieved: null },
         gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
+          female: { target: 400, achieved: 660 },
+          male: { target: 600, achieved: 400 },
         },
         age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
+          youth: { target: 500, achieved: 610 },
+          adult: { target: 500, achieved: 500 },
         },
       },
       {
         panel: "COFO",
         sampleSize: { target: 780, achieved: null },
         gender: {
-          female: { target: 200, achieved: null },
-          male: { target: 200, achieved: null },
+          female: { target: 200, achieved: 200 },
+          male: { target: 200, achieved: 200 },
         },
         age: {
-          youth: { target: 200, achieved: null },
-          adult: { target: 200, achieved: null },
+          youth: { target: 390, achieved: 540 },
+          adult: { target: 390, achieved: null },
         },
       },
     ],
@@ -114,36 +114,36 @@ const quotaTabs: QuotaTabDefinition[] = [
         panel: "TVET",
         sampleSize: { target: 2000, achieved: null },
         gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
+          female: { target: 400, achieved: 440 },
+          male: { target: 600, achieved: 600 },
         },
         age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
+          youth: { target: 500, achieved: 350 },
+          adult: { target: 500, achieved: 500 },
         },
       },
       {
-        panel: "VCDF",
-        sampleSize: { target: 2600, achieved: null },
+        panel: "Agric",
+        sampleSize: { target: 2000, achieved: null },
         gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
+          female: { target: 400, achieved: 660 },
+          male: { target: 600, achieved: 400 },
         },
         age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
+          youth: { target: 500, achieved: 610 },
+          adult: { target: 500, achieved: 500 },
         },
       },
       {
         panel: "COFO",
         sampleSize: { target: 780, achieved: null },
         gender: {
-          female: { target: 200, achieved: null },
-          male: { target: 200, achieved: null },
+          female: { target: 200, achieved: 200 },
+          male: { target: 200, achieved: 200 },
         },
         age: {
-          youth: { target: 200, achieved: null },
-          adult: { target: 200, achieved: null },
+          youth: { target: 390, achieved: 540 },
+          adult: { target: 390, achieved: null },
         },
       },
     ],
@@ -254,12 +254,16 @@ const exportToExcel = async (tabs: QuotaTabDefinition[]) => {
         "Achieved Sample Size",
         "Target Female",
         "Achieved Female",
+        "Balance Female",
         "Target Male",
         "Achieved Male",
+        "Balance Male",
         "Target Youth",
         "Achieved Youth",
+        "Balance Youth",
         "Target Adult",
         "Achieved Adult",
+        "Balance Adult",
       ],
     ];
 
@@ -270,12 +274,16 @@ const exportToExcel = async (tabs: QuotaTabDefinition[]) => {
         row.sampleSize.achieved ?? 0,
         row.gender.female.target,
         row.gender.female.achieved ?? 0,
+        calculateBalance(row.gender.female.target, row.gender.female.achieved),
         row.gender.male.target,
         row.gender.male.achieved ?? 0,
+        calculateBalance(row.gender.male.target, row.gender.male.achieved),
         row.age.youth.target,
         row.age.youth.achieved ?? 0,
+        calculateBalance(row.age.youth.target, row.age.youth.achieved),
         row.age.adult.target,
         row.age.adult.achieved ?? 0,
+        calculateBalance(row.age.adult.target, row.age.adult.achieved),
       ]);
     });
 
@@ -290,6 +298,58 @@ const formatNumber = (value: number | null | undefined): string => {
   if (value === null || value === undefined || Number.isNaN(value)) return "0";
   return value.toLocaleString("en-NG");
 };
+
+const formatDisplayNumber = (
+  value: number | null | undefined,
+  { wrapInParens = false, blankForNull = false }: { wrapInParens?: boolean; blankForNull?: boolean } = {},
+): string => {
+  if (value === null || value === undefined || Number.isNaN(value)) return blankForNull ? "" : "0";
+
+  const formatted = value.toLocaleString("en-NG");
+  return wrapInParens ? `(${formatted})` : formatted;
+};
+
+const calculateBalance = (target: number, achieved: number | null | undefined) => target - (achieved ?? 0);
+
+const cellBorderClass = "border-[1.5px] border-slate-700 dark:border-slate-400";
+
+const calculateTotals = (rows: QuotaRow[]) =>
+  rows.reduce(
+    (totals, row) => ({
+      sampleSize: totals.sampleSize + (row.sampleSize.target ?? 0),
+      gender: {
+        female: {
+          target: totals.gender.female.target + (row.gender.female.target ?? 0),
+          achieved: totals.gender.female.achieved + (row.gender.female.achieved ?? 0),
+        },
+        male: {
+          target: totals.gender.male.target + (row.gender.male.target ?? 0),
+          achieved: totals.gender.male.achieved + (row.gender.male.achieved ?? 0),
+        },
+      },
+      age: {
+        youth: {
+          target: totals.age.youth.target + (row.age.youth.target ?? 0),
+          achieved: totals.age.youth.achieved + (row.age.youth.achieved ?? 0),
+        },
+        adult: {
+          target: totals.age.adult.target + (row.age.adult.target ?? 0),
+          achieved: totals.age.adult.achieved + (row.age.adult.achieved ?? 0),
+        },
+      },
+    }),
+    {
+      sampleSize: 0,
+      gender: {
+        female: { target: 0, achieved: 0 },
+        male: { target: 0, achieved: 0 },
+      },
+      age: {
+        youth: { target: 0, achieved: 0 },
+        adult: { target: 0, achieved: 0 },
+      },
+    },
+  );
 
 const safePanelKey = (panel: string): string => {
   const cleaned = panel.replace(/[^\p{L}\p{N}]+/gu, "_").toUpperCase();
@@ -330,46 +390,177 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
             <TabsTrigger value="control">Control</TabsTrigger>
           </TabsList>
 
-          {tabsWithAchievements.map((tab) => (
-            <TabsContent key={tab.value} value={tab.value}>
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Pillar</TableHead>
-                      <TableHead>Target Sample Size</TableHead>
-                      <TableHead>Achieved Sample Size</TableHead>
-                      <TableHead>Target Female</TableHead>
-                      <TableHead>Achieved Female</TableHead>
-                      <TableHead>Target Male</TableHead>
-                      <TableHead>Achieved Male</TableHead>
-                      <TableHead>Target Youth</TableHead>
-                      <TableHead>Achieved Youth</TableHead>
-                      <TableHead>Target Adult</TableHead>
-                      <TableHead>Achieved Adult</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tab.rows.map((row) => (
-                      <TableRow key={`${tab.value}-${safePanelKey(row.panel)}`}>
-                        <TableCell className="font-medium">{row.panel}</TableCell>
-                        <TableCell>{formatNumber(row.sampleSize.target)}</TableCell>
-                        <TableCell>{formatNumber(row.sampleSize.achieved)}</TableCell>
-                        <TableCell>{formatNumber(row.gender.female.target)}</TableCell>
-                        <TableCell>{formatNumber(row.gender.female.achieved)}</TableCell>
-                        <TableCell>{formatNumber(row.gender.male.target)}</TableCell>
-                        <TableCell>{formatNumber(row.gender.male.achieved)}</TableCell>
-                        <TableCell>{formatNumber(row.age.youth.target)}</TableCell>
-                        <TableCell>{formatNumber(row.age.youth.achieved)}</TableCell>
-                        <TableCell>{formatNumber(row.age.adult.target)}</TableCell>
-                        <TableCell>{formatNumber(row.age.adult.achieved)}</TableCell>
+          {tabsWithAchievements.map((tab) => {
+            const totals = calculateTotals(tab.rows);
+
+            return (
+              <TabsContent key={tab.value} value={tab.value}>
+                <div className="overflow-x-auto rounded-md border-[2px] border-slate-700 bg-white shadow-sm dark:border-slate-500 dark:bg-slate-900">
+                  <Table
+                    className="border-collapse text-center"
+                    containerClassName="border-[2px] border-slate-700 dark:border-slate-500"
+                  >
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 font-semibold dark:bg-slate-800`} rowSpan={3}>
+                          Pillar
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 font-semibold dark:bg-slate-800`} rowSpan={3}>
+                          N
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={6}>
+                          Gender
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={6}>
+                          Age
+                        </TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-          ))}
+                      <TableRow>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
+                          Target
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
+                          Achieved
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
+                          Balance
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
+                          Target
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
+                          Achieved
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
+                          Balance
+                        </TableHead>
+                      </TableRow>
+                      <TableRow>
+                        <TableHead className={cellBorderClass}>Female</TableHead>
+                        <TableHead className={cellBorderClass}>Male</TableHead>
+                        <TableHead className={cellBorderClass}>Female</TableHead>
+                        <TableHead className={cellBorderClass}>Male</TableHead>
+                        <TableHead className={cellBorderClass}>Female</TableHead>
+                        <TableHead className={cellBorderClass}>Male</TableHead>
+                        <TableHead className={cellBorderClass}>&lt;35 (Youth)</TableHead>
+                        <TableHead className={cellBorderClass}>&gt;35 (Adult)</TableHead>
+                        <TableHead className={cellBorderClass}>&lt;35 (Youth)</TableHead>
+                        <TableHead className={cellBorderClass}>&gt;35 (Adult)</TableHead>
+                        <TableHead className={cellBorderClass}>&lt;35 (Youth)</TableHead>
+                        <TableHead className={cellBorderClass}>&gt;35 (Adult)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tab.rows.map((row) => (
+                        <TableRow key={`${tab.value}-${safePanelKey(row.panel)}`}>
+                          <TableCell className={`${cellBorderClass} bg-slate-50 font-medium text-left dark:bg-slate-800`}>
+                            {row.panel}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(row.sampleSize.target)}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(row.gender.female.target)}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(row.gender.male.target)}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatDisplayNumber(row.gender.female.achieved, {
+                              wrapInParens: true,
+                              blankForNull: true,
+                            })}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatDisplayNumber(row.gender.male.achieved, {
+                              wrapInParens: true,
+                              blankForNull: true,
+                            })}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(calculateBalance(row.gender.female.target, row.gender.female.achieved))}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(calculateBalance(row.gender.male.target, row.gender.male.achieved))}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(row.age.youth.target)}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(row.age.adult.target)}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatDisplayNumber(row.age.youth.achieved, {
+                              wrapInParens: true,
+                              blankForNull: true,
+                            })}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatDisplayNumber(row.age.adult.achieved, {
+                              wrapInParens: true,
+                              blankForNull: true,
+                            })}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(calculateBalance(row.age.youth.target, row.age.youth.achieved))}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(calculateBalance(row.age.adult.target, row.age.adult.achieved))}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="font-semibold">
+                        <TableCell className={`${cellBorderClass} bg-slate-50 text-left dark:bg-slate-800`}>
+                          Total
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(totals.sampleSize)}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(totals.gender.female.target)}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(totals.gender.male.target)}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatDisplayNumber(totals.gender.female.achieved, { wrapInParens: true })}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatDisplayNumber(totals.gender.male.achieved, { wrapInParens: true })}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(
+                            calculateBalance(totals.gender.female.target, totals.gender.female.achieved),
+                          )}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(calculateBalance(totals.gender.male.target, totals.gender.male.achieved))}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(totals.age.youth.target)}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(totals.age.adult.target)}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatDisplayNumber(totals.age.youth.achieved, { wrapInParens: true })}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatDisplayNumber(totals.age.adult.achieved, { wrapInParens: true })}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(calculateBalance(totals.age.youth.target, totals.age.youth.achieved))}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(calculateBalance(totals.age.adult.target, totals.age.adult.achieved))}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            );
+          })}
         </Tabs>
       </CardContent>
     </Card>
