@@ -22,7 +22,6 @@ const falsyTokens = new Set([
 ]);
 
 const cancellationTokens = new Set([
-  "Canceled"
   "cancel",
   "canceled",
   "cancelled",
