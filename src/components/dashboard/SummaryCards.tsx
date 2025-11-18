@@ -67,6 +67,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     tone?: MetricTone;
     colSpan?: number;
     valueClassName?: string;
+    labelClassName?: string;
   }
 
   interface CardConfig {
@@ -136,6 +137,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           value: formatNumber(summary.notApprovedSubmissions),
           helper: `Not approved rate: ${formatPercentage(summary.notApprovedRate)}`,
           tone: "destructive",
+          labelClassName: "whitespace-nowrap",
         },
         {
           label: "Canceled",
@@ -192,7 +194,11 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         metric.colSpan ? `col-span-${metric.colSpan}` : ""
       }`.trim()}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 whitespace-nowrap">
+      <div
+        className={`text-[11px] font-semibold uppercase tracking-wide text-slate-400 ${
+          metric.labelClassName ?? ""
+        }`.trim()}
+      >
         {metric.label}
       </div>
       <div
