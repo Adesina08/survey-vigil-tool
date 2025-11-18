@@ -336,6 +336,27 @@ const shouldIgnoreErrorType = (code: string): boolean => {
   return /^QC[\s_]*(?:FLAG|WARN)[\s_]*COUNT$/i.test(code.trim());
 };
 
+const determinePathFromPillar = (response?: string | null): OgstepPath => {
+  if (!response) {
+    return "unknown";
+  }
+
+  const lower = response.trim().toLowerCase();
+  if (!lower) {
+    return "unknown";
+  }
+
+  if (lower.includes("treatment")) {
+    return "treatment";
+  }
+
+  if (lower.includes("control")) {
+    return "control";
+  }
+
+  return "unknown";
+};
+
 const determineOgstepPath = (response?: string | null): OgstepPath => {
   if (!response) {
     return "unknown";
@@ -357,7 +378,19 @@ const determineOgstepPath = (response?: string | null): OgstepPath => {
   return "unknown";
 };
 
+const getPillarResponse = (row: SheetSubmissionRow): string | null =>
+  pickFirstText(row, [
+    "Pillar. Interviewers, kindly recruit the respondent into the right Pillar according to your target",
+    "Pillar",
+    "pillar",
+  ]);
+
 const extractOgstepDetails = (row: SheetSubmissionRow): { response: string | null; path: OgstepPath } => {
+  const pillarResponse = getPillarResponse(row);
+  if (pillarResponse) {
+    return { response: pillarResponse, path: determinePathFromPillar(pillarResponse) };
+  }
+
   const raw = row["B2. Did you participate in OGSTEP?"];
   if (raw === undefined || raw === null) {
     return { response: null, path: "unknown" };

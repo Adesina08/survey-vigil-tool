@@ -161,7 +161,27 @@ function isTruthy(value: any): boolean {
 /**
  * Determine OGSTEP path from B2 response
  */
+const getPillarValue = (row: RawSurveyRow): string | null =>
+  getTextValue(row, [
+    "Pillar. Interviewers, kindly recruit the respondent into the right Pillar according to your target",
+    "Pillar",
+    "pillar",
+  ]);
+
+function getOgstepPathFromPillar(pillar: string | null): "treatment" | "control" | "unknown" {
+  if (!pillar) return "unknown";
+
+  const lower = pillar.trim().toLowerCase();
+  if (lower.includes("treatment")) return "treatment";
+  if (lower.includes("control")) return "control";
+  return "unknown";
+}
+
 function getOgstepPath(row: RawSurveyRow): "treatment" | "control" | "unknown" {
+  const pillarResponse = getPillarValue(row);
+  const pillarPath = getOgstepPathFromPillar(pillarResponse);
+  if (pillarPath !== "unknown") return pillarPath;
+
   const response = getTextValue(row, [
     "B2. Did you participate in OGSTEP?",
     "b2_did_you_participate_in_ogstep",
@@ -357,6 +377,7 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
       const community = getTextValue(row, ["A4. Community / Village", "Community", "Village"]);
       const consent = getTextValue(row, ["A6. Consent to participate", "Consent"]);
       const qcStatus = getTextValue(row, ["QC Status", "qc_status"]);
+      const pillarResponse = getPillarValue(row);
 
       const allFlags = Array.from(combinedFlagSlugs);
 
@@ -380,7 +401,8 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
         approvalLabel,
         approvalSource,
         ogstepPath: getOgstepPath(row),
-        ogstepResponse: getTextValue(row, ["B2. Did you participate in OGSTEP?"]),
+        ogstepResponse:
+          pillarResponse ?? getTextValue(row, ["B2. Did you participate in OGSTEP?"]),
         directions: row.Direction || null,
         respondentName,
         respondentPhone,
