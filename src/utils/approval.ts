@@ -22,6 +22,7 @@ const falsyTokens = new Set([
 ]);
 
 const cancellationTokens = new Set([
+  "Canceled"
   "cancel",
   "canceled",
   "cancelled",
@@ -87,17 +88,7 @@ const normaliseCandidateWithCancellation = (
 };
 
 export const APPROVAL_FIELD_CANDIDATES = [
-  "Approval",
-  "approval",
-  "Approval Status",
-  "approval_status",
-  "ApprovalStatus",
-  "Outcome Status",
-  "outcome_status",
-  "QC Status",
-  "qc_status",
-  "_validation_status",
-  "_status",
+  "Approval"
 ] as const;
 
 export type ApprovalFieldKey = (typeof APPROVAL_FIELD_CANDIDATES)[number];
