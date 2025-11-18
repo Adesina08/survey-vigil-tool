@@ -235,7 +235,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
       {cards.map((card) => (
         <Card
           key={card.title}
@@ -244,9 +244,6 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${getAccentGradient(card.variant)}`} />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <div className="space-y-1 text-balance">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Key Metric
-              </p>
               <CardTitle className="text-lg font-semibold leading-tight text-foreground">{card.title}</CardTitle>
             </div>
             <div
@@ -268,14 +265,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
                 key={metric.label}
                 className="space-y-2 rounded-xl border border-border/60 bg-background/70 p-3 shadow-inner"
               >
-                <div className="flex items-center gap-2 text-xs font-semibold leading-tight text-foreground sm:text-sm">
+                <div className="flex items-center gap-1.5 text-xs font-semibold leading-tight text-foreground sm:text-sm">
                   {metric.icon ? (
                     <span
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/70 ${getMetricToneStyles(
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted/70 ${getMetricToneStyles(
                         metric.tone,
                       )}`}
                     >
-                      <metric.icon className="h-4 w-4" />
+                      <metric.icon className="h-3.5 w-3.5" />
                     </span>
                   ) : null}
                   <span className="min-w-0 leading-tight whitespace-nowrap text-balance sm:leading-snug">
