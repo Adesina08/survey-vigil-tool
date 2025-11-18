@@ -10,7 +10,8 @@ interface SummaryData {
   canceledSubmissions: number;
   canceledRate: number;
   wrongVersionFlagCount: number;
-  terminatedInterviews: number;
+  unqualifiedRespondents: number;
+  validSubmissions: number;
   completionRate: number;
   treatmentPathCount: number;
   controlPathCount: number;
@@ -27,8 +28,8 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const formatNumber = (value: number) => value.toLocaleString();
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
   const knownPathTotal = Math.max(summary.treatmentPathCount + summary.controlPathCount, 0);
-  const invalidSubmissionsTotal = summary.terminatedInterviews + summary.wrongVersionFlagCount;
-  const unqualifiedRespondents = summary.unknownPathCount;
+  const invalidSubmissionsTotal = summary.unqualifiedRespondents + summary.wrongVersionFlagCount;
+  const unqualifiedRespondents = summary.unqualifiedRespondents;
   const knownGenderTotal = Math.max(summary.maleCount + summary.femaleCount, 0);
 
   const formatPathHelper = (count: number) => {
@@ -49,7 +50,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     return `${percentage.toFixed(1)}% of respondents with recorded gender`;
   };
 
-  const validSubmissions = Math.max(summary.totalSubmissions - invalidSubmissionsTotal, 0);
+  const validSubmissions = summary.validSubmissions;
 
   const totalSubmissionRate =
     summary.overallTarget > 0 ? (summary.totalSubmissions / summary.overallTarget) * 100 : 0;
@@ -110,9 +111,8 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
               : "",
         },
         {
-          label: "Terminated interviews",
-          value: formatNumber(summary.terminatedInterviews),
-          helper: `Includes ${formatNumber(unqualifiedRespondents)} unqualified respondents`,
+          label: "UNQUALIFIED RESPONDENTS",
+          value: formatNumber(summary.unqualifiedRespondents),
           labelClassName: "text-[10px] sm:text-[11px]",
           valueClassName: "text-2xl sm:text-3xl",
         },
@@ -237,9 +237,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
               <div className="grid grid-cols-2 gap-4 sm:gap-6">
                 {invalidMetrics.map((metric) => renderMetric(metric))}
               </div>
-              <div className="mt-2 text-right text-xs text-amber-200/80">
-                Sum<sub className="text-[10px] align-sub">subscript</sub>: {formatNumber(invalidSubmissionsTotal)}
-              </div>
+              <div className="mt-2 text-right text-xs text-amber-200/80">Total: {formatNumber(invalidSubmissionsTotal)}</div>
             </div>
           ) : null}
         </div>
@@ -301,7 +299,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       {cards.map((card) => (
         <Card
           key={card.title}
