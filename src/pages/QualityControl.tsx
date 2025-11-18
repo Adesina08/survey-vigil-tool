@@ -3,11 +3,10 @@ import { QualityControlContent } from "@/components/dashboard/QualityControlCont
 
 interface QualityControlProps {
   dashboardData: DashboardData | undefined;
-  onFilterChange: (filterType: string, value: string) => void;
   selectedLga: string | null;
 }
 
-const QualityControl = ({ dashboardData, onFilterChange, selectedLga }: QualityControlProps) => {
+const QualityControl = ({ dashboardData, selectedLga }: QualityControlProps) => {
   if (!dashboardData) {
     return <div>Loading…</div>;
   }
@@ -16,7 +15,6 @@ const QualityControl = ({ dashboardData, onFilterChange, selectedLga }: QualityC
     <QualityControlContent
       dashboardData={dashboardData}
       selectedLga={selectedLga}
-      onFilterChange={onFilterChange}
     />
   );
 };

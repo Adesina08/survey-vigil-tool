@@ -17,34 +17,6 @@ const getFirstTextValue = (row: Record<string, unknown>, keys: string[]): string
   return null;
 };
 
-const deriveAvailableLgas = (analysisRows: unknown[] | undefined) => {
-  const set = new Set<string>();
-
-  (analysisRows || []).forEach((row) => {
-    if (!row || typeof row !== "object") {
-      return;
-    }
-
-    const lgaValue =
-      getFirstTextValue(row as Record<string, unknown>, [
-        "A3. select the LGA",
-        "A3. Select the LGA",
-        "a3_select_the_lga",
-        "lga",
-        "LGA",
-        "local_government_area",
-        "local_government",
-        "location_lga",
-      ]) ?? "";
-
-    if (lgaValue && lgaValue.trim().length > 0) {
-      set.add(lgaValue.trim());
-    }
-  });
-
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
-};
-
 const Index = () => {
   const {
     data: dashboardData,
@@ -56,16 +28,7 @@ const Index = () => {
     dataUpdatedAt,
   } = useDashboardData();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedLga, setSelectedLga] = useState<string | null>(null);
-
-  const availableLgas = useMemo(() => {
-    const payloadLgas = dashboardData?.lgas ?? dashboardData?.filters?.lgas ?? [];
-    if (Array.isArray(payloadLgas) && payloadLgas.length > 0) {
-      return payloadLgas;
-    }
-
-    return deriveAvailableLgas(dashboardData?.analysisRows);
-  }, [dashboardData?.analysisRows, dashboardData?.filters?.lgas, dashboardData?.lgas]);
+  const selectedLga: string | null = null;
 
   const dateTimeFormatter = useMemo(
     () =>
@@ -108,31 +71,6 @@ const Index = () => {
       setIsRefreshing(false);
     }
   }, [refetch]);
-
-  const handleFilterChange = (filterType: string, value: string) => {
-    if (filterType === "lga") {
-      const normalized = !value || value === "all" || value === "All LGAs" ? null : value;
-      setSelectedLga(normalized);
-      console.log(`Filter changed: ${filterType} = ${normalized ?? "All LGAs"}`);
-      return;
-    }
-
-    console.log(`Filter changed: ${filterType} = ${value}`);
-  };
-
-  useEffect(() => {
-    if (!selectedLga) {
-      return;
-    }
-
-    if (availableLgas.length === 0) {
-      return;
-    }
-
-    if (!availableLgas.includes(selectedLga)) {
-      setSelectedLga(null);
-    }
-  }, [availableLgas, selectedLga]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -196,7 +134,6 @@ const Index = () => {
           qualityControl={
             <QualityControl
               dashboardData={dashboardData}
-              onFilterChange={handleFilterChange}
               selectedLga={selectedLga}
             />
           }
