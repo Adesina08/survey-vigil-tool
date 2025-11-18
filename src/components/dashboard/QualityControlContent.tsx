@@ -30,6 +30,17 @@ const getPillarFromRow = (row: NormalisedRow): string | null =>
     "pillar",
   ]);
 
+// NEW: classify OGSTEP path from Pillar
+const getOgstepPathFromPillar = (pillar: string | null): OgstepPath => {
+  if (!pillar) return "unknown";
+
+  const normalised = pillar.toUpperCase();
+  if (normalised.includes("TREATMENT")) return "treatment";
+  if (normalised.includes("CONTROL")) return "control";
+
+  return "unknown";
+};
+
 // NEW: parse panel + path from Pillar
 const parsePillar = (value: string | null): { panel: string; path: OgstepPath } => {
   if (!value) return { panel: "UNKNOWN", path: "unknown" };
@@ -42,9 +53,7 @@ const parsePillar = (value: string | null): { panel: string; path: OgstepPath } 
   else if (lower.includes("cofo") || lower.includes("cofdo")) panel = "COFO";
   else if (lower.includes("unqualified")) panel = "UNQUALIFIED RESPONDENT";
 
-  let path: OgstepPath = "unknown";
-  if (lower.includes("treatment")) path = "treatment";
-  else if (lower.includes("control")) path = "control";
+  const path = getOgstepPathFromPillar(value);
 
   return { panel, path };
 };
@@ -161,10 +170,9 @@ const matchesSelectedLga = (value: unknown, selectedLga: string): boolean => {
 
 const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
   const pillar = getPillarFromRow(row);
-  const { path } = parsePillar(pillar);
 
   // OGSTEP path is determined solely by the Pillar field
-  return path;
+  return getOgstepPathFromPillar(pillar);
 };
 
 const getGenderFromRow = (row: NormalisedRow): "male" | "female" | "unknown" => {
