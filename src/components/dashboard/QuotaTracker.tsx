@@ -51,6 +51,20 @@ type SheetJS = {
   writeFile: (workbook: unknown, filename: string) => void;
 };
 
+interface QuotaTrackerAchievements {
+  [tab: string]: {
+    [panel: string]: {
+      sampleSize: number;
+      gender: { female: number; male: number };
+      age: { youth: number; adult: number };
+    };
+  };
+}
+
+interface QuotaTrackerProps {
+  achievements?: QuotaTrackerAchievements;
+}
+
 const quotaTabs: QuotaTabDefinition[] = [
   {
     value: "treatment",
@@ -137,6 +151,51 @@ const quotaTabs: QuotaTabDefinition[] = [
     ],
   },
 ];
+
+const applyAchievementsToQuotaTabs = (
+  tabs: QuotaTabDefinition[],
+  achievements?: QuotaTrackerAchievements,
+): QuotaTabDefinition[] => {
+  if (!achievements) return tabs;
+
+  return tabs.map((tab) => {
+    const tabAchievements = achievements[tab.value];
+    if (!tabAchievements) return tab;
+
+    return {
+      ...tab,
+      rows: tab.rows.map((row) => {
+        const panelAchievements = tabAchievements[row.panel];
+        if (!panelAchievements) return row;
+
+        return {
+          ...row,
+          sampleSize: panelAchievements.sampleSize,
+          gender: {
+            female: {
+              ...row.gender.female,
+              achieved: panelAchievements.gender.female,
+            },
+            male: {
+              ...row.gender.male,
+              achieved: panelAchievements.gender.male,
+            },
+          },
+          age: {
+            youth: {
+              ...row.age.youth,
+              achieved: panelAchievements.age.youth,
+            },
+            adult: {
+              ...row.age.adult,
+              achieved: panelAchievements.age.adult,
+            },
+          },
+        };
+      }),
+    };
+  });
+};
 
 const loadSheetJS = async (): Promise<SheetJS> => {
   if (typeof window === "undefined") {
@@ -255,14 +314,15 @@ const sanitizeSheetName = (label: string): string => {
   return cleaned.length > 31 ? cleaned.slice(0, 31) : cleaned;
 };
 
-export function QuotaTracker() {
+export function QuotaTracker({ achievements }: QuotaTrackerProps) {
   const [activeTab, setActiveTab] = useState<string>(quotaTabs[0]?.value ?? "treatment");
+  const tabsWithAchieved = applyAchievementsToQuotaTabs(quotaTabs, achievements);
 
   const handleExport = async () => {
     try {
       const XLSX = await loadSheetJS();
       const workbook = XLSX.utils.book_new();
-      quotaTabs.forEach((tab) => {
+      tabsWithAchieved.forEach((tab) => {
         const rowsWithTotals = [...tab.rows, calculateTotals(tab.rows)];
         const worksheet = XLSX.utils.json_to_sheet(getSheetRows(rowsWithTotals));
         XLSX.utils.book_append_sheet(workbook, worksheet, sanitizeSheetName(tab.label));
@@ -302,14 +362,14 @@ export function QuotaTracker() {
       <CardContent className="bg-card/60 p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            {quotaTabs.map((tab) => (
+            {tabsWithAchieved.map((tab) => (
               <TabsTrigger key={tab.value} value={tab.value}>
                 {tab.label}
               </TabsTrigger>
             ))}
           </TabsList>
 
-          {quotaTabs.map((tab) => {
+          {tabsWithAchieved.map((tab) => {
             const rowsWithTotals = [...tab.rows, calculateTotals(tab.rows)];
             return (
               <TabsContent key={tab.value} value={tab.value}>
