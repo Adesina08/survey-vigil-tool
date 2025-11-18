@@ -22,13 +22,14 @@ import { AchievementsTables } from "./AchievementsTables";
 type NormalisedRow = Record<string, unknown>;
 type OgstepPath = "treatment" | "control" | "unknown";
 
+const OGSTEP_PILLAR_FIELD =
+  "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target";
+
 // NEW: read Pillar from the row
-const getPillarFromRow = (row: NormalisedRow): string | null =>
-  getFirstTextValue(row, [
-    "Pillar. Interviewers, kindly recruit the respondent into the right Pillar according to your target",
-    "Pillar",
-    "pillar",
-  ]);
+const getPillarFromRow = (row: NormalisedRow): string | null => {
+  const raw = row[OGSTEP_PILLAR_FIELD];
+  return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
+};
 
 // NEW: classify OGSTEP path from Pillar
 const getOgstepPathFromPillar = (pillar: string | null): OgstepPath => {

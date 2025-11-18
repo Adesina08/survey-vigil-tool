@@ -336,6 +336,9 @@ const shouldIgnoreErrorType = (code: string): boolean => {
   return /^QC[\s_]*(?:FLAG|WARN)[\s_]*COUNT$/i.test(code.trim());
 };
 
+const OGSTEP_PILLAR_FIELD =
+  "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target";
+
 const determineOgstepPath = (pillar?: string | null): OgstepPath => {
   if (!pillar) {
     return "unknown";
@@ -359,11 +362,8 @@ const determineOgstepPath = (pillar?: string | null): OgstepPath => {
 
 const extractOgstepDetails = (row: SheetSubmissionRow): { response: string | null; path: OgstepPath } => {
   const rawResponse = row["B2. Did you participate in OGSTEP?"];
-  const pillar = pickFirstText(row, [
-    "Pillar. Interviewers, kindly recruit the respondent into the right Pillar according to your target",
-    "Pillar",
-    "pillar",
-  ]);
+  const rawPillar = row[OGSTEP_PILLAR_FIELD];
+  const pillar = typeof rawPillar === "string" ? rawPillar : null;
 
   if (rawResponse === undefined || rawResponse === null) {
     return { response: null, path: determineOgstepPath(pillar) };

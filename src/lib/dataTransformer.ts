@@ -161,12 +161,11 @@ function isTruthy(value: any): boolean {
 /**
  * Determine OGSTEP path from the Pillar field
  */
+const OGSTEP_PILLAR_FIELD =
+  "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target";
+
 function getOgstepPath(row: RawSurveyRow): "treatment" | "control" | "unknown" {
-  const pillar = getTextValue(row, [
-    "Pillar. Interviewers, kindly recruit the respondent into the right Pillar according to your target",
-    "Pillar",
-    "pillar",
-  ]);
+  const pillar = getTextValue(row, [OGSTEP_PILLAR_FIELD]);
 
   if (!pillar) return "unknown";
 
