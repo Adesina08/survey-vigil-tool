@@ -67,7 +67,7 @@ const quotaTabs: QuotaTabDefinition[] = [
   {
     value: "treatment",
     label: "Treatment",
-    rows: [
+      rows: [
       {
         panel: "TVET",
         sampleSize: { target: 2000, achieved: null },
@@ -81,7 +81,7 @@ const quotaTabs: QuotaTabDefinition[] = [
         },
       },
       {
-        panel: "Agric",
+        panel: "VCDF / Agric",
         sampleSize: { target: 2000, achieved: null },
         gender: {
           female: { target: 400, achieved: 660 },
@@ -109,7 +109,7 @@ const quotaTabs: QuotaTabDefinition[] = [
   {
     value: "control",
     label: "Control",
-    rows: [
+      rows: [
       {
         panel: "TVET",
         sampleSize: { target: 2000, achieved: null },
@@ -123,7 +123,7 @@ const quotaTabs: QuotaTabDefinition[] = [
         },
       },
       {
-        panel: "Agric",
+        panel: "VCDF / Agric",
         sampleSize: { target: 2000, achieved: null },
         gender: {
           female: { target: 400, achieved: 660 },
@@ -311,7 +311,17 @@ const formatDisplayNumber = (
 
 const calculateBalance = (target: number, achieved: number | null | undefined) => target - (achieved ?? 0);
 
-const cellBorderClass = "border-[1.5px] border-slate-700 dark:border-slate-400";
+const getBalanceCellClass = (balance: number) => {
+  if (balance > 0) {
+    return "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300";
+  }
+  if (balance < 0) {
+    return "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
+  }
+  return "bg-slate-50 text-slate-900 dark:bg-slate-800 dark:text-slate-100";
+};
+
+const cellBorderClass = "border-[2px] border-slate-300 dark:border-slate-500";
 
 const calculateTotals = (rows: QuotaRow[]) =>
   rows.reduce(
@@ -392,13 +402,17 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
 
           {tabsWithAchievements.map((tab) => {
             const totals = calculateTotals(tab.rows);
+            const totalFemaleBalance = calculateBalance(totals.gender.female.target, totals.gender.female.achieved);
+            const totalMaleBalance = calculateBalance(totals.gender.male.target, totals.gender.male.achieved);
+            const totalYouthBalance = calculateBalance(totals.age.youth.target, totals.age.youth.achieved);
+            const totalAdultBalance = calculateBalance(totals.age.adult.target, totals.age.adult.achieved);
 
             return (
               <TabsContent key={tab.value} value={tab.value}>
-                <div className="overflow-x-auto rounded-md border-[2px] border-slate-700 bg-white shadow-sm dark:border-slate-500 dark:bg-slate-900">
+                <div className="overflow-x-auto rounded-md border-[2px] border-slate-300 bg-white shadow-sm dark:border-slate-500 dark:bg-slate-900">
                   <Table
                     className="border-collapse text-center"
-                    containerClassName="border-[2px] border-slate-700 dark:border-slate-500"
+                    containerClassName="border-[2px] border-slate-300 dark:border-slate-500"
                   >
                     <TableHeader>
                       <TableRow>
@@ -451,64 +465,71 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {tab.rows.map((row) => (
-                        <TableRow key={`${tab.value}-${safePanelKey(row.panel)}`}>
-                          <TableCell className={`${cellBorderClass} bg-slate-50 font-medium text-left dark:bg-slate-800`}>
-                            {row.panel}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatNumber(row.sampleSize.target)}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatNumber(row.gender.female.target)}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatNumber(row.gender.male.target)}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatDisplayNumber(row.gender.female.achieved, {
-                              wrapInParens: true,
-                              blankForNull: true,
-                            })}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatDisplayNumber(row.gender.male.achieved, {
-                              wrapInParens: true,
-                              blankForNull: true,
-                            })}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatNumber(calculateBalance(row.gender.female.target, row.gender.female.achieved))}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatNumber(calculateBalance(row.gender.male.target, row.gender.male.achieved))}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatNumber(row.age.youth.target)}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatNumber(row.age.adult.target)}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatDisplayNumber(row.age.youth.achieved, {
-                              wrapInParens: true,
-                              blankForNull: true,
-                            })}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatDisplayNumber(row.age.adult.achieved, {
-                              wrapInParens: true,
-                              blankForNull: true,
-                            })}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatNumber(calculateBalance(row.age.youth.target, row.age.youth.achieved))}
-                          </TableCell>
-                          <TableCell className={cellBorderClass}>
-                            {formatNumber(calculateBalance(row.age.adult.target, row.age.adult.achieved))}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {tab.rows.map((row) => {
+                        const femaleBalance = calculateBalance(row.gender.female.target, row.gender.female.achieved);
+                        const maleBalance = calculateBalance(row.gender.male.target, row.gender.male.achieved);
+                        const youthBalance = calculateBalance(row.age.youth.target, row.age.youth.achieved);
+                        const adultBalance = calculateBalance(row.age.adult.target, row.age.adult.achieved);
+
+                        return (
+                          <TableRow key={`${tab.value}-${safePanelKey(row.panel)}`}>
+                            <TableCell className={`${cellBorderClass} bg-slate-50 font-medium text-left dark:bg-slate-800`}>
+                              {row.panel}
+                            </TableCell>
+                            <TableCell className={cellBorderClass}>
+                              {formatNumber(row.sampleSize.target)}
+                            </TableCell>
+                            <TableCell className={cellBorderClass}>
+                              {formatNumber(row.gender.female.target)}
+                            </TableCell>
+                            <TableCell className={cellBorderClass}>
+                              {formatNumber(row.gender.male.target)}
+                            </TableCell>
+                            <TableCell className={cellBorderClass}>
+                              {formatDisplayNumber(row.gender.female.achieved, {
+                                wrapInParens: true,
+                                blankForNull: true,
+                              })}
+                            </TableCell>
+                            <TableCell className={cellBorderClass}>
+                              {formatDisplayNumber(row.gender.male.achieved, {
+                                wrapInParens: true,
+                                blankForNull: true,
+                              })}
+                            </TableCell>
+                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass(femaleBalance)}`}>
+                              {formatNumber(femaleBalance)}
+                            </TableCell>
+                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass(maleBalance)}`}>
+                              {formatNumber(maleBalance)}
+                            </TableCell>
+                            <TableCell className={cellBorderClass}>
+                              {formatNumber(row.age.youth.target)}
+                            </TableCell>
+                            <TableCell className={cellBorderClass}>
+                              {formatNumber(row.age.adult.target)}
+                            </TableCell>
+                            <TableCell className={cellBorderClass}>
+                              {formatDisplayNumber(row.age.youth.achieved, {
+                                wrapInParens: true,
+                                blankForNull: true,
+                              })}
+                            </TableCell>
+                            <TableCell className={cellBorderClass}>
+                              {formatDisplayNumber(row.age.adult.achieved, {
+                                wrapInParens: true,
+                                blankForNull: true,
+                              })}
+                            </TableCell>
+                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass(youthBalance)}`}>
+                              {formatNumber(youthBalance)}
+                            </TableCell>
+                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass(adultBalance)}`}>
+                              {formatNumber(adultBalance)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                       <TableRow className="font-semibold">
                         <TableCell className={`${cellBorderClass} bg-slate-50 text-left dark:bg-slate-800`}>
                           Total
@@ -528,13 +549,11 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
                         <TableCell className={cellBorderClass}>
                           {formatDisplayNumber(totals.gender.male.achieved, { wrapInParens: true })}
                         </TableCell>
-                        <TableCell className={cellBorderClass}>
-                          {formatNumber(
-                            calculateBalance(totals.gender.female.target, totals.gender.female.achieved),
-                          )}
+                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass(totalFemaleBalance)}`}>
+                          {formatNumber(totalFemaleBalance)}
                         </TableCell>
-                        <TableCell className={cellBorderClass}>
-                          {formatNumber(calculateBalance(totals.gender.male.target, totals.gender.male.achieved))}
+                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass(totalMaleBalance)}`}>
+                          {formatNumber(totalMaleBalance)}
                         </TableCell>
                         <TableCell className={cellBorderClass}>
                           {formatNumber(totals.age.youth.target)}
@@ -548,11 +567,11 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
                         <TableCell className={cellBorderClass}>
                           {formatDisplayNumber(totals.age.adult.achieved, { wrapInParens: true })}
                         </TableCell>
-                        <TableCell className={cellBorderClass}>
-                          {formatNumber(calculateBalance(totals.age.youth.target, totals.age.youth.achieved))}
+                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass(totalYouthBalance)}`}>
+                          {formatNumber(totalYouthBalance)}
                         </TableCell>
-                        <TableCell className={cellBorderClass}>
-                          {formatNumber(calculateBalance(totals.age.adult.target, totals.age.adult.achieved))}
+                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass(totalAdultBalance)}`}>
+                          {formatNumber(totalAdultBalance)}
                         </TableCell>
                       </TableRow>
                     </TableBody>
