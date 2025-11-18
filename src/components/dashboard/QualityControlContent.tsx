@@ -38,7 +38,7 @@ const parsePillar = (value: string | null): { panel: string; path: OgstepPath } 
 
   let panel = "UNKNOWN";
   if (lower.includes("tvet")) panel = "TVET";
-  else if (lower.includes("vcdf")) panel = "VCDF";
+  else if (lower.includes("agric") || lower.includes("vcdf")) panel = "Agric";
   else if (lower.includes("cofo") || lower.includes("cofdo")) panel = "COFO";
   else if (lower.includes("unqualified")) panel = "UNQUALIFIED RESPONDENT";
 

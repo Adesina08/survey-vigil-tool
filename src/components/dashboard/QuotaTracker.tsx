@@ -254,12 +254,16 @@ const exportToExcel = async (tabs: QuotaTabDefinition[]) => {
         "Achieved Sample Size",
         "Target Female",
         "Achieved Female",
+        "Balance Female",
         "Target Male",
         "Achieved Male",
+        "Balance Male",
         "Target Youth",
         "Achieved Youth",
+        "Balance Youth",
         "Target Adult",
         "Achieved Adult",
+        "Balance Adult",
       ],
     ];
 
@@ -270,12 +274,16 @@ const exportToExcel = async (tabs: QuotaTabDefinition[]) => {
         row.sampleSize.achieved ?? 0,
         row.gender.female.target,
         row.gender.female.achieved ?? 0,
+        calculateBalance(row.gender.female.target, row.gender.female.achieved),
         row.gender.male.target,
         row.gender.male.achieved ?? 0,
+        calculateBalance(row.gender.male.target, row.gender.male.achieved),
         row.age.youth.target,
         row.age.youth.achieved ?? 0,
+        calculateBalance(row.age.youth.target, row.age.youth.achieved),
         row.age.adult.target,
         row.age.adult.achieved ?? 0,
+        calculateBalance(row.age.adult.target, row.age.adult.achieved),
       ]);
     });
 
@@ -300,6 +308,10 @@ const formatDisplayNumber = (
   const formatted = value.toLocaleString("en-NG");
   return wrapInParens ? `(${formatted})` : formatted;
 };
+
+const calculateBalance = (target: number, achieved: number | null | undefined) => target - (achieved ?? 0);
+
+const cellBorderClass = "border-[1.5px] border-slate-700 dark:border-slate-400";
 
 const calculateTotals = (rows: QuotaRow[]) =>
   rows.reduce(
@@ -383,123 +395,164 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
 
             return (
               <TabsContent key={tab.value} value={tab.value}>
-                <div className="overflow-x-auto rounded-md border">
-                  <Table className="border-collapse text-center" containerClassName="border border-slate-500">
+                <div className="overflow-x-auto rounded-md border-[2px] border-slate-700 bg-white shadow-sm dark:border-slate-500 dark:bg-slate-900">
+                  <Table
+                    className="border-collapse text-center"
+                    containerClassName="border-[2px] border-slate-700 dark:border-slate-500"
+                  >
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="border-2 border-slate-500" rowSpan={3}>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 font-semibold dark:bg-slate-800`} rowSpan={3}>
                           Pillar
                         </TableHead>
-                        <TableHead className="border-2 border-slate-500" rowSpan={3}>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 font-semibold dark:bg-slate-800`} rowSpan={3}>
                           N
                         </TableHead>
-                        <TableHead className="border-2 border-slate-500 text-center" colSpan={4}>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={6}>
                           Gender
                         </TableHead>
-                        <TableHead className="border-2 border-slate-500 text-center" colSpan={4}>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={6}>
                           Age
                         </TableHead>
                       </TableRow>
                       <TableRow>
-                        <TableHead className="border-2 border-slate-500 text-center" colSpan={2}>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
                           Target
                         </TableHead>
-                        <TableHead className="border-2 border-slate-500 text-center" colSpan={2}>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
                           Achieved
                         </TableHead>
-                        <TableHead className="border-2 border-slate-500 text-center" colSpan={2}>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
+                          Balance
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
                           Target
                         </TableHead>
-                        <TableHead className="border-2 border-slate-500 text-center" colSpan={2}>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
                           Achieved
+                        </TableHead>
+                        <TableHead className={`${cellBorderClass} bg-slate-50 text-center font-semibold dark:bg-slate-800`} colSpan={2}>
+                          Balance
                         </TableHead>
                       </TableRow>
                       <TableRow>
-                        <TableHead className="border-2 border-slate-500">Female</TableHead>
-                        <TableHead className="border-2 border-slate-500">Male</TableHead>
-                        <TableHead className="border-2 border-slate-500">Female</TableHead>
-                        <TableHead className="border-2 border-slate-500">Male</TableHead>
-                        <TableHead className="border-2 border-slate-500">&lt;35 (Youth)</TableHead>
-                        <TableHead className="border-2 border-slate-500">&gt;35 (Adult)</TableHead>
-                        <TableHead className="border-2 border-slate-500">&lt;35 (Youth)</TableHead>
-                        <TableHead className="border-2 border-slate-500">&gt;35 (Adult)</TableHead>
+                        <TableHead className={cellBorderClass}>Female</TableHead>
+                        <TableHead className={cellBorderClass}>Male</TableHead>
+                        <TableHead className={cellBorderClass}>Female</TableHead>
+                        <TableHead className={cellBorderClass}>Male</TableHead>
+                        <TableHead className={cellBorderClass}>Female</TableHead>
+                        <TableHead className={cellBorderClass}>Male</TableHead>
+                        <TableHead className={cellBorderClass}>&lt;35 (Youth)</TableHead>
+                        <TableHead className={cellBorderClass}>&gt;35 (Adult)</TableHead>
+                        <TableHead className={cellBorderClass}>&lt;35 (Youth)</TableHead>
+                        <TableHead className={cellBorderClass}>&gt;35 (Adult)</TableHead>
+                        <TableHead className={cellBorderClass}>&lt;35 (Youth)</TableHead>
+                        <TableHead className={cellBorderClass}>&gt;35 (Adult)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {tab.rows.map((row) => (
                         <TableRow key={`${tab.value}-${safePanelKey(row.panel)}`}>
-                          <TableCell className="border-2 border-slate-500 font-medium text-left">
+                          <TableCell className={`${cellBorderClass} bg-slate-50 font-medium text-left dark:bg-slate-800`}>
                             {row.panel}
                           </TableCell>
-                          <TableCell className="border-2 border-slate-500">
+                          <TableCell className={cellBorderClass}>
                             {formatNumber(row.sampleSize.target)}
                           </TableCell>
-                          <TableCell className="border-2 border-slate-500">
+                          <TableCell className={cellBorderClass}>
                             {formatNumber(row.gender.female.target)}
                           </TableCell>
-                          <TableCell className="border-2 border-slate-500">
+                          <TableCell className={cellBorderClass}>
                             {formatNumber(row.gender.male.target)}
                           </TableCell>
-                          <TableCell className="border-2 border-slate-500">
+                          <TableCell className={cellBorderClass}>
                             {formatDisplayNumber(row.gender.female.achieved, {
                               wrapInParens: true,
                               blankForNull: true,
                             })}
                           </TableCell>
-                          <TableCell className="border-2 border-slate-500">
+                          <TableCell className={cellBorderClass}>
                             {formatDisplayNumber(row.gender.male.achieved, {
                               wrapInParens: true,
                               blankForNull: true,
                             })}
                           </TableCell>
-                          <TableCell className="border-2 border-slate-500">
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(calculateBalance(row.gender.female.target, row.gender.female.achieved))}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(calculateBalance(row.gender.male.target, row.gender.male.achieved))}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
                             {formatNumber(row.age.youth.target)}
                           </TableCell>
-                          <TableCell className="border-2 border-slate-500">
+                          <TableCell className={cellBorderClass}>
                             {formatNumber(row.age.adult.target)}
                           </TableCell>
-                          <TableCell className="border-2 border-slate-500">
+                          <TableCell className={cellBorderClass}>
                             {formatDisplayNumber(row.age.youth.achieved, {
                               wrapInParens: true,
                               blankForNull: true,
                             })}
                           </TableCell>
-                          <TableCell className="border-2 border-slate-500">
+                          <TableCell className={cellBorderClass}>
                             {formatDisplayNumber(row.age.adult.achieved, {
                               wrapInParens: true,
                               blankForNull: true,
                             })}
                           </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(calculateBalance(row.age.youth.target, row.age.youth.achieved))}
+                          </TableCell>
+                          <TableCell className={cellBorderClass}>
+                            {formatNumber(calculateBalance(row.age.adult.target, row.age.adult.achieved))}
+                          </TableCell>
                         </TableRow>
                       ))}
                       <TableRow className="font-semibold">
-                        <TableCell className="border-2 border-slate-500 text-left">Total</TableCell>
-                        <TableCell className="border-2 border-slate-500">
+                        <TableCell className={`${cellBorderClass} bg-slate-50 text-left dark:bg-slate-800`}>
+                          Total
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
                           {formatNumber(totals.sampleSize)}
                         </TableCell>
-                        <TableCell className="border-2 border-slate-500">
+                        <TableCell className={cellBorderClass}>
                           {formatNumber(totals.gender.female.target)}
                         </TableCell>
-                        <TableCell className="border-2 border-slate-500">
+                        <TableCell className={cellBorderClass}>
                           {formatNumber(totals.gender.male.target)}
                         </TableCell>
-                        <TableCell className="border-2 border-slate-500">
+                        <TableCell className={cellBorderClass}>
                           {formatDisplayNumber(totals.gender.female.achieved, { wrapInParens: true })}
                         </TableCell>
-                        <TableCell className="border-2 border-slate-500">
+                        <TableCell className={cellBorderClass}>
                           {formatDisplayNumber(totals.gender.male.achieved, { wrapInParens: true })}
                         </TableCell>
-                        <TableCell className="border-2 border-slate-500">
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(
+                            calculateBalance(totals.gender.female.target, totals.gender.female.achieved),
+                          )}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(calculateBalance(totals.gender.male.target, totals.gender.male.achieved))}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
                           {formatNumber(totals.age.youth.target)}
                         </TableCell>
-                        <TableCell className="border-2 border-slate-500">
+                        <TableCell className={cellBorderClass}>
                           {formatNumber(totals.age.adult.target)}
                         </TableCell>
-                        <TableCell className="border-2 border-slate-500">
+                        <TableCell className={cellBorderClass}>
                           {formatDisplayNumber(totals.age.youth.achieved, { wrapInParens: true })}
                         </TableCell>
-                        <TableCell className="border-2 border-slate-500">
+                        <TableCell className={cellBorderClass}>
                           {formatDisplayNumber(totals.age.adult.achieved, { wrapInParens: true })}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(calculateBalance(totals.age.youth.target, totals.age.youth.achieved))}
+                        </TableCell>
+                        <TableCell className={cellBorderClass}>
+                          {formatNumber(calculateBalance(totals.age.adult.target, totals.age.adult.achieved))}
                         </TableCell>
                       </TableRow>
                     </TableBody>
