@@ -313,10 +313,10 @@ const calculateBalance = (target: number, achieved: number | null | undefined) =
 
 const getBalanceCellClass = (balance: number) => {
   if (balance > 0) {
-    return "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300";
+    return "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
   }
   if (balance < 0) {
-    return "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
+    return "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300";
   }
   return "bg-slate-50 text-slate-900 dark:bg-slate-800 dark:text-slate-100";
 };
