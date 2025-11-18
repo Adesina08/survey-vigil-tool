@@ -65,6 +65,8 @@ export const APPROVAL_FIELD_CANDIDATES = [
   "outcome_status",
   "QC Status",
   "qc_status",
+  "_validation_status",
+  "_status",
 ] as const;
 
 export type ApprovalFieldKey = (typeof APPROVAL_FIELD_CANDIDATES)[number];
