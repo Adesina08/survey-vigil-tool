@@ -27,6 +27,8 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const formatNumber = (value: number) => value.toLocaleString();
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
   const knownPathTotal = Math.max(summary.treatmentPathCount + summary.controlPathCount, 0);
+  const invalidSubmissionsTotal = summary.terminatedInterviews + summary.wrongVersionFlagCount;
+  const unqualifiedRespondents = summary.unknownPathCount;
   const knownGenderTotal = Math.max(summary.maleCount + summary.femaleCount, 0);
 
   const formatPathHelper = (count: number) => {
@@ -47,10 +49,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     return `${percentage.toFixed(1)}% of respondents with recorded gender`;
   };
 
-  const validSubmissions = Math.max(
-    summary.totalSubmissions - summary.terminatedInterviews - summary.wrongVersionFlagCount,
-    0
-  );
+  const validSubmissions = Math.max(summary.totalSubmissions - invalidSubmissionsTotal, 0);
 
   const totalSubmissionRate =
     summary.overallTarget > 0 ? (summary.totalSubmissions / summary.overallTarget) * 100 : 0;
@@ -68,6 +67,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     colSpan?: number;
     valueClassName?: string;
     labelClassName?: string;
+    extraHelperLine?: boolean;
   }
 
   interface CardConfig {
@@ -112,7 +112,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         {
           label: "Terminated interviews",
           value: formatNumber(summary.terminatedInterviews),
-          helper: "",
+          helper: `Includes ${formatNumber(unqualifiedRespondents)} unqualified respondents`,
         },
         {
           label: "Wrong Version",
@@ -131,6 +131,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           helper: `Approval rate: ${formatPercentage(summary.approvalRate)}`,
           tone: "success",
           valueClassName: "mt-1",
+          extraHelperLine: true,
         },
         {
           label: "Not Approved",
@@ -138,6 +139,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           helper: `Not approved rate: ${formatPercentage(summary.notApprovedRate)}`,
           tone: "destructive",
           labelClassName: "whitespace-nowrap",
+          extraHelperLine: true,
         },
         {
           label: "Canceled",
@@ -155,17 +157,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           value: formatNumber(summary.treatmentPathCount),
           helper: formatPathHelper(summary.treatmentPathCount),
           tone: "treatment",
+          extraHelperLine: true,
         },
         {
           label: "Control",
           value: formatNumber(summary.controlPathCount),
           helper: formatPathHelper(summary.controlPathCount),
           tone: "control",
-        },
-        {
-          label: "Unqualified Respondent",
-          value: formatNumber(summary.unknownPathCount),
-          helper: "",
+          extraHelperLine: true,
         },
       ],
     },
@@ -190,7 +189,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const renderMetric = (metric: CardMetric) => (
     <div
       key={metric.label}
-      className={`flex flex-col items-start gap-2 ${
+      className={`flex flex-col items-start gap-1.5 ${
         metric.colSpan ? `col-span-${metric.colSpan}` : ""
       }`.trim()}
     >
@@ -208,7 +207,8 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       >
         {metric.value}
       </div>
-      <div className="min-h-[18px] text-xs text-slate-400">{metric.helper ?? ""}</div>
+      <div className="min-h-[18px] text-xs leading-snug text-slate-400">{metric.helper ?? ""}</div>
+      {metric.extraHelperLine ? <div className="min-h-[18px] text-xs text-transparent">-</div> : null}
     </div>
   );
 
@@ -234,7 +234,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
                 {invalidMetrics.map((metric) => renderMetric(metric))}
               </div>
               <div className="mt-2 text-right text-xs text-amber-200/80">
-                Sum<sub className="text-[10px] align-sub">subscript</sub>
+                Sum<sub className="text-[10px] align-sub">subscript</sub>: {formatNumber(invalidSubmissionsTotal)}
               </div>
             </div>
           ) : null}
@@ -307,7 +307,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold leading-tight text-slate-100">{card.title}</CardTitle>
           </CardHeader>
-          <CardContent className="flex h-full flex-col gap-4">
+          <CardContent className="flex h-full flex-col gap-3">
             {renderMetrics(card)}
             {card.footer ? (
               <div className="rounded-lg bg-slate-800/60 px-3 py-2 text-xs text-slate-200/80">{card.footer}</div>

@@ -396,7 +396,13 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       }
     });
 
-    const collectedInterviews = Math.max(totalRows - terminatedInterviews - wrongVersionFlagCount, 0);
+    const unqualifiedRespondents = pathTotals.unknown;
+    const combinedTerminatedInterviews = terminatedInterviews + unqualifiedRespondents;
+    const totalSubmissions = totalRows;
+    const collectedInterviews = Math.max(
+      totalSubmissions - combinedTerminatedInterviews - wrongVersionFlagCount,
+      0,
+    );
 
     const totalTarget = shouldFilter
       ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
@@ -431,7 +437,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
 
     const summary = {
       overallTarget: totalTarget,
-      totalSubmissions: collectedInterviews,
+      totalSubmissions,
       approvedSubmissions: approvedCount,
       approvalRate: approvalRatePercent,
       notApprovedSubmissions: notApprovedCount,
@@ -439,7 +445,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       canceledSubmissions: canceledCount,
       canceledRate: canceledRatePercent,
       wrongVersionFlagCount,
-      terminatedInterviews,
+      terminatedInterviews: combinedTerminatedInterviews,
       completionRate,
       treatmentPathCount: pathTotals.treatment,
       controlPathCount: pathTotals.control,
