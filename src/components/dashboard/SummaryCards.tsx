@@ -28,7 +28,6 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const formatPercentage = (value: number) => `${value.toFixed(1)}%`;
   const knownPathTotal = Math.max(summary.treatmentPathCount + summary.controlPathCount, 0);
   const invalidSubmissionsTotal = summary.terminatedInterviews + summary.wrongVersionFlagCount;
-  const unqualifiedRespondents = summary.unknownPathCount;
   const knownGenderTotal = Math.max(summary.maleCount + summary.femaleCount, 0);
 
   const formatPathHelper = (count: number) => {
@@ -112,7 +111,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         {
           label: "Terminated interviews",
           value: formatNumber(summary.terminatedInterviews),
-          helper: `Includes ${formatNumber(unqualifiedRespondents)} unqualified respondents`,
+          helper: "",
         },
         {
           label: "Wrong Version",
@@ -234,7 +233,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
                 {invalidMetrics.map((metric) => renderMetric(metric))}
               </div>
               <div className="mt-2 text-right text-xs text-amber-200/80">
-                Sum<sub className="text-[10px] align-sub">subscript</sub>: {formatNumber(invalidSubmissionsTotal)}
+                Total: {formatNumber(invalidSubmissionsTotal)}
               </div>
             </div>
           ) : null}

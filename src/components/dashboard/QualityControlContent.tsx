@@ -324,6 +324,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     let femaleCount = 0;
     let wrongVersionFlagCount = 0;
     let terminatedInterviews = 0;
+    let validSubmissionCount = 0;
 
     const pathTotals: Record<Exclude<OgstepPath, null>, number> = {
       treatment: 0,
@@ -353,56 +354,56 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
         return null;
       })();
 
-      if (genderValue === "male") maleCount += 1;
-      else if (genderValue === "female") femaleCount += 1;
-
       if (ogstepPath) {
         pathTotals[ogstepPath] += 1;
       }
 
-      const approvalStatus = determineApprovalStatus(row);
-      const isApproved = approvalStatus === "Approved" || approvalCategory === "approved";
-
-      if (isApproved) {
-        approvedCount += 1;
-      } else {
-        notApprovedCount += 1;
-      }
-
-      if (approvalCategory === "canceled") {
-        canceledCount += 1;
-      }
-
       const consentLower = consentValue.trim().toLowerCase();
-      if (
-        consentLower === "no" ||
-        consentLower === "0" ||
-        consentLower === "false" ||
-        consentLower === "n"
-      ) {
-        terminatedInterviews += 1;
-      }
-
       const indicatorCounts = extractQualityIndicatorCounts(row as Record<string, unknown>);
       const wrongVersionIndicators = indicatorCounts[wrongVersionSlug] ?? 0;
       const hasWrongVersionCode = extractErrorCodes(row as Record<string, unknown>).some(
         (code) => normaliseErrorType(code).slug === wrongVersionSlug,
       );
 
+      const isTerminated =
+        consentLower === "no" || consentLower === "0" || consentLower === "false" || consentLower === "n";
+      if (isTerminated) {
+        terminatedInterviews += 1;
+      }
+
+      const isWrongVersion = wrongVersionIndicators > 0 || hasWrongVersionCode;
       if (wrongVersionIndicators > 0) {
         wrongVersionFlagCount += wrongVersionIndicators;
       } else if (hasWrongVersionCode) {
         wrongVersionFlagCount += 1;
+      }
+
+      const isUnqualifiedRespondent = ogstepPath === "unknown";
+      const isValidSubmission = !isTerminated && !isWrongVersion && !isUnqualifiedRespondent;
+
+      if (isValidSubmission) {
+        validSubmissionCount += 1;
+
+        if (genderValue === "male") maleCount += 1;
+        else if (genderValue === "female") femaleCount += 1;
+
+        const approvalStatus = determineApprovalStatus(row);
+        const isApproved = approvalStatus === "Approved" || approvalCategory === "approved";
+
+        if (approvalCategory === "canceled") {
+          canceledCount += 1;
+        } else if (isApproved) {
+          approvedCount += 1;
+        } else {
+          notApprovedCount += 1;
+        }
       }
     });
 
     const unqualifiedRespondents = pathTotals.unknown;
     const combinedTerminatedInterviews = terminatedInterviews + unqualifiedRespondents;
     const totalSubmissions = totalRows;
-    const collectedInterviews = Math.max(
-      totalSubmissions - combinedTerminatedInterviews - wrongVersionFlagCount,
-      0,
-    );
+    const collectedInterviews = validSubmissionCount;
 
     const totalTarget = shouldFilter
       ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
@@ -427,13 +428,13 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     };
 
     const approvalRatePercent =
-      totalRows > 0 ? Number(((approvedCount / totalRows) * 100).toFixed(1)) : 0;
+      validSubmissionCount > 0 ? Number(((approvedCount / validSubmissionCount) * 100).toFixed(1)) : 0;
 
     const notApprovedRatePercent =
-      totalRows > 0 ? Number(((notApprovedCount / totalRows) * 100).toFixed(1)) : 0;
+      validSubmissionCount > 0 ? Number(((notApprovedCount / validSubmissionCount) * 100).toFixed(1)) : 0;
 
     const canceledRatePercent =
-      totalRows > 0 ? Number(((canceledCount / totalRows) * 100).toFixed(1)) : 0;
+      validSubmissionCount > 0 ? Number(((canceledCount / validSubmissionCount) * 100).toFixed(1)) : 0;
 
     const summary = {
       overallTarget: totalTarget,
