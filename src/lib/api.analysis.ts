@@ -76,13 +76,14 @@ interface FetchTableOptions {
 const buildQueryString = (options: FetchTableOptions): string => {
   const params = new URLSearchParams();
   if (options.topbreak) {
-    if (Array.isArray(options.topbreak)) {
-      options.topbreak.forEach((value) => {
-        params.append("topbreak", value);
-      });
-    } else {
-      params.set("topbreak", options.topbreak);
-    }
+    const topbreakValues = Array.isArray(options.topbreak)
+      ? options.topbreak
+      : [options.topbreak];
+
+    topbreakValues
+      .map((value) => value?.toString().trim())
+      .filter((value): value is string => Boolean(value))
+      .forEach((value) => params.append("topbreak", value));
   }
   params.set("variable", options.variable);
   if (options.stat) {

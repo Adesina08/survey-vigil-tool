@@ -94,9 +94,16 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     return;
   }
 
+  const readTopbreaks = (params: URLSearchParams): string[] => {
+    const candidateKeys = ["topbreak", "topbreaks", "topbreak[]", "topBreak", "topBreaks"];
+    const values = candidateKeys.flatMap((key) => params.getAll(key));
+    const unique = Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean)));
+    return unique;
+  };
+
   if (method === "GET" && parsedUrl.pathname === "/api/analysis/table") {
     try {
-      const topbreaks = parsedUrl.searchParams.getAll("topbreak").filter(Boolean);
+      const topbreaks = readTopbreaks(parsedUrl.searchParams);
       const params = Object.fromEntries(parsedUrl.searchParams.entries());
       const table = await generateAnalysisTable({
         topbreaks: topbreaks.length > 0 ? topbreaks : params.topbreak ? [params.topbreak] : null,
