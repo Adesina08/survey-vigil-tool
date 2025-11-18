@@ -222,6 +222,8 @@ interface QualityControlContentProps {
 }
 
 export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChange }: QualityControlContentProps) => {
+  console.log('QualityControlContent render:', { selectedLga, hasData: !!dashboardData.analysisRows });
+  
   // Compute available LGAs from ALL analysis rows (unfiltered)
   const availableLgas = useMemo(() => {
     const set = new Set<string>();
@@ -255,9 +257,15 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
   // Analysis rows for KPI cards - filtered by selectedLga
   const filteredAnalysisRowsForKPI = useMemo(() => {
     const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
-    if (!selectedLga || selectedLga === "all") return rows;
+    
+    // Only filter if we have a valid, non-"all" LGA selected
+    const shouldFilter = selectedLga && selectedLga.trim() !== "" && selectedLga.toLowerCase() !== "all";
+    
+    if (!shouldFilter) {
+      return rows;
+    }
 
-    return rows.filter((row) => {
+    const filtered = rows.filter((row) => {
       const lgaValue =
         getFirstTextValue(row, [
           "A3. select the LGA",
@@ -270,6 +278,10 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
         ]) ?? "";
       return matchesSelectedLga(lgaValue, selectedLga);
     });
+    
+    console.log('Filtering KPI data:', { selectedLga, totalRows: rows.length, filteredRows: filtered.length });
+    
+    return filtered;
   }, [dashboardData.analysisRows, selectedLga]);
 
   // Analysis rows for other components - ALWAYS unfiltered
@@ -318,11 +330,21 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     quotaSummary,
     statusBreakdown,
   } = useMemo(() => {
-    const relevantQuotaByLGA = selectedLga && selectedLga !== "all"
+    const shouldFilter = selectedLga && selectedLga.trim() !== "" && selectedLga.toLowerCase() !== "all";
+    
+    const relevantQuotaByLGA = shouldFilter
       ? (dashboardData.quotaByLGA || []).filter((row) => matchesSelectedLga(row.lga, selectedLga))
       : dashboardData.quotaByLGA || [];
 
     const rows = filteredAnalysisRowsForKPI as NormalisedRow[];
+    
+    console.log('Computing KPI metrics:', { 
+      selectedLga, 
+      shouldFilter,
+      rowCount: rows.length,
+      relevantQuotaCount: relevantQuotaByLGA.length 
+    });
+    
     let totalSubmissions = 0;
     let approvedCount = 0;
     let notApprovedCount = 0;
@@ -352,11 +374,11 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       }
     });
 
-    const totalTarget = selectedLga && selectedLga !== "all"
+    const totalTarget = shouldFilter
       ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
       : dashboardData.summary?.overallTarget || 0;
 
-    const approvedAgainstTarget = selectedLga && selectedLga !== "all"
+    const approvedAgainstTarget = shouldFilter
       ? relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0)
       : approvedCount;
 
@@ -394,6 +416,8 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       maleCount,
       femaleCount,
     };
+    
+    console.log('KPI Summary:', summary);
 
     return {
       summary,
