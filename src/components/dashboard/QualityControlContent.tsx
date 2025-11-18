@@ -1,9 +1,4 @@
-const quotaAchievements: QuotaAchievementsByPillar = {
-      treatment: {},
-      control: {},
-    };
-    
-    const productivityMap = new Mapimport { useMemo } from "react";
+import { useMemo } from "react";
 import type { DashboardData } from "@/types/dashboard";
 import { determineApprovalStatus } from "@/utils/approval";
 import {
@@ -317,6 +312,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     };
   };
 
+  // Compute KPI metrics from FILTERED data
   const {
     summary,
     quotaSummary,
@@ -434,7 +430,9 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     const quotaAchievements: QuotaAchievementsByPillar = {
       treatment: {},
       control: {},
-    };<
+    };
+
+    const productivityMap = new Map<
       string,
       {
         interviewerId: string;
@@ -691,49 +689,6 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
         percentageApproved: row.total > 0 ? Number(((row.approved / row.total) * 100).toFixed(1)) : 0,
       }))
       .sort((a, b) => a.lga.localeCompare(b.lga));
-
-    const totalTarget = selectedLga && selectedLga !== "all"
-      ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
-      : dashboardData.summary?.overallTarget || 0;
-
-    const approvedAgainstTarget = selectedLga && selectedLga !== "all"
-      ? relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0)
-      : approvedCount;
-
-    const completionRate =
-      totalTarget > 0 ? Number(((approvedAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
-
-    const submissionsAgainstTarget = totalSubmissions;
-    const submissionProgressPercent =
-      totalTarget > 0 ? Number(((submissionsAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
-
-    const quotaSummary = {
-      achieved: submissionsAgainstTarget,
-      remaining: Math.max(totalTarget - submissionsAgainstTarget, 0),
-      target: totalTarget,
-      achievedPercent: submissionProgressPercent,
-    };
-
-    const approvalRatePercent =
-      totalSubmissions > 0 ? Number(((approvedCount / totalSubmissions) * 100).toFixed(1)) : 0;
-
-    const notApprovedRatePercent =
-      totalSubmissions > 0 ? Number(((notApprovedCount / totalSubmissions) * 100).toFixed(1)) : 0;
-
-    const summary = {
-      overallTarget: totalTarget,
-      totalSubmissions,
-      approvedSubmissions: approvedCount,
-      approvalRate: approvalRatePercent,
-      notApprovedSubmissions: notApprovedCount,
-      notApprovedRate: notApprovedRatePercent,
-      completionRate,
-      treatmentPathCount: pathTotals.treatment,
-      controlPathCount: pathTotals.control,
-      unknownPathCount: pathTotals.unknown,
-      maleCount,
-      femaleCount,
-    };
 
     const ensuredSlugs = new Set<string>(allQualityFlagSlugs);
     (dashboardData.filters?.errorTypes ?? []).forEach((raw) => {
