@@ -6,11 +6,12 @@ import {
 } from "../src/lib/googleSheets";
 import { buildDashboardData, type DashboardData } from "../src/lib/dashboardData";
 import { extractMapMetadataFromPayload } from "../src/lib/mapMetadata";
-import type {
-  SheetStateAgeTargetRow,
-  SheetStateGenderTargetRow,
-  SheetStateTargetRow,
-  SheetSubmissionRow,
+import {
+  TARGET_AGE_GROUPS,
+  type SheetStateAgeTargetRow,
+  type SheetStateGenderTargetRow,
+  type SheetStateTargetRow,
+  type SheetSubmissionRow,
 } from "../src/types/sheets";
 
 const APPS_SCRIPT_URL =
@@ -22,7 +23,6 @@ const APPS_SCRIPT_FETCH_ERROR_MESSAGE =
 
 const OGUN_STATE_NAME = "Ogun State";
 const OVERALL_STATE_TARGET = 2000;
-const AGE_GROUPS = ["15-24", "25-34", "35-44", "45+"] as const;
 
 const BODY_SNIPPET_LENGTH = 200;
 
@@ -139,8 +139,8 @@ const buildFallbackTargets = (presentGenders: PresentGender[]) => {
     { State: OGUN_STATE_NAME, "State Target": OVERALL_STATE_TARGET },
   ];
 
-  const perAge = Math.round(OVERALL_STATE_TARGET / AGE_GROUPS.length);
-  const stateAgeTargets: SheetStateAgeTargetRow[] = AGE_GROUPS.map((group) => ({
+  const perAge = Math.round(OVERALL_STATE_TARGET / TARGET_AGE_GROUPS.length);
+  const stateAgeTargets: SheetStateAgeTargetRow[] = TARGET_AGE_GROUPS.map((group) => ({
     State: OGUN_STATE_NAME,
     "Age Group": group,
     "Age Group Target": perAge,

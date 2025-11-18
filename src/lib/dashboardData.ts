@@ -1,8 +1,10 @@
-import type {
-  SheetSubmissionRow,
-  SheetStateTargetRow,
-  SheetStateAgeTargetRow,
-  SheetStateGenderTargetRow,
+import {
+  AGE_GROUP_ORDER,
+  type AgeGroup,
+  type SheetSubmissionRow,
+  type SheetStateTargetRow,
+  type SheetStateAgeTargetRow,
+  type SheetStateGenderTargetRow,
 } from "@/types/sheets";
 import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks";
 import { normaliseHeaderKey } from "./googleSheets";
@@ -23,6 +25,10 @@ import {
 type OgstepPath = "treatment" | "control" | "unknown" | null;
 
 const QC_FLAG_REGEX = /^QC_(FLAG|WARN)_/i;
+const getAgeGroupSortIndex = (ageGroup: string): number => {
+  const index = AGE_GROUP_ORDER.indexOf(ageGroup as AgeGroup);
+  return index === -1 ? AGE_GROUP_ORDER.length : index;
+};
 
 export type AnalysisRow = Record<string, unknown>;
 
@@ -1082,6 +1088,9 @@ export const buildDashboardData = ({
     .sort((a, b) => {
       const lgaComparison = a.lga.localeCompare(b.lga);
       if (lgaComparison !== 0) return lgaComparison;
+      const ageGroupComparison =
+        getAgeGroupSortIndex(a.ageGroup) - getAgeGroupSortIndex(b.ageGroup);
+      if (ageGroupComparison !== 0) return ageGroupComparison;
       return a.ageGroup.localeCompare(b.ageGroup);
     });
 
