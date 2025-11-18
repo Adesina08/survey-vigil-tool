@@ -72,36 +72,36 @@ const quotaTabs: QuotaTabDefinition[] = [
         panel: "TVET",
         sampleSize: { target: 2000, achieved: null },
         gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
+          female: { target: 400, achieved: 440 },
+          male: { target: 600, achieved: 600 },
         },
         age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
+          youth: { target: 500, achieved: 350 },
+          adult: { target: 500, achieved: 500 },
         },
       },
       {
-        panel: "VCDF",
-        sampleSize: { target: 2600, achieved: null },
+        panel: "Agric",
+        sampleSize: { target: 2000, achieved: null },
         gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
+          female: { target: 400, achieved: 660 },
+          male: { target: 600, achieved: 400 },
         },
         age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
+          youth: { target: 500, achieved: 610 },
+          adult: { target: 500, achieved: 500 },
         },
       },
       {
         panel: "COFO",
         sampleSize: { target: 780, achieved: null },
         gender: {
-          female: { target: 200, achieved: null },
-          male: { target: 200, achieved: null },
+          female: { target: 200, achieved: 200 },
+          male: { target: 200, achieved: 200 },
         },
         age: {
-          youth: { target: 200, achieved: null },
-          adult: { target: 200, achieved: null },
+          youth: { target: 390, achieved: 540 },
+          adult: { target: 390, achieved: null },
         },
       },
     ],
@@ -114,36 +114,36 @@ const quotaTabs: QuotaTabDefinition[] = [
         panel: "TVET",
         sampleSize: { target: 2000, achieved: null },
         gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
+          female: { target: 400, achieved: 440 },
+          male: { target: 600, achieved: 600 },
         },
         age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
+          youth: { target: 500, achieved: 350 },
+          adult: { target: 500, achieved: 500 },
         },
       },
       {
-        panel: "VCDF",
-        sampleSize: { target: 2600, achieved: null },
+        panel: "Agric",
+        sampleSize: { target: 2000, achieved: null },
         gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
+          female: { target: 400, achieved: 660 },
+          male: { target: 600, achieved: 400 },
         },
         age: {
-          youth: { target: 400, achieved: null },
-          adult: { target: 600, achieved: null },
+          youth: { target: 500, achieved: 610 },
+          adult: { target: 500, achieved: 500 },
         },
       },
       {
         panel: "COFO",
         sampleSize: { target: 780, achieved: null },
         gender: {
-          female: { target: 200, achieved: null },
-          male: { target: 200, achieved: null },
+          female: { target: 200, achieved: 200 },
+          male: { target: 200, achieved: 200 },
         },
         age: {
-          youth: { target: 200, achieved: null },
-          adult: { target: 200, achieved: null },
+          youth: { target: 390, achieved: 540 },
+          adult: { target: 390, achieved: null },
         },
       },
     ],
@@ -291,6 +291,16 @@ const formatNumber = (value: number | null | undefined): string => {
   return value.toLocaleString("en-NG");
 };
 
+const formatDisplayNumber = (
+  value: number | null | undefined,
+  { wrapInParens = false, blankForNull = false }: { wrapInParens?: boolean; blankForNull?: boolean } = {},
+): string => {
+  if (value === null || value === undefined || Number.isNaN(value)) return blankForNull ? "" : "0";
+
+  const formatted = value.toLocaleString("en-NG");
+  return wrapInParens ? `(${formatted})` : formatted;
+};
+
 const calculateTotals = (rows: QuotaRow[]) =>
   rows.reduce(
     (totals, row) => ({
@@ -374,67 +384,123 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
             return (
               <TabsContent key={tab.value} value={tab.value}>
                 <div className="overflow-x-auto rounded-md border">
-                  <Table>
+                  <Table className="border-collapse text-center" containerClassName="border border-slate-500">
                     <TableHeader>
                       <TableRow>
-                        <TableHead rowSpan={3}>Pillar</TableHead>
-                        <TableHead rowSpan={3}>N</TableHead>
-                        <TableHead className="text-center" colSpan={4}>
+                        <TableHead className="border-2 border-slate-500" rowSpan={3}>
+                          Pillar
+                        </TableHead>
+                        <TableHead className="border-2 border-slate-500" rowSpan={3}>
+                          N
+                        </TableHead>
+                        <TableHead className="border-2 border-slate-500 text-center" colSpan={4}>
                           Gender
                         </TableHead>
-                        <TableHead className="text-center" colSpan={4}>Age</TableHead>
-                      </TableRow>
-                      <TableRow>
-                        <TableHead className="text-center" colSpan={2}>
-                          Target
-                        </TableHead>
-                        <TableHead className="text-center" colSpan={2}>
-                          Achieved
-                        </TableHead>
-                        <TableHead className="text-center" colSpan={2}>
-                          Target
-                        </TableHead>
-                        <TableHead className="text-center" colSpan={2}>
-                          Achieved
+                        <TableHead className="border-2 border-slate-500 text-center" colSpan={4}>
+                          Age
                         </TableHead>
                       </TableRow>
                       <TableRow>
-                        <TableHead>Female</TableHead>
-                        <TableHead>Male</TableHead>
-                        <TableHead>Female</TableHead>
-                        <TableHead>Male</TableHead>
-                        <TableHead>&lt;35 (Youth)</TableHead>
-                        <TableHead>&gt;35 (Adult)</TableHead>
-                        <TableHead>&lt;35 (Youth)</TableHead>
-                        <TableHead>&gt;35 (Adult)</TableHead>
+                        <TableHead className="border-2 border-slate-500 text-center" colSpan={2}>
+                          Target
+                        </TableHead>
+                        <TableHead className="border-2 border-slate-500 text-center" colSpan={2}>
+                          Achieved
+                        </TableHead>
+                        <TableHead className="border-2 border-slate-500 text-center" colSpan={2}>
+                          Target
+                        </TableHead>
+                        <TableHead className="border-2 border-slate-500 text-center" colSpan={2}>
+                          Achieved
+                        </TableHead>
+                      </TableRow>
+                      <TableRow>
+                        <TableHead className="border-2 border-slate-500">Female</TableHead>
+                        <TableHead className="border-2 border-slate-500">Male</TableHead>
+                        <TableHead className="border-2 border-slate-500">Female</TableHead>
+                        <TableHead className="border-2 border-slate-500">Male</TableHead>
+                        <TableHead className="border-2 border-slate-500">&lt;35 (Youth)</TableHead>
+                        <TableHead className="border-2 border-slate-500">&gt;35 (Adult)</TableHead>
+                        <TableHead className="border-2 border-slate-500">&lt;35 (Youth)</TableHead>
+                        <TableHead className="border-2 border-slate-500">&gt;35 (Adult)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {tab.rows.map((row) => (
                         <TableRow key={`${tab.value}-${safePanelKey(row.panel)}`}>
-                          <TableCell className="font-medium">{row.panel}</TableCell>
-                          <TableCell>{formatNumber(row.sampleSize.target)}</TableCell>
-                          <TableCell>{formatNumber(row.gender.female.target)}</TableCell>
-                          <TableCell>{formatNumber(row.gender.male.target)}</TableCell>
-                          <TableCell>{formatNumber(row.gender.female.achieved)}</TableCell>
-                          <TableCell>{formatNumber(row.gender.male.achieved)}</TableCell>
-                          <TableCell>{formatNumber(row.age.youth.target)}</TableCell>
-                          <TableCell>{formatNumber(row.age.adult.target)}</TableCell>
-                          <TableCell>{formatNumber(row.age.youth.achieved)}</TableCell>
-                          <TableCell>{formatNumber(row.age.adult.achieved)}</TableCell>
+                          <TableCell className="border-2 border-slate-500 font-medium text-left">
+                            {row.panel}
+                          </TableCell>
+                          <TableCell className="border-2 border-slate-500">
+                            {formatNumber(row.sampleSize.target)}
+                          </TableCell>
+                          <TableCell className="border-2 border-slate-500">
+                            {formatNumber(row.gender.female.target)}
+                          </TableCell>
+                          <TableCell className="border-2 border-slate-500">
+                            {formatNumber(row.gender.male.target)}
+                          </TableCell>
+                          <TableCell className="border-2 border-slate-500">
+                            {formatDisplayNumber(row.gender.female.achieved, {
+                              wrapInParens: true,
+                              blankForNull: true,
+                            })}
+                          </TableCell>
+                          <TableCell className="border-2 border-slate-500">
+                            {formatDisplayNumber(row.gender.male.achieved, {
+                              wrapInParens: true,
+                              blankForNull: true,
+                            })}
+                          </TableCell>
+                          <TableCell className="border-2 border-slate-500">
+                            {formatNumber(row.age.youth.target)}
+                          </TableCell>
+                          <TableCell className="border-2 border-slate-500">
+                            {formatNumber(row.age.adult.target)}
+                          </TableCell>
+                          <TableCell className="border-2 border-slate-500">
+                            {formatDisplayNumber(row.age.youth.achieved, {
+                              wrapInParens: true,
+                              blankForNull: true,
+                            })}
+                          </TableCell>
+                          <TableCell className="border-2 border-slate-500">
+                            {formatDisplayNumber(row.age.adult.achieved, {
+                              wrapInParens: true,
+                              blankForNull: true,
+                            })}
+                          </TableCell>
                         </TableRow>
                       ))}
                       <TableRow className="font-semibold">
-                        <TableCell>Total</TableCell>
-                        <TableCell>{formatNumber(totals.sampleSize)}</TableCell>
-                        <TableCell>{formatNumber(totals.gender.female.target)}</TableCell>
-                        <TableCell>{formatNumber(totals.gender.male.target)}</TableCell>
-                        <TableCell>{formatNumber(totals.gender.female.achieved)}</TableCell>
-                        <TableCell>{formatNumber(totals.gender.male.achieved)}</TableCell>
-                        <TableCell>{formatNumber(totals.age.youth.target)}</TableCell>
-                        <TableCell>{formatNumber(totals.age.adult.target)}</TableCell>
-                        <TableCell>{formatNumber(totals.age.youth.achieved)}</TableCell>
-                        <TableCell>{formatNumber(totals.age.adult.achieved)}</TableCell>
+                        <TableCell className="border-2 border-slate-500 text-left">Total</TableCell>
+                        <TableCell className="border-2 border-slate-500">
+                          {formatNumber(totals.sampleSize)}
+                        </TableCell>
+                        <TableCell className="border-2 border-slate-500">
+                          {formatNumber(totals.gender.female.target)}
+                        </TableCell>
+                        <TableCell className="border-2 border-slate-500">
+                          {formatNumber(totals.gender.male.target)}
+                        </TableCell>
+                        <TableCell className="border-2 border-slate-500">
+                          {formatDisplayNumber(totals.gender.female.achieved, { wrapInParens: true })}
+                        </TableCell>
+                        <TableCell className="border-2 border-slate-500">
+                          {formatDisplayNumber(totals.gender.male.achieved, { wrapInParens: true })}
+                        </TableCell>
+                        <TableCell className="border-2 border-slate-500">
+                          {formatNumber(totals.age.youth.target)}
+                        </TableCell>
+                        <TableCell className="border-2 border-slate-500">
+                          {formatNumber(totals.age.adult.target)}
+                        </TableCell>
+                        <TableCell className="border-2 border-slate-500">
+                          {formatDisplayNumber(totals.age.youth.achieved, { wrapInParens: true })}
+                        </TableCell>
+                        <TableCell className="border-2 border-slate-500">
+                          {formatDisplayNumber(totals.age.adult.achieved, { wrapInParens: true })}
+                        </TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
