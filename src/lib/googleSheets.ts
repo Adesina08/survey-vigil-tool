@@ -219,16 +219,47 @@ const determineAgeGroup = (age?: number): AgeGroup => {
   if (typeof age !== "number" || Number.isNaN(age) || age <= 0) {
     return "Unknown";
   }
-  if (age <= 24) return "15-24";
-  if (age <= 34) return "25-34";
-  if (age <= 44) return "35-44";
-  return "45+";
+  if (age >= 15 && age <= 35) return "Youth";
+  if (age > 35) return ">35";
+  return "Unknown";
 };
 
 const normaliseAgeGroupLabel = (value: string): AgeGroup => {
   const formatted = value.trim();
-  const allowed: AgeGroup[] = ["15-24", "25-34", "35-44", "45+", "Unknown"];
-  return allowed.includes(formatted as AgeGroup) ? (formatted as AgeGroup) : "Unknown";
+  if (!formatted) return "Unknown";
+
+  const lower = formatted.toLowerCase();
+  const youthHints = ["youth", "15-24", "25-34", "15-34", "15-35", "15 – 35"];
+  if (youthHints.some((hint) => lower.includes(hint))) {
+    return "Youth";
+  }
+
+  const adultHints = ["35-44", "45+", ">35", "35+", "adult", "36-49", "36-59", "50+"];
+  if (adultHints.some((hint) => lower.includes(hint))) {
+    return ">35";
+  }
+
+  const rangeMatch = lower.match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (rangeMatch) {
+    const upper = Number.parseInt(rangeMatch[2] ?? "", 10);
+    if (Number.isFinite(upper)) {
+      return determineAgeGroup(upper);
+    }
+  }
+
+  const numericMatch = lower.match(/\d+/);
+  if (numericMatch) {
+    const numericValue = Number.parseInt(numericMatch[0] ?? "", 10);
+    if (Number.isFinite(numericValue)) {
+      return determineAgeGroup(numericValue);
+    }
+  }
+
+  if (formatted === "Youth" || formatted === ">35") {
+    return formatted as AgeGroup;
+  }
+
+  return "Unknown";
 };
 
 const normaliseGender = (value: unknown): Gender => {

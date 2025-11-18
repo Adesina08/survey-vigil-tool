@@ -1,6 +1,8 @@
 export type ApprovalStatus = "Approved" | "Not Approved";
 export type Gender = "Male" | "Female" | "Unknown";
-export type AgeGroup = "15-24" | "25-34" | "35-44" | "45+" | "Unknown";
+export type AgeGroup = "Youth" | ">35" | "Unknown";
+export const AGE_GROUP_ORDER: AgeGroup[] = ["Youth", ">35", "Unknown"];
+export const TARGET_AGE_GROUPS: AgeGroup[] = ["Youth", ">35"];
 export type ErrorType =
   | "OddHour"
   | "Low LOI"
