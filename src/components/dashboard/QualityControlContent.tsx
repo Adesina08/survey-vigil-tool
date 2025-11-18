@@ -38,7 +38,7 @@ const parsePillar = (value: string | null): { panel: string; path: OgstepPath } 
 
   let panel = "UNKNOWN";
   if (lower.includes("tvet")) panel = "TVET";
-  else if (lower.includes("agric") || lower.includes("vcdf")) panel = "Agric";
+  else if (lower.includes("agric") || lower.includes("vcdf")) panel = "VCDF/Agric";
   else if (lower.includes("cofo") || lower.includes("cofdo")) panel = "COFO";
   else if (lower.includes("unqualified")) panel = "UNQUALIFIED RESPONDENT";
 
@@ -56,12 +56,20 @@ const getAgeBucketFromRow = (row: NormalisedRow): "youth" | "adult" | "unknown" 
     getFirstTextValue(row, ["A8. Age", "a8_age"]);
 
   if (!raw) return "unknown";
+
   const lower = raw.toLowerCase();
+
+  const parsedNumber = Number.parseInt(lower, 10);
+  if (Number.isFinite(parsedNumber)) {
+    if (parsedNumber >= 15 && parsedNumber <= 35) return "youth";
+    if (parsedNumber > 35) return "adult";
+  }
 
   if (
     lower.includes("15-24") ||
     lower.includes("25-34") ||
-    lower.includes("15-35")
+    lower.includes("15-35") ||
+    lower.includes("youth")
   ) {
     return "youth";
   }
@@ -70,7 +78,8 @@ const getAgeBucketFromRow = (row: NormalisedRow): "youth" | "adult" | "unknown" 
     lower.includes("35-44") ||
     lower.includes("45+") ||
     lower.includes("35-49") ||
-    lower.includes("50+")
+    lower.includes("50+") ||
+    lower.includes("adult")
   ) {
     return "adult";
   }
@@ -554,7 +563,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
       if (path === "treatment" || path === "control") {
         // skip UNQUALIFIED / unknown panels in the quota tracker
-        if (panel === "TVET" || panel === "VCDF" || panel === "COFO") {
+        if (panel === "TVET" || panel === "VCDF/Agric" || panel === "COFO") {
           const tabKey = path;
           const panelMap = (quotaAchievements[tabKey] ||= {});
           const bucket =
