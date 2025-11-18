@@ -42,6 +42,7 @@ export interface SheetSubmissionRow {
   simserial?: string;
   "Age Group"?: AgeGroup;
   Gender?: Gender;
+  "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target"?: string;
   Approval?: ApprovalStatus | string;
   "Approval Status"?: ApprovalStatus;
   "Outcome Status"?: "Valid" | "Invalid";

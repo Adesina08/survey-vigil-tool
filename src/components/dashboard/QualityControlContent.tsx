@@ -20,30 +20,32 @@ import { ErrorBreakdown } from "./ErrorBreakdown";
 import { AchievementsTables } from "./AchievementsTables";
 
 type NormalisedRow = Record<string, unknown>;
-type OgstepPath = "treatment" | "control" | "unknown";
+type OgstepPath = "treatment" | "control" | "unknown" | null;
+
+const OGSTEP_PILLAR_FIELD =
+  "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target";
 
 // NEW: read Pillar from the row
-const getPillarFromRow = (row: NormalisedRow): string | null =>
-  getFirstTextValue(row, [
-    "Pillar. Interviewers, kindly recruit the respondent into the right Pillar according to your target",
-    "Pillar",
-    "pillar",
-  ]);
+const getPillarFromRow = (row: NormalisedRow): string | null => {
+  const raw = row[OGSTEP_PILLAR_FIELD];
+  return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
+};
 
 // NEW: classify OGSTEP path from Pillar
 const getOgstepPathFromPillar = (pillar: string | null): OgstepPath => {
-  if (!pillar) return "unknown";
+  if (!pillar) return null;
 
   const normalised = pillar.toUpperCase();
   if (normalised.includes("TREATMENT")) return "treatment";
   if (normalised.includes("CONTROL")) return "control";
+  if (normalised.includes("UNQUALIFIED")) return "unknown";
 
-  return "unknown";
+  return null;
 };
 
 // NEW: parse panel + path from Pillar
 const parsePillar = (value: string | null): { panel: string; path: OgstepPath } => {
-  if (!value) return { panel: "UNKNOWN", path: "unknown" };
+  if (!value) return { panel: "UNKNOWN", path: null };
 
   const lower = value.toLowerCase();
 
@@ -352,7 +354,11 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     let maleCount = 0;
     let femaleCount = 0;
 
-    const pathTotals: Record<OgstepPath, number> = { treatment: 0, control: 0, unknown: 0 };
+    const pathTotals: Record<Exclude<OgstepPath, null>, number> = {
+      treatment: 0,
+      control: 0,
+      unknown: 0,
+    };
 
     rows.forEach((row) => {
       totalSubmissions += 1;
@@ -363,7 +369,9 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       if (genderValue === "male") maleCount += 1;
       else if (genderValue === "female") femaleCount += 1;
 
-      pathTotals[ogstepPath] += 1;
+      if (ogstepPath) {
+        pathTotals[ogstepPath] += 1;
+      }
 
       const approvalStatus = determineApprovalStatus(row);
       const isApproved = approvalStatus === "Approved";
@@ -449,7 +457,11 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     let maleCount = 0;
     let femaleCount = 0;
 
-    const pathTotals: Record<OgstepPath, number> = { treatment: 0, control: 0, unknown: 0 };
+    const pathTotals: Record<Exclude<OgstepPath, null>, number> = {
+      treatment: 0,
+      control: 0,
+      unknown: 0,
+    };
 
     // NEW: quota achievements per panel & tab (treatment / control)
     const quotaAchievements: QuotaAchievementsByPillar = {
@@ -608,9 +620,11 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
 
       if (ogstepPath === "treatment") existing.treatmentPathCount += 1;
       else if (ogstepPath === "control") existing.controlPathCount += 1;
-      else existing.unknownPathCount += 1;
+      else if (ogstepPath === "unknown") existing.unknownPathCount += 1;
 
-      pathTotals[ogstepPath] += 1;
+      if (ogstepPath) {
+        pathTotals[ogstepPath] += 1;
+      }
 
       const qualityCounts = extractQualityIndicatorCounts(row);
       const qualityLabels = collectQualityIndicatorLabels(row as Record<string, unknown>);
@@ -662,7 +676,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       else interviewerEntry.notApproved += 1;
       if (ogstepPath === "treatment") interviewerEntry.treatmentPathCount += 1;
       else if (ogstepPath === "control") interviewerEntry.controlPathCount += 1;
-      else interviewerEntry.unknownPathCount += 1;
+      else if (ogstepPath === "unknown") interviewerEntry.unknownPathCount += 1;
 
       // Achievements by LGA
       const lgaKey = lga;
@@ -683,7 +697,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       else lgaEntry.notApproved += 1;
       if (ogstepPath === "treatment") lgaEntry.treatmentPathCount += 1;
       else if (ogstepPath === "control") lgaEntry.controlPathCount += 1;
-      else lgaEntry.unknownPathCount += 1;
+      else if (ogstepPath === "unknown") lgaEntry.unknownPathCount += 1;
       achievementsByLGAMap.set(lgaKey, lgaEntry);
     });
 
