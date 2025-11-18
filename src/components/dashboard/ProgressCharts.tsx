@@ -28,6 +28,7 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
   const safeStatus = {
     approved: Math.max(statusBreakdown?.approved ?? 0, 0),
     notApproved: Math.max(statusBreakdown?.notApproved ?? 0, 0),
+    canceled: Math.max(statusBreakdown?.canceled ?? 0, 0),
   };
 
   const quotaData = [
@@ -38,10 +39,15 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
   const statusData = [
     { name: "Approved", value: safeStatus.approved },
     { name: "Not Approved", value: safeStatus.notApproved },
+    { name: "Canceled", value: safeStatus.canceled },
   ];
 
   const QUOTA_COLORS = ["hsl(var(--primary))", "hsl(var(--warning))"];
-  const STATUS_COLORS = ["hsl(var(--success))", "hsl(var(--destructive))"];
+  const STATUS_COLORS = [
+    "hsl(var(--success))",
+    "hsl(var(--destructive))",
+    "hsl(var(--warning))",
+  ];
 
   const formatNumber = (value: number) => value.toLocaleString();
   const formatPercent = (value: number) => `${value.toFixed(1)}%`;
