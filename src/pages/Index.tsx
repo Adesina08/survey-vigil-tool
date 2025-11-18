@@ -7,6 +7,44 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import TabsQCAnalysis from "@/components/TabsQCAnalysis";
 import QualityControl from "./QualityControl";
 
+const getFirstTextValue = (row: Record<string, unknown>, keys: string[]): string | null => {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return null;
+};
+
+const deriveAvailableLgas = (analysisRows: unknown[] | undefined) => {
+  const set = new Set<string>();
+
+  (analysisRows || []).forEach((row) => {
+    if (!row || typeof row !== "object") {
+      return;
+    }
+
+    const lgaValue =
+      getFirstTextValue(row as Record<string, unknown>, [
+        "A3. select the LGA",
+        "A3. Select the LGA",
+        "a3_select_the_lga",
+        "lga",
+        "LGA",
+        "local_government_area",
+        "local_government",
+        "location_lga",
+      ]) ?? "";
+
+    if (lgaValue && lgaValue.trim().length > 0) {
+      set.add(lgaValue.trim());
+    }
+  });
+
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+};
+
 const Index = () => {
   const {
     data: dashboardData,
@@ -19,6 +57,15 @@ const Index = () => {
   } = useDashboardData();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedLga, setSelectedLga] = useState<string | null>(null);
+
+  const availableLgas = useMemo(() => {
+    const payloadLgas = dashboardData?.lgas ?? dashboardData?.filters?.lgas ?? [];
+    if (Array.isArray(payloadLgas) && payloadLgas.length > 0) {
+      return payloadLgas;
+    }
+
+    return deriveAvailableLgas(dashboardData?.analysisRows);
+  }, [dashboardData?.analysisRows, dashboardData?.filters?.lgas, dashboardData?.lgas]);
 
   const dateTimeFormatter = useMemo(
     () =>
@@ -78,11 +125,14 @@ const Index = () => {
       return;
     }
 
-    const availableLgas = dashboardData?.filters?.lgas ?? [];
+    if (availableLgas.length === 0) {
+      return;
+    }
+
     if (!availableLgas.includes(selectedLga)) {
       setSelectedLga(null);
     }
-  }, [dashboardData?.filters?.lgas, selectedLga]);
+  }, [availableLgas, selectedLga]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
