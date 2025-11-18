@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 
 interface ExportData {
-  topbreak: string;
+  topbreak: string | string[];
   variable: string;
   rows: Array<Record<string, string | number>>;
   stat: string;
@@ -49,7 +49,7 @@ const parseHtmlTable = (html: string): Array<Record<string, string | number>> =>
 
 export const exportAnalysisToExcel = (
   html: string,
-  topbreak: string,
+  topbreak: string | string[],
   variable: string,
   stat: string
 ): void => {
@@ -85,6 +85,7 @@ export const exportAnalysisToExcel = (
   }));
 
   // Generate and download
-  const filename = `analysis_${topbreak}_by_${variable}_${stat}.xlsx`;
+  const topbreakLabel = Array.isArray(topbreak) ? topbreak.join("_") : topbreak;
+  const filename = `analysis_${topbreakLabel}_by_${variable}_${stat}.xlsx`;
   XLSX.writeFile(workbook, filename);
 };

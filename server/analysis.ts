@@ -36,7 +36,8 @@ export interface AnalysisChartSpec {
 }
 
 export interface AnalysisMeta {
-  topbreak: string | null;
+  topbreak?: string | null;
+  topbreaks: string[];
   variable: string;
   n: number;
   stat: string;
@@ -156,9 +157,15 @@ const normalizeCategorical = (
   return [...top, { value: "Other", count: otherCount }];
 };
 
+interface ColumnDefinition {
+  id: string;
+  topbreak: string;
+  category: string;
+}
+
 interface BuildCrossTabOptions {
   rows: Record<string, unknown>[];
-  topbreak: string;
+  topbreaks: string[];
   variable: string;
   stat: "counts" | "rowpct" | "colpct" | "totalpct";
   limitCategories?: number;
@@ -166,134 +173,121 @@ interface BuildCrossTabOptions {
 
 const buildCrossTab = ({
   rows,
-  topbreak,
+  topbreaks,
   variable,
   stat,
   limitCategories = CATEGORY_LIMIT_DEFAULT,
 }: BuildCrossTabOptions): AnalysisTableResponse => {
-  const topValues = rows.map((row) => row[topbreak]);
+  const uniqueTopbreaks = Array.from(new Set(topbreaks));
   const variableValues = rows.map((row) => row[variable]);
-
-  const topCategories = normalizeCategorical(topValues, limitCategories).map((entry) => entry.value);
   const variableCategories = normalizeCategorical(variableValues, limitCategories).map((entry) => entry.value);
 
-  const crosstab: Record<string, Record<string, number>> = {};
-  for (const topCategory of topCategories) {
-    crosstab[topCategory] = {};
-    for (const variableCategory of variableCategories) {
-      crosstab[topCategory][variableCategory] = 0;
-    }
+  const topbreakCategoryMap: Record<string, string[]> = {};
+  for (const topbreak of uniqueTopbreaks) {
+    const topValues = rows.map((row) => row[topbreak]);
+    topbreakCategoryMap[topbreak] = normalizeCategorical(topValues, limitCategories).map((entry) => entry.value);
   }
 
-  for (const row of rows) {
-    const rawTop = row[topbreak];
-    const rawVariable = row[variable];
+  const columns: ColumnDefinition[] = uniqueTopbreaks.flatMap((topbreak) =>
+    (topbreakCategoryMap[topbreak] ?? []).map((category) => ({
+      id: `${topbreak}:${category}`,
+      topbreak,
+      category,
+    })),
+  );
 
-    if (isPlaceholderValue(rawTop) || isPlaceholderValue(rawVariable)) {
-      continue;
-    }
-
-    const topText = String(rawTop).trim();
-    const variableText = String(rawVariable).trim();
-
-    if (isPlaceholderValue(topText) || isPlaceholderValue(variableText)) {
-      continue;
-    }
-
-    const topKey = topCategories.includes(topText) ? topText : "Other";
-    const variableKey = variableCategories.includes(variableText) ? variableText : "Other";
-
-    if (!crosstab[topKey]) {
-      crosstab[topKey] = {};
-    }
-
-    if (crosstab[topKey][variableKey] === undefined) {
-      crosstab[topKey][variableKey] = 0;
-    }
-
-    crosstab[topKey][variableKey] += 1;
-  }
-
+  const counts: Record<string, Record<string, number>> = {};
   const rowTotals: Record<string, number> = {};
   const columnTotals: Record<string, number> = {};
   let grandTotal = 0;
 
-  for (const topCategory of topCategories) {
-    rowTotals[topCategory] = 0;
-    for (const variableCategory of variableCategories) {
-      const count = crosstab[topCategory]?.[variableCategory] ?? 0;
-      rowTotals[topCategory] += count;
-      columnTotals[variableCategory] = (columnTotals[variableCategory] ?? 0) + count;
+  for (const variableCategory of variableCategories) {
+    counts[variableCategory] = {};
+    rowTotals[variableCategory] = 0;
+  }
+
+  for (const row of rows) {
+    const rawVariable = row[variable];
+    if (isPlaceholderValue(rawVariable)) {
+      continue;
+    }
+
+    const variableText = String(rawVariable).trim();
+    const variableKey = variableCategories.includes(variableText) ? variableText : "Other";
+
+    for (const topbreak of uniqueTopbreaks) {
+      const rawTop = row[topbreak];
+      if (isPlaceholderValue(rawTop)) {
+        continue;
+      }
+
+      const topText = String(rawTop).trim();
+      const topCategories = topbreakCategoryMap[topbreak] ?? [];
+      const topKey = topCategories.includes(topText) ? topText : "Other";
+      const columnId = `${topbreak}:${topKey}`;
+
+      counts[variableKey][columnId] = (counts[variableKey][columnId] ?? 0) + 1;
+    }
+  }
+
+  for (const variableCategory of variableCategories) {
+    for (const column of columns) {
+      const count = counts[variableCategory]?.[column.id] ?? 0;
+      rowTotals[variableCategory] = (rowTotals[variableCategory] ?? 0) + count;
+      columnTotals[column.id] = (columnTotals[column.id] ?? 0) + count;
       grandTotal += count;
     }
   }
 
   const statMatrix: Record<string, Record<string, number>> = {};
-  for (const topCategory of topCategories) {
-    statMatrix[topCategory] = {};
-    for (const variableCategory of variableCategories) {
-      const count = crosstab[topCategory]?.[variableCategory] ?? 0;
+  for (const variableCategory of variableCategories) {
+    statMatrix[variableCategory] = {};
+    for (const column of columns) {
+      const count = counts[variableCategory]?.[column.id] ?? 0;
       let value = count;
 
-      if (stat === "rowpct" && rowTotals[topCategory] > 0) {
-        value = (count / rowTotals[topCategory]) * 100;
-      } else if (stat === "colpct" && columnTotals[variableCategory] > 0) {
-        value = (count / columnTotals[variableCategory]) * 100;
+      if (stat === "rowpct" && rowTotals[variableCategory] > 0) {
+        value = (count / rowTotals[variableCategory]) * 100;
+      } else if (stat === "colpct" && columnTotals[column.id] > 0) {
+        value = (count / columnTotals[column.id]) * 100;
       } else if (stat === "totalpct" && grandTotal > 0) {
         value = (count / grandTotal) * 100;
       }
 
-      statMatrix[topCategory][variableCategory] = value;
+      statMatrix[variableCategory][column.id] = value;
     }
   }
 
   let html = '<table class="analysis-table" style="width:100%; border-collapse: collapse;">';
   html += '<thead><tr style="border-bottom: 2px solid #ddd;">';
-  html += `<th style="padding: 8px; text-align: left;">${topbreak}</th>`;
-  for (const variableCategory of variableCategories) {
-    html += `<th style="padding: 8px; text-align: right;">${variableCategory}</th>`;
+  html += `<th style="padding: 8px; text-align: left;">${variable}</th>`;
+  for (const column of columns) {
+    html += `<th style="padding: 8px; text-align: right;">${column.topbreak}: ${column.category}</th>`;
   }
   html += '<th style="padding: 8px; text-align: right;">Total</th>';
   html += "</tr></thead><tbody>";
 
-  for (const topCategory of topCategories) {
+  for (const variableCategory of variableCategories) {
     html += '<tr style="border-bottom: 1px solid #eee;">';
-    html += `<td style="padding: 8px;">${topCategory}</td>`;
-    for (const variableCategory of variableCategories) {
-      const value = statMatrix[topCategory]?.[variableCategory] ?? 0;
+    html += `<td style="padding: 8px;">${variableCategory}</td>`;
+    for (const column of columns) {
+      const value = statMatrix[variableCategory]?.[column.id] ?? 0;
       const display = stat === "counts" ? value.toFixed(0) : `${value.toFixed(1)}%`;
       html += `<td style="padding: 8px; text-align: right;">${display}</td>`;
     }
-    const totalDisplay = stat === "counts" ? rowTotals[topCategory] : "100.0%";
+    const totalDisplay = stat === "counts" ? rowTotals[variableCategory] : "100.0%";
     html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${totalDisplay}</td>`;
     html += "</tr>";
   }
 
   html += "</tbody></table>";
 
-  const series: AnalysisChartSeries[] = variableCategories.map((variableCategory) => ({
-    name: variableCategory,
-    data: topCategories.map((topCategory) => ({
-      x: topCategory,
-      y: statMatrix[topCategory]?.[variableCategory] ?? 0,
-    })),
-  }));
-
-  const chart: AnalysisChartSpec = {
-    kind: "stacked_bar",
-    x: topbreak,
-    series,
-    labels: {
-      x: topbreak,
-      y: stat === "counts" ? "Count" : "Percent",
-    },
-  };
-
   return {
     html,
-    chart,
+    chart: null,
     meta: {
-      topbreak,
+      topbreaks: uniqueTopbreaks,
+      topbreak: uniqueTopbreaks[0] ?? null,
       variable,
       n: grandTotal,
       stat,
@@ -332,7 +326,7 @@ export const generateAnalysisSchema = async (): Promise<AnalysisSchema> => {
 };
 
 interface GenerateAnalysisTableOptions {
-  topbreak: string | null;
+  topbreaks: string[] | null;
   variable: string | null;
   stat?: string | null;
   limitCategories?: string | null;
@@ -348,14 +342,14 @@ export const generateAnalysisTable = async (
     throw new Error("No data available");
   }
 
-  const topbreak = params.topbreak;
+  const topbreaks = params.topbreaks;
   const variable = params.variable;
 
   if (!variable) {
     throw new Error("variable parameter is required");
   }
 
-  if (!topbreak) {
+  if (!topbreaks || topbreaks.length === 0) {
     throw new Error("topbreak parameter is required");
   }
 
@@ -364,7 +358,7 @@ export const generateAnalysisTable = async (
 
   return buildCrossTab({
     rows,
-    topbreak,
+    topbreaks,
     variable,
     stat,
     limitCategories: Number.isFinite(limitCategories) ? limitCategories : undefined,

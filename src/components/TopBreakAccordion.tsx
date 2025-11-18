@@ -25,6 +25,7 @@ type AnalysisTableResponse = {
     n?: number;
     stat?: string;
     topbreak?: string;
+    topbreaks?: string[];
     variable?: string;
     notes?: string[];
   };
@@ -292,8 +293,14 @@ const TopBreakAccordion: React.FC<TopBreakAccordionProps> = ({
                 {response.meta?.stat && (
                   <Badge variant="outline">Statistic: {response.meta.stat}</Badge>
                 )}
-                {response.meta?.topbreak && (
-                  <Badge variant="outline">Top break: {formatLabel(response.meta.topbreak)}</Badge>
+                {response.meta?.topbreaks?.length ? (
+                  <Badge variant="outline">
+                    Top break: {response.meta.topbreaks.map((tb) => formatLabel(tb)).join(", ")}
+                  </Badge>
+                ) : (
+                  response.meta?.topbreak && (
+                    <Badge variant="outline">Top break: {formatLabel(response.meta.topbreak)}</Badge>
+                  )
                 )}
                 {response.meta?.variable && (
                   <Badge variant="outline">Variable: {formatLabel(response.meta.variable)}</Badge>

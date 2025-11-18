@@ -3,7 +3,7 @@ import { getAnalysisTable, type AnalysisTableResponse } from "@/lib/api.analysis
 export type DisplayMode = "counts" | "rowpct" | "colpct" | "totalpct";
 
 export interface AnalysisRequest {
-  topBreak: string | null;
+  topBreaks: string[];
   variables: string[];
   mode: DisplayMode;
   limitCategories?: number;
@@ -17,7 +17,7 @@ export interface AnalysisResult {
 }
 
 export async function generateAnalysis(request: AnalysisRequest): Promise<AnalysisResult> {
-  const { topBreak, variables, mode, limitCategories, bins, dropMissing, minCount } = request;
+  const { topBreaks, variables, mode, limitCategories, bins, dropMissing, minCount } = request;
   const shouldDropMissing = dropMissing ?? true;
 
   if (!variables.length) {
@@ -27,7 +27,7 @@ export async function generateAnalysis(request: AnalysisRequest): Promise<Analys
   const tables: AnalysisTableResponse[] = [];
   for (const variable of variables) {
     const table = await getAnalysisTable({
-      topbreak: topBreak,
+      topbreak: topBreaks,
       variable,
       stat: mode,
       limitCategories,

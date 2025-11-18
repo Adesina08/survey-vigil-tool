@@ -96,9 +96,10 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
 
   if (method === "GET" && parsedUrl.pathname === "/api/analysis/table") {
     try {
+      const topbreaks = parsedUrl.searchParams.getAll("topbreak").filter(Boolean);
       const params = Object.fromEntries(parsedUrl.searchParams.entries());
       const table = await generateAnalysisTable({
-        topbreak: params.topbreak ?? null,
+        topbreaks: topbreaks.length > 0 ? topbreaks : params.topbreak ? [params.topbreak] : null,
         variable: params.variable ?? null,
         stat: params.stat ?? null,
         limitCategories: params.limit_categories ?? null,

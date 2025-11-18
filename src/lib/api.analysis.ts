@@ -47,7 +47,8 @@ export interface AnalysisChartSpec {
 }
 
 export interface AnalysisMeta {
-  topbreak: string | null;
+  topbreak?: string | null;
+  topbreaks: string[];
   variable: string;
   n: number;
   stat: string;
@@ -61,7 +62,7 @@ export interface AnalysisTableResponse {
 }
 
 interface FetchTableOptions {
-  topbreak: string | null;
+  topbreak: string | string[] | null;
   variable: string;
   stat?: "counts" | "rowpct" | "colpct" | "totalpct";
   bins?: number;
@@ -75,7 +76,13 @@ interface FetchTableOptions {
 const buildQueryString = (options: FetchTableOptions): string => {
   const params = new URLSearchParams();
   if (options.topbreak) {
-    params.set("topbreak", options.topbreak);
+    if (Array.isArray(options.topbreak)) {
+      options.topbreak.forEach((value) => {
+        params.append("topbreak", value);
+      });
+    } else {
+      params.set("topbreak", options.topbreak);
+    }
   }
   params.set("variable", options.variable);
   if (options.stat) {
