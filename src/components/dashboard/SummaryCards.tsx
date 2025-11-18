@@ -300,21 +300,23 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
 
   return (
     <div className="mx-auto w-full">
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-6 items-stretch sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {cards.map((card) => (
             <Card
               key={card.title}
-              className={`count-up relative h-full min-w-0 overflow-hidden border bg-gradient-to-b from-card/95 via-card/90 to-card/95 text-card-foreground shadow-lg transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl ${getCardStyles(card.variant)}`.trim()}
+              className={`count-up relative flex h-full min-w-0 flex-col overflow-hidden border bg-gradient-to-b from-card/95 via-card/90 to-card/95 text-card-foreground shadow-lg transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl ${getCardStyles(card.variant)}`.trim()}
             >
               <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${getAccentGradient(card.variant)}`} />
               <CardHeader className="p-4 pb-3 sm:p-5 lg:p-4 lg:pb-2">
                 <CardTitle className="text-base font-semibold leading-tight text-card-foreground">{card.title}</CardTitle>
               </CardHeader>
-              <CardContent className="flex h-full flex-col gap-3 px-4 pb-4 pt-0 sm:px-5 sm:pb-5 lg:px-4 lg:pb-3 lg:gap-2.5">
-                {renderMetrics(card)}
-                {card.footer ? (
-                  <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{card.footer}</div>
-                ) : null}
+              <CardContent className="flex flex-1 flex-col gap-3 px-4 pb-4 pt-0 sm:px-5 sm:pb-5 lg:px-4 lg:pb-3 lg:gap-2.5">
+                <div className="mt-auto space-y-3 lg:space-y-2.5">
+                  {renderMetrics(card)}
+                  {card.footer ? (
+                    <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{card.footer}</div>
+                  ) : null}
+                </div>
               </CardContent>
             </Card>
           ))}
