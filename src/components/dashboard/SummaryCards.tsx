@@ -162,15 +162,30 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const getCardStyles = (variant: string) => {
     switch (variant) {
       case "success":
-        return "border-success/20 bg-success/5";
+        return "border-success/30 bg-gradient-to-b from-success/10 via-background to-background";
       case "destructive":
-        return "border-destructive/20 bg-destructive/5";
+        return "border-destructive/30 bg-gradient-to-b from-destructive/10 via-background to-background";
       case "treatment":
-        return "border-blue-500/20 bg-blue-500/5";
+        return "border-blue-500/30 bg-gradient-to-b from-blue-500/10 via-background to-background";
       case "control":
-        return "border-green-500/20 bg-green-500/5";
+        return "border-green-500/30 bg-gradient-to-b from-green-500/10 via-background to-background";
       default:
-        return "";
+        return "border-border/70 bg-gradient-to-b from-muted/10 via-background to-background";
+    }
+  };
+
+  const getAccentGradient = (variant: string) => {
+    switch (variant) {
+      case "success":
+        return "from-success/80 via-success/60 to-success/80";
+      case "destructive":
+        return "from-destructive/70 via-destructive/60 to-destructive/70";
+      case "treatment":
+        return "from-blue-500/80 via-blue-400/70 to-blue-500/80";
+      case "control":
+        return "from-green-500/80 via-green-400/70 to-green-500/80";
+      default:
+        return "from-primary/70 via-primary/60 to-primary/70";
     }
   };
 
@@ -204,42 +219,76 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     }
   };
 
+  const getIconBackgroundStyles = (variant: string) => {
+    switch (variant) {
+      case "success":
+        return "bg-success/10 text-success";
+      case "destructive":
+        return "bg-destructive/10 text-destructive";
+      case "treatment":
+        return "bg-blue-500/10 text-blue-600 dark:text-blue-300";
+      case "control":
+        return "bg-green-500/10 text-green-600 dark:text-green-300";
+      default:
+        return "bg-primary/10 text-primary";
+    }
+  };
+
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {cards.map((card) => (
         <Card
           key={card.title}
-          className={`count-up h-full ${getCardStyles(card.variant)}`.trim()}
+          className={`count-up relative h-full min-w-0 overflow-hidden border bg-card/80 shadow-sm transition-transform duration-200 hover:-translate-y-1 hover:shadow-lg ${getCardStyles(card.variant)}`.trim()}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-            <card.icon className={`h-4 w-4 ${getIconStyles(card.variant)}`} />
+          <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${getAccentGradient(card.variant)}`} />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div className="space-y-1 text-balance">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                Key Metric
+              </p>
+              <CardTitle className="text-lg font-semibold leading-tight text-foreground">{card.title}</CardTitle>
+            </div>
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-full border border-border/60 ${getIconBackgroundStyles(card.variant)}`}
+            >
+              <card.icon className={`h-5 w-5 ${getIconStyles(card.variant)}`} />
+            </div>
           </CardHeader>
           <CardContent>
             <div
               className={
                 card.metrics.length > 1
                   ? "grid grid-cols-1 gap-4 sm:grid-cols-2"
-                  : "space-y-3"
-              }
-            >
-              {card.metrics.map((metric) => (
-                <div key={metric.label} className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {metric.icon ? (
-                      <metric.icon className={`h-4 w-4 ${getMetricToneStyles(metric.tone)}`} />
-                    ) : null}
-                    <span>{metric.label}</span>
-                  </div>
-                  <div className={`text-xl font-semibold ${getMetricToneStyles(metric.tone)}`}>
-                    {metric.value}
-                  </div>
-                  {metric.helper ? (
-                    <div className="text-xs text-muted-foreground">{metric.helper}</div>
+                  : "space-y-4"
+            }
+          >
+            {card.metrics.map((metric) => (
+              <div
+                key={metric.label}
+                className="space-y-2 rounded-xl border border-border/60 bg-background/70 p-3 shadow-inner"
+              >
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  {metric.icon ? (
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/70 ${getMetricToneStyles(
+                        metric.tone,
+                      )}`}
+                    >
+                      <metric.icon className="h-4 w-4" />
+                    </span>
                   ) : null}
+                  <span className="min-w-0 leading-snug break-words text-balance">{metric.label}</span>
                 </div>
-              ))}
-            </div>
+                <div className={`text-3xl font-bold leading-tight tracking-tight ${getMetricToneStyles(metric.tone)}`}>
+                  {metric.value}
+                </div>
+                {metric.helper ? (
+                  <div className="text-xs leading-relaxed text-muted-foreground text-balance break-words">{metric.helper}</div>
+                ) : null}
+              </div>
+            ))}
+          </div>
             {card.footer ? (
               <div className="mt-4 border-t pt-3 text-xs text-muted-foreground">{card.footer}</div>
             ) : null}
