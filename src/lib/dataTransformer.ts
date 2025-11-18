@@ -164,16 +164,17 @@ function isTruthy(value: any): boolean {
 const OGSTEP_PILLAR_FIELD =
   "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target";
 
-function getOgstepPath(row: RawSurveyRow): "treatment" | "control" | "unknown" {
+function getOgstepPath(row: RawSurveyRow): "treatment" | "control" | "unknown" | null {
   const pillar = getTextValue(row, [OGSTEP_PILLAR_FIELD]);
 
-  if (!pillar) return "unknown";
+  if (!pillar) return null;
 
   const normalised = pillar.toUpperCase();
   if (normalised.includes("TREATMENT")) return "treatment";
   if (normalised.includes("CONTROL")) return "control";
+  if (normalised.includes("UNQUALIFIED")) return "unknown";
 
-  return "unknown";
+  return null;
 }
 
 function getGenderValue(row: RawSurveyRow): "male" | "female" | "unknown" {
@@ -451,7 +452,7 @@ export function calculateAchievementsByInterviewer(rawData: RawSurveyRow[]) {
     const path = getOgstepPath(row);
     if (path === "treatment") entry.treatmentPathCount += 1;
     else if (path === "control") entry.controlPathCount += 1;
-    else entry.unknownPathCount += 1;
+    else if (path === "unknown") entry.unknownPathCount += 1;
   });
 
   return Array.from(interviewerMap.values()).map((entry) => ({
@@ -496,7 +497,7 @@ export function calculateAchievementsByLGA(rawData: RawSurveyRow[]) {
     const path = getOgstepPath(row);
     if (path === "treatment") entry.treatmentPathCount += 1;
     else if (path === "control") entry.controlPathCount += 1;
-    else entry.unknownPathCount += 1;
+    else if (path === "unknown") entry.unknownPathCount += 1;
   });
 
   return Array.from(lgaMap.values())
@@ -579,7 +580,7 @@ export function calculateAchievementsByState(rawData: RawSurveyRow[]) {
     const path = getOgstepPath(row);
     if (path === "treatment") entry.treatmentPathCount += 1;
     else if (path === "control") entry.controlPathCount += 1;
-    else entry.unknownPathCount += 1;
+    else if (path === "unknown") entry.unknownPathCount += 1;
   });
 
   return Array.from(stateMap.values())
@@ -628,7 +629,7 @@ export function calculateSummary(rawData: RawSurveyRow[], overallTarget: number 
     const path = getOgstepPath(row);
     if (path === "treatment") treatmentPathCount += 1;
     else if (path === "control") controlPathCount += 1;
-    else unknownPathCount += 1;
+    else if (path === "unknown") unknownPathCount += 1;
 
     const gender = getGenderValue(row);
     if (gender === "male") maleCount += 1;

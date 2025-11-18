@@ -43,7 +43,7 @@ interface Submission {
   status: "approved" | "not_approved";
   approvalLabel?: string | null;
   approvalSource?: string | null;
-  ogstepPath: "treatment" | "control" | "unknown";
+  ogstepPath: "treatment" | "control" | "unknown" | null;
   ogstepResponse: string | null;
   directions: string | null;
   respondentName?: string | null;
@@ -83,10 +83,15 @@ const getPathMetadata = (submission: Submission) => {
         color: "#f97316",
         label: "Control path",
       } as const;
-    default:
+    case "unknown":
       return {
         color: "#0ea5e9",
         label: "Unqualified respondent",
+      } as const;
+    default:
+      return {
+        color: "#94a3b8",
+        label: "Path not specified",
       } as const;
   }
 };
