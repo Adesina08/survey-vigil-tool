@@ -299,24 +299,26 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     };
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-      {cards.map((card) => (
-          <Card
-            key={card.title}
-            className={`count-up relative h-full min-w-0 overflow-hidden border bg-gradient-to-b from-card/95 via-card/90 to-card/95 text-card-foreground shadow-lg transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl ${getCardStyles(card.variant)}`.trim()}
-          >
-            <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${getAccentGradient(card.variant)}`} />
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold leading-tight text-card-foreground">{card.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex h-full flex-col gap-3">
-              {renderMetrics(card)}
-              {card.footer ? (
-                <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{card.footer}</div>
-              ) : null}
-            </CardContent>
-          </Card>
-        ))}
+    <div className="mx-auto w-full max-w-6xl">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        {cards.map((card) => (
+            <Card
+              key={card.title}
+              className={`count-up relative h-full min-w-0 overflow-hidden border bg-gradient-to-b from-card/95 via-card/90 to-card/95 text-card-foreground shadow-lg transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl ${getCardStyles(card.variant)}`.trim()}
+            >
+              <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${getAccentGradient(card.variant)}`} />
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold leading-tight text-card-foreground">{card.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="flex h-full flex-col gap-3">
+                {renderMetrics(card)}
+                {card.footer ? (
+                  <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{card.footer}</div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ))}
       </div>
-    );
+    </div>
+  );
 }
