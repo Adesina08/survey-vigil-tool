@@ -453,11 +453,11 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
                         <TableHead className={cellBorderClass}>Male</TableHead>
                         <TableHead className={cellBorderClass}>Female</TableHead>
                         <TableHead className={cellBorderClass}>Male</TableHead>
-                        <TableHead className={cellBorderClass}>&lt;35 (Youth)</TableHead>
+                        <TableHead className={cellBorderClass}>15–35 (Youth)</TableHead>
                         <TableHead className={cellBorderClass}>&gt;35 (Adult)</TableHead>
-                        <TableHead className={cellBorderClass}>&lt;35 (Youth)</TableHead>
+                        <TableHead className={cellBorderClass}>15–35 (Youth)</TableHead>
                         <TableHead className={cellBorderClass}>&gt;35 (Adult)</TableHead>
-                        <TableHead className={cellBorderClass}>&lt;35 (Youth)</TableHead>
+                        <TableHead className={cellBorderClass}>15–35 (Youth)</TableHead>
                         <TableHead className={cellBorderClass}>&gt;35 (Adult)</TableHead>
                       </TableRow>
                     </TableHeader>
