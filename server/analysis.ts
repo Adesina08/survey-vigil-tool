@@ -258,25 +258,38 @@ const buildCrossTab = ({
     }
   }
 
+  const numberFormatter = new Intl.NumberFormat("en-US");
+  const numericCellStyle = "padding: 8px; text-align: right; font-variant-numeric: tabular-nums;";
+
   let html = '<table class="analysis-table" style="width:100%; border-collapse: collapse;">';
   html += '<thead><tr style="border-bottom: 2px solid #ddd;">';
   html += `<th style="padding: 8px; text-align: left;">${variable}</th>`;
   for (const column of columns) {
-    html += `<th style="padding: 8px; text-align: right;">${column.topbreak}: ${column.category}</th>`;
+    html += `<th style="${numericCellStyle}">${column.topbreak}: ${column.category}</th>`;
   }
-  html += '<th style="padding: 8px; text-align: right;">Total</th>';
+  html += `<th style="${numericCellStyle} border-left: 2px solid #ccc;">Total</th>`;
   html += "</tr></thead><tbody>";
+
+  html += '<tr style="border-bottom: 2px solid #ddd; background-color: #f9fafb;">';
+  html += '<td style="padding: 8px; font-weight: 600;">Base</td>';
+  for (const column of columns) {
+    const count = columnTotals[column.id] ?? 0;
+    html += `<td style="${numericCellStyle}"><div style="font-weight: 600;">${numberFormatter.format(count)}</div><div style="font-size: 12px; color: #666;">Weighted: —</div></td>`;
+  }
+  html += `<td style="${numericCellStyle} border-left: 2px solid #ccc; font-weight: 700;"><div>${numberFormatter.format(grandTotal)}</div><div style="font-size: 12px; color: #666;">Weighted: —</div></td>`;
+  html += "</tr>";
 
   for (const variableCategory of variableCategories) {
     html += '<tr style="border-bottom: 1px solid #eee;">';
     html += `<td style="padding: 8px;">${variableCategory}</td>`;
     for (const column of columns) {
       const value = statMatrix[variableCategory]?.[column.id] ?? 0;
-      const display = stat === "counts" ? value.toFixed(0) : `${value.toFixed(1)}%`;
-      html += `<td style="padding: 8px; text-align: right;">${display}</td>`;
+      const display = stat === "counts" ? numberFormatter.format(value) : `${value.toFixed(1)}%`;
+      html += `<td style="${numericCellStyle}">${display}</td>`;
     }
-    const totalDisplay = stat === "counts" ? rowTotals[variableCategory] : "100.0%";
-    html += `<td style="padding: 8px; text-align: right; font-weight: 600;">${totalDisplay}</td>`;
+    const totalDisplay =
+      stat === "counts" ? numberFormatter.format(rowTotals[variableCategory]) : "100.0%";
+    html += `<td style="${numericCellStyle} border-left: 2px solid #ccc; font-weight: 600;">${totalDisplay}</td>`;
     html += "</tr>";
   }
 
