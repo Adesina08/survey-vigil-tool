@@ -159,36 +159,12 @@ const matchesSelectedLga = (value: unknown, selectedLga: string): boolean => {
   return normalisedCandidates.has(target);
 };
 
-const normaliseOgstepResponse = (value: string | null): OgstepPath => {
-  if (!value) return "unknown";
-  const lower = value.trim().toLowerCase();
-  if (lower.startsWith("y") || lower === "1" || lower === "yes" || lower === "true") return "treatment";
-  if (lower.startsWith("n") || lower === "0" || lower === "no" || lower === "false") return "control";
-  return "unknown";
-};
-
 const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
-  // 1) Prefer the Pillar field
   const pillar = getPillarFromRow(row);
-  if (pillar) {
-    const { path } = parsePillar(pillar);
-    if (path !== "unknown") {
-      return path;
-    }
-  }
+  const { path } = parsePillar(pillar);
 
-  // 2) Fallback to the OGSTEP participation question
-  const response =
-    getFirstTextValue(row, [
-      "B2. Did you participate in OGSTEP?",
-      "b2_did_you_participate_in_ogstep",
-      "did_you_participate_in_ogstep",
-      "ogstep",
-      "ogstep_participation",
-      "ogstep_response",
-    ]) ?? null;
-
-  return normaliseOgstepResponse(response);
+  // OGSTEP path is determined solely by the Pillar field
+  return path;
 };
 
 const getGenderFromRow = (row: NormalisedRow): "male" | "female" | "unknown" => {
