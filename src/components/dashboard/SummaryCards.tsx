@@ -50,6 +50,9 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const totalSubmissionRate =
     summary.overallTarget > 0 ? (summary.totalSubmissions / summary.overallTarget) * 100 : 0;
 
+  const validSubmissionRate =
+    summary.overallTarget > 0 ? (validSubmissions / summary.overallTarget) * 100 : 0;
+
   const validSubmissions = Math.max(
     summary.totalSubmissions - summary.terminatedInterviews - summary.wrongVersionFlagCount,
     0
@@ -100,7 +103,10 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         {
           label: "Valid submissions",
           value: formatNumber(validSubmissions),
-          helper: "",
+          helper:
+            summary.overallTarget > 0
+              ? `${formatPercentage(validSubmissionRate)} of target volume`
+              : "",
         },
         {
           label: "Terminated interviews",
@@ -108,7 +114,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           helper: "",
         },
         {
-          label: "Wrong version flags",
+          label: "Wrong Version",
           value: formatNumber(summary.wrongVersionFlagCount),
           helper: "",
         },
@@ -186,7 +192,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         metric.colSpan ? `col-span-${metric.colSpan}` : ""
       }`.trim()}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 whitespace-nowrap">
         {metric.label}
       </div>
       <div
@@ -205,14 +211,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       const [totalSubmissions, validSubmissionsMetric, ...invalidMetrics] = card.metrics;
 
       return (
-        <div className="space-y-5">
+        <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
             {totalSubmissions ? renderMetric(totalSubmissions) : null}
             {validSubmissionsMetric ? renderMetric(validSubmissionsMetric) : null}
           </div>
           {invalidMetrics.length > 0 ? (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-amber-200">
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 pb-2">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-200">
                 <span aria-label="Caution" role="img">
                   🚨
                 </span>
@@ -220,6 +226,9 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
               </div>
               <div className="grid grid-cols-2 gap-4 sm:gap-6">
                 {invalidMetrics.map((metric) => renderMetric(metric))}
+              </div>
+              <div className="mt-2 text-right text-xs text-amber-200/80">
+                Sum<sub className="text-[10px] align-sub">subscript</sub>
               </div>
             </div>
           ) : null}
@@ -292,7 +301,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold leading-tight text-slate-100">{card.title}</CardTitle>
           </CardHeader>
-          <CardContent className="flex h-full flex-col gap-5">
+          <CardContent className="flex h-full flex-col gap-4">
             {renderMetrics(card)}
             {card.footer ? (
               <div className="rounded-lg bg-slate-800/60 px-3 py-2 text-xs text-slate-200/80">{card.footer}</div>
