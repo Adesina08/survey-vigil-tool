@@ -301,25 +301,22 @@ const formatNumber = (value: number | null | undefined): string => {
 
 const formatDisplayNumber = (
   value: number | null | undefined,
-  { wrapInParens = false, blankForNull = false }: { wrapInParens?: boolean; blankForNull?: boolean } = {},
+  { blankForNull = false }: { blankForNull?: boolean } = {},
 ): string => {
   if (value === null || value === undefined || Number.isNaN(value)) return blankForNull ? "" : "0";
 
-  const formatted = value.toLocaleString("en-NG");
-  return wrapInParens ? `(${formatted})` : formatted;
+  return value.toLocaleString("en-NG");
 };
 
 const calculateBalance = (target: number, achieved: number | null | undefined) => target - (achieved ?? 0);
 
-const getBalanceCellClass = (balance: number) => {
-  if (balance > 0) {
-    return "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
-  }
-  if (balance < 0) {
-    return "bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300";
-  }
-  return "bg-slate-50 text-slate-900 dark:bg-slate-800 dark:text-slate-100";
-};
+const getBalanceCellClass = () =>
+  "bg-orange-50 text-orange-800 dark:bg-orange-950/40 dark:text-orange-300";
+
+const getAchievedCellClass = (value: number | null | undefined) =>
+  value === null || value === undefined || Number.isNaN(value)
+    ? ""
+    : "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
 
 const cellBorderClass = "border-[2px] border-slate-300 dark:border-slate-500";
 
@@ -485,22 +482,24 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
                             <TableCell className={cellBorderClass}>
                               {formatNumber(row.gender.male.target)}
                             </TableCell>
-                            <TableCell className={cellBorderClass}>
+                            <TableCell
+                              className={`${cellBorderClass} ${getAchievedCellClass(row.gender.female.achieved)}`}
+                            >
                               {formatDisplayNumber(row.gender.female.achieved, {
-                                wrapInParens: true,
                                 blankForNull: true,
                               })}
                             </TableCell>
-                            <TableCell className={cellBorderClass}>
+                            <TableCell
+                              className={`${cellBorderClass} ${getAchievedCellClass(row.gender.male.achieved)}`}
+                            >
                               {formatDisplayNumber(row.gender.male.achieved, {
-                                wrapInParens: true,
                                 blankForNull: true,
                               })}
                             </TableCell>
-                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass(femaleBalance)}`}>
+                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass()}`}>
                               {formatNumber(femaleBalance)}
                             </TableCell>
-                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass(maleBalance)}`}>
+                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass()}`}>
                               {formatNumber(maleBalance)}
                             </TableCell>
                             <TableCell className={cellBorderClass}>
@@ -509,22 +508,24 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
                             <TableCell className={cellBorderClass}>
                               {formatNumber(row.age.adult.target)}
                             </TableCell>
-                            <TableCell className={cellBorderClass}>
+                            <TableCell
+                              className={`${cellBorderClass} ${getAchievedCellClass(row.age.youth.achieved)}`}
+                            >
                               {formatDisplayNumber(row.age.youth.achieved, {
-                                wrapInParens: true,
                                 blankForNull: true,
                               })}
                             </TableCell>
-                            <TableCell className={cellBorderClass}>
+                            <TableCell
+                              className={`${cellBorderClass} ${getAchievedCellClass(row.age.adult.achieved)}`}
+                            >
                               {formatDisplayNumber(row.age.adult.achieved, {
-                                wrapInParens: true,
                                 blankForNull: true,
                               })}
                             </TableCell>
-                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass(youthBalance)}`}>
+                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass()}`}>
                               {formatNumber(youthBalance)}
                             </TableCell>
-                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass(adultBalance)}`}>
+                            <TableCell className={`${cellBorderClass} ${getBalanceCellClass()}`}>
                               {formatNumber(adultBalance)}
                             </TableCell>
                           </TableRow>
@@ -543,16 +544,20 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
                         <TableCell className={cellBorderClass}>
                           {formatNumber(totals.gender.male.target)}
                         </TableCell>
-                        <TableCell className={cellBorderClass}>
-                          {formatDisplayNumber(totals.gender.female.achieved, { wrapInParens: true })}
+                        <TableCell
+                          className={`${cellBorderClass} ${getAchievedCellClass(totals.gender.female.achieved)}`}
+                        >
+                          {formatDisplayNumber(totals.gender.female.achieved)}
                         </TableCell>
-                        <TableCell className={cellBorderClass}>
-                          {formatDisplayNumber(totals.gender.male.achieved, { wrapInParens: true })}
+                        <TableCell
+                          className={`${cellBorderClass} ${getAchievedCellClass(totals.gender.male.achieved)}`}
+                        >
+                          {formatDisplayNumber(totals.gender.male.achieved)}
                         </TableCell>
-                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass(totalFemaleBalance)}`}>
+                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass()}`}>
                           {formatNumber(totalFemaleBalance)}
                         </TableCell>
-                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass(totalMaleBalance)}`}>
+                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass()}`}>
                           {formatNumber(totalMaleBalance)}
                         </TableCell>
                         <TableCell className={cellBorderClass}>
@@ -561,16 +566,20 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
                         <TableCell className={cellBorderClass}>
                           {formatNumber(totals.age.adult.target)}
                         </TableCell>
-                        <TableCell className={cellBorderClass}>
-                          {formatDisplayNumber(totals.age.youth.achieved, { wrapInParens: true })}
+                        <TableCell
+                          className={`${cellBorderClass} ${getAchievedCellClass(totals.age.youth.achieved)}`}
+                        >
+                          {formatDisplayNumber(totals.age.youth.achieved)}
                         </TableCell>
-                        <TableCell className={cellBorderClass}>
-                          {formatDisplayNumber(totals.age.adult.achieved, { wrapInParens: true })}
+                        <TableCell
+                          className={`${cellBorderClass} ${getAchievedCellClass(totals.age.adult.achieved)}`}
+                        >
+                          {formatDisplayNumber(totals.age.adult.achieved)}
                         </TableCell>
-                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass(totalYouthBalance)}`}>
+                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass()}`}>
                           {formatNumber(totalYouthBalance)}
                         </TableCell>
-                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass(totalAdultBalance)}`}>
+                        <TableCell className={`${cellBorderClass} ${getBalanceCellClass()}`}>
                           {formatNumber(totalAdultBalance)}
                         </TableCell>
                       </TableRow>
