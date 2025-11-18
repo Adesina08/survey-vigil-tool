@@ -207,29 +207,48 @@ def _build_categorical_table(
     counts = counts.reindex(index=top_categories, columns=var_categories, fill_value=0)
 
     totals = counts.values.sum()
-    row_pct = counts.div(counts.sum(axis=1).replace(0, np.nan), axis=0) * 100
-    col_pct = counts.div(counts.sum(axis=0).replace(0, np.nan), axis=1) * 100
-    total_pct = (counts / totals * 100) if totals else counts * 0
+    counts_with_total = counts.assign(Total=counts.sum(axis=1))
+    row_pct = counts_with_total.div(counts_with_total.sum(axis=1).replace(0, np.nan), axis=0) * 100
+    col_pct = counts_with_total.div(counts_with_total.sum(axis=0).replace(0, np.nan), axis=1) * 100
+    total_pct = (counts_with_total / totals * 100) if totals else counts_with_total * 0
 
-    display = pd.DataFrame(index=counts.index)
-    for column in counts.columns:
-        display[f"{column} (count)"] = counts[column]
-        display[f"{column} (row%)"] = row_pct[column].map(_format_percentage)
-    display["Total (count)"] = counts.sum(axis=1)
-    display["Total (row%)"] = "100.0%"
-    display.insert(0, topbreak, counts.index)
+    stat_labels = {
+        "counts": "Count",
+        "rowpct": "Row %",
+        "colpct": "Column %",
+        "totalpct": "Total %",
+    }
+    stat_label = stat_labels[stat]
 
-    gt_table = GT(display.reset_index(drop=True))
-    gt_table = gt_table.tab_header(title=f"{variable} by {topbreak}", subtitle=f"Statistic: {stat}")
-    gt_table = gt_table.opt_row_striping()
-    html = gt_table.to_html()
-
-    stat_matrix = {
-        "counts": counts,
+    stat_tables = {
+        "counts": counts_with_total,
         "rowpct": row_pct,
         "colpct": col_pct,
         "totalpct": total_pct,
-    }[stat]
+    }
+
+    display_matrix = stat_tables[stat]
+    display = pd.DataFrame(index=display_matrix.index)
+    for column in display_matrix.columns:
+        values = display_matrix[column]
+        if stat == "counts":
+            display[f"{column} ({stat_label})"] = values.astype(int)
+        else:
+            display[f"{column} ({stat_label})"] = values.map(_format_percentage)
+    display.insert(0, topbreak, display_matrix.index)
+
+    gt_table = GT(display.reset_index(drop=True))
+    gt_table = gt_table.tab_header(title=f"{variable} by {topbreak}", subtitle=f"Statistic: {stat_label}")
+    gt_table = gt_table.opt_row_striping()
+    html = gt_table.to_html()
+
+    chart_matrices = {
+        "counts": counts,
+        "rowpct": counts.div(counts.sum(axis=1).replace(0, np.nan), axis=0) * 100,
+        "colpct": counts.div(counts.sum(axis=0).replace(0, np.nan), axis=1) * 100,
+        "totalpct": (counts / totals * 100) if totals else counts * 0,
+    }
+    stat_matrix = chart_matrices[stat]
 
     chart_series = []
     for column in stat_matrix.columns:
@@ -245,7 +264,7 @@ def _build_categorical_table(
         "series": chart_series,
         "labels": {
             "x": topbreak,
-            "y": "Percent" if stat != "counts" else "Count",
+            "y": stat_label,
         },
     }
 
