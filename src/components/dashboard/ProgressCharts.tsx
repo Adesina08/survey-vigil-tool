@@ -39,7 +39,7 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
     { name: "Not Approved", value: safeStatus.notApproved },
   ];
 
-  const QUOTA_COLORS = ["hsl(var(--primary))", "hsl(var(--muted))"];
+  const QUOTA_COLORS = ["hsl(var(--primary))", "hsl(var(--warning))"];
   const STATUS_COLORS = ["hsl(var(--success))", "hsl(var(--destructive))"];
 
   const formatNumber = (value: number) => value.toLocaleString();
@@ -71,7 +71,7 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
                 ))}
               </Pie>
               <Tooltip />
-              <Legend />
+              <Legend wrapperStyle={{ color: "hsl(var(--foreground))" }} />
             </PieChart>
           </ResponsiveContainer>
           <div className="mt-4 text-center">
@@ -82,7 +82,7 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
               {safeQuota.target > 0 ? formatPercent(safeQuota.achievedPercent) : "0.0%"} of target interviews
               completed
             </div>
-            <div className="text-xs text-muted-foreground">Remaining: {formatNumber(safeQuota.remaining)}</div>
+            <div className="text-xs text-foreground">Remaining: {formatNumber(safeQuota.remaining)}</div>
           </div>
         </CardContent>
       </Card>

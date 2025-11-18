@@ -191,29 +191,29 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   ];
 
   const renderMetric = (metric: CardMetric) => (
-    <div
-      key={metric.label}
-      className={`flex flex-col items-start gap-1.5 ${
-        metric.colSpan ? `col-span-${metric.colSpan}` : ""
-      }`.trim()}
-    >
       <div
-        className={`text-[11px] font-semibold uppercase tracking-wide text-slate-400 ${
-          metric.labelClassName ?? ""
+        key={metric.label}
+        className={`flex flex-col items-start gap-1.5 ${
+          metric.colSpan ? `col-span-${metric.colSpan}` : ""
         }`.trim()}
       >
-        {metric.label}
+        <div
+          className={`text-[11px] font-semibold uppercase tracking-wide text-muted-foreground ${
+            metric.labelClassName ?? ""
+          }`.trim()}
+        >
+          {metric.label}
+        </div>
+        <div
+          className={`text-3xl font-semibold leading-tight sm:text-4xl ${getMetricToneStyles(
+            metric.tone
+          )} ${metric.valueClassName ?? ""}`.trim()}
+        >
+          {metric.value}
+        </div>
+        <div className="min-h-[18px] text-xs leading-snug text-muted-foreground">{metric.helper ?? ""}</div>
+        {metric.extraHelperLine ? <div className="min-h-[18px] text-xs text-transparent">-</div> : null}
       </div>
-      <div
-        className={`text-3xl font-semibold leading-tight sm:text-4xl ${getMetricToneStyles(
-          metric.tone
-        )} ${metric.valueClassName ?? ""}`.trim()}
-      >
-        {metric.value}
-      </div>
-      <div className="min-h-[18px] text-xs leading-snug text-slate-400">{metric.helper ?? ""}</div>
-      {metric.extraHelperLine ? <div className="min-h-[18px] text-xs text-transparent">-</div> : null}
-    </div>
   );
 
   const renderMetrics = (card: CardConfig) => {
@@ -227,8 +227,8 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             {validSubmissionsMetric ? renderMetric(validSubmissionsMetric) : null}
           </div>
           {invalidMetrics.length > 0 ? (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 pb-2">
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-200">
+            <div className="rounded-lg border border-amber-200/70 bg-amber-500/10 p-3 pb-2 dark:border-amber-500/30 dark:bg-amber-500/5">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200">
                 <span aria-label="Caution" role="img">
                   🚨
                 </span>
@@ -255,68 +255,68 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
 
   const getCardStyles = (variant: string) => {
     switch (variant) {
-      case "success":
-        return "border-emerald-500/30 from-emerald-900/40";
-      case "destructive":
-        return "border-rose-500/30 from-rose-900/30";
-      case "treatment":
-        return "border-amber-400/30 from-amber-900/30";
-      case "control":
-        return "border-cyan-400/30 from-cyan-900/30";
-      default:
-        return "border-slate-800 from-slate-900";
-    }
-  };
+        case "success":
+          return "border-emerald-200/80 dark:border-emerald-500/40";
+        case "destructive":
+          return "border-rose-200/80 dark:border-rose-500/40";
+        case "treatment":
+          return "border-amber-200/80 dark:border-amber-400/30";
+        case "control":
+          return "border-cyan-200/80 dark:border-cyan-400/30";
+        default:
+          return "border-border";
+      }
+    };
 
   const getAccentGradient = (variant: string) => {
     switch (variant) {
-      case "success":
-        return "from-emerald-400 via-emerald-300 to-emerald-400";
-      case "destructive":
-        return "from-rose-400 via-rose-300 to-rose-400";
-      case "treatment":
-        return "from-amber-300 via-amber-200 to-amber-300";
-      case "control":
-        return "from-cyan-300 via-cyan-200 to-cyan-300";
-      default:
-        return "from-sky-400 via-indigo-300 to-sky-400";
-    }
-  };
+        case "success":
+          return "from-emerald-500/80 via-emerald-400/80 to-emerald-500/80";
+        case "destructive":
+          return "from-rose-500/80 via-rose-400/80 to-rose-500/80";
+        case "treatment":
+          return "from-amber-400/80 via-amber-300/80 to-amber-400/80";
+        case "control":
+          return "from-cyan-400/80 via-cyan-300/80 to-cyan-400/80";
+        default:
+          return "from-sky-500/80 via-indigo-400/80 to-sky-500/80";
+      }
+    };
 
   const getMetricToneStyles = (tone: MetricTone = "default") => {
     switch (tone) {
-      case "success":
-        return "text-emerald-300";
-      case "destructive":
-        return "text-rose-300";
-      case "treatment":
-        return "text-amber-200";
-      case "control":
-        return "text-cyan-200";
-      default:
-        return "text-slate-50";
-    }
-  };
+        case "success":
+          return "text-success";
+        case "destructive":
+          return "text-destructive";
+        case "treatment":
+          return "text-amber-700 dark:text-amber-200";
+        case "control":
+          return "text-cyan-700 dark:text-cyan-200";
+        default:
+          return "text-card-foreground";
+      }
+    };
 
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       {cards.map((card) => (
-        <Card
-          key={card.title}
-          className={`count-up relative h-full min-w-0 overflow-hidden border bg-gradient-to-b via-slate-950/50 to-slate-950/80 text-slate-100 shadow-lg transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl ${getCardStyles(card.variant)}`.trim()}
-        >
-          <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${getAccentGradient(card.variant)}`} />
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold leading-tight text-slate-100">{card.title}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex h-full flex-col gap-3">
-            {renderMetrics(card)}
-            {card.footer ? (
-              <div className="rounded-lg bg-slate-800/60 px-3 py-2 text-xs text-slate-200/80">{card.footer}</div>
-            ) : null}
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
+          <Card
+            key={card.title}
+            className={`count-up relative h-full min-w-0 overflow-hidden border bg-gradient-to-b from-card/95 via-card/90 to-card/95 text-card-foreground shadow-lg transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl ${getCardStyles(card.variant)}`.trim()}
+          >
+            <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${getAccentGradient(card.variant)}`} />
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold leading-tight text-card-foreground">{card.title}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex h-full flex-col gap-3">
+              {renderMetrics(card)}
+              {card.footer ? (
+                <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{card.footer}</div>
+              ) : null}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
 }
