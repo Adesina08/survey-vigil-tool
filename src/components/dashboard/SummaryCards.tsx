@@ -5,8 +5,12 @@ interface SummaryData {
   totalSubmissions: number;
   approvedSubmissions: number;
   approvalRate: number;
-  notApprovedSubmissions: number;
-  notApprovedRate: number;
+  flaggedSubmissions: number;
+  flaggedRate: number;
+  canceledSubmissions: number;
+  canceledRate: number;
+  wrongVersionFlagCount: number;
+  terminatedInterviews: number;
   completionRate: number;
   treatmentPathCount: number;
   controlPathCount: number;
@@ -75,7 +79,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       ],
     },
     {
-      title: "Total submissions",
+      title: "Submissions",
       variant: "default",
       metrics: [
         {
@@ -85,6 +89,16 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             summary.overallTarget > 0
               ? `${formatPercentage(totalSubmissionRate)} of target volume`
               : undefined,
+        },
+        {
+          label: "Wrong version flags",
+          value: formatNumber(summary.wrongVersionFlagCount),
+          helper: "Submissions flagged for using the wrong survey version",
+        },
+        {
+          label: "Terminated interviews",
+          value: formatNumber(summary.terminatedInterviews),
+          helper: "Consent declined (A6 answered No)",
         },
       ],
     },
@@ -100,9 +114,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         },
         {
           label: "Flagged",
-          value: formatNumber(summary.notApprovedSubmissions),
-          helper: `Flag rate: ${formatPercentage(summary.notApprovedRate)}`,
+          value: formatNumber(summary.flaggedSubmissions),
+          helper: `Flag rate: ${formatPercentage(summary.flaggedRate)}`,
           tone: "destructive",
+        },
+        {
+          label: "Canceled",
+          value: formatNumber(summary.canceledSubmissions),
+          helper: `Cancellation rate: ${formatPercentage(summary.canceledRate)}`,
         },
       ],
     },
