@@ -222,9 +222,14 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
   
   // Compute available LGAs from ALL analysis rows (unfiltered)
   const availableLgas = useMemo(() => {
+    const fromPayload = dashboardData.lgas ?? dashboardData.filters?.lgas ?? [];
+    if (Array.isArray(fromPayload) && fromPayload.length > 0) {
+      return fromPayload;
+    }
+
     const set = new Set<string>();
     const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
-    
+
     rows.forEach((row) => {
       const lgaValue =
         getFirstTextValue(row, [
@@ -236,14 +241,14 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
           "local_government",
           "location_lga",
         ]) ?? "";
-      
+
       if (lgaValue && lgaValue.trim().length > 0) {
         set.add(lgaValue.trim());
       }
     });
-    
+
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [dashboardData.analysisRows]);
+  }, [dashboardData.analysisRows, dashboardData.filters?.lgas, dashboardData.lgas]);
 
   // Map submissions - ALWAYS unfiltered (not affected by LGA filter)
   const filteredMapSubmissions = useMemo(() => {

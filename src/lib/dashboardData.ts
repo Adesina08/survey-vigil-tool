@@ -560,6 +560,21 @@ const getRespondentGenderLabel = (row: SheetSubmissionRow): string | null => {
 };
 
 const getLGA = (row: SheetSubmissionRow) => {
+  const lgaCandidates = pickFirstText(row, [
+    "A3. select the LGA",
+    "A3. Select the LGA",
+    "LGA",
+    "lga",
+    "a3_select_the_lga",
+    "local_government_area",
+    "local_government",
+    "location_lga",
+  ]);
+
+  if (lgaCandidates) {
+    return lgaCandidates;
+  }
+
   const candidates = [
     row["A3. select the LGA"],
     row.LGA,
