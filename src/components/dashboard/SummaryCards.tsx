@@ -268,7 +268,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
                 key={metric.label}
                 className="space-y-2 rounded-xl border border-border/60 bg-background/70 p-3 shadow-inner"
               >
-                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                <div className="flex items-center gap-2 text-xs font-semibold leading-tight text-foreground sm:text-sm">
                   {metric.icon ? (
                     <span
                       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/70 ${getMetricToneStyles(
@@ -278,7 +278,9 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
                       <metric.icon className="h-4 w-4" />
                     </span>
                   ) : null}
-                  <span className="min-w-0 leading-snug break-words text-balance">{metric.label}</span>
+                  <span className="min-w-0 leading-tight whitespace-nowrap text-balance sm:leading-snug">
+                    {metric.label}
+                  </span>
                 </div>
                 <div className={`text-3xl font-bold leading-tight tracking-tight ${getMetricToneStyles(metric.tone)}`}>
                   {metric.value}
