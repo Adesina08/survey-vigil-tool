@@ -70,7 +70,7 @@ const quotaTabs: QuotaTabDefinition[] = [
       rows: [
       {
         panel: "TVET",
-        sampleSize: { target: 2000, achieved: null },
+        sampleSize: { target: 1000, achieved: null },
         gender: {
           female: { target: 400, achieved: null },
           male: { target: 600, achieved: null },
@@ -82,7 +82,7 @@ const quotaTabs: QuotaTabDefinition[] = [
       },
       {
         panel: "VCDF / Agric",
-        sampleSize: { target: 2200, achieved: null },
+        sampleSize: { target: 1100, achieved: null },
         gender: {
           female: { target: 440, achieved: null },
           male: { target: 660, achieved: null },
@@ -94,7 +94,7 @@ const quotaTabs: QuotaTabDefinition[] = [
       },
       {
         panel: "COFO",
-        sampleSize: { target: 800, achieved: null },
+        sampleSize: { target: 400, achieved: null },
         gender: {
           female: { target: 120, achieved: null },
           male: { target: 280, achieved: null },
@@ -112,7 +112,7 @@ const quotaTabs: QuotaTabDefinition[] = [
       rows: [
       {
         panel: "TVET",
-        sampleSize: { target: 2000, achieved: null },
+        sampleSize: { target: 1000, achieved: null },
         gender: {
           female: { target: 400, achieved: null },
           male: { target: 600, achieved: null },
@@ -124,7 +124,7 @@ const quotaTabs: QuotaTabDefinition[] = [
       },
       {
         panel: "VCDF / Agric",
-        sampleSize: { target: 2200, achieved: null },
+        sampleSize: { target: 1100, achieved: null },
         gender: {
           female: { target: 440, achieved: null },
           male: { target: 660, achieved: null },
@@ -136,7 +136,7 @@ const quotaTabs: QuotaTabDefinition[] = [
       },
       {
         panel: "COFO",
-        sampleSize: { target: 800, achieved: null },
+        sampleSize: { target: 400, achieved: null },
         gender: {
           female: { target: 120, achieved: null },
           male: { target: 280, achieved: null },
