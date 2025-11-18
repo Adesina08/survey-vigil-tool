@@ -86,7 +86,7 @@ const getPathMetadata = (submission: Submission) => {
     default:
       return {
         color: "#0ea5e9",
-        label: "Path unavailable",
+        label: "Unqualified respondent",
       } as const;
   }
 };
