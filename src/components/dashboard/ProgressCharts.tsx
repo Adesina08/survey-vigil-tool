@@ -11,6 +11,7 @@ interface ProgressChartsProps {
   statusBreakdown: {
     approved: number;
     notApproved: number;
+    canceled?: number;
   };
 }
 

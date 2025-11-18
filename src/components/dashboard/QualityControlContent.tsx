@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { DashboardData } from "@/types/dashboard";
-import { determineApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
+import { determineApprovalCategory } from "@/utils/approval";
 import {
   QUALITY_INDICATOR_COUNT_REGEX,
   QUALITY_INDICATOR_PREFIX_REGEX,
@@ -353,21 +353,10 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       const genderValue = getGenderFromRow(row);
       const consentValue =
         getFirstTextValue(row, ["A6. Consent to participate", "Consent"]) ?? "";
-      const approvalFieldValue = findApprovalFieldValue(row as Record<string, unknown>);
-      const approvalLabel = approvalFieldValue?.value?.toString().trim() ?? "";
-      const approvalLower = approvalLabel.toLowerCase();
-
-      const approvalCategory = (() => {
-        if (!approvalLower) return null;
-        if (approvalLower.includes("cancel")) return "canceled" as const;
-        if (approvalLower.includes("flag")) return "flagged" as const;
-        if (approvalLower.includes("approved") && !approvalLower.includes("not"))
-          return "approved" as const;
-        return null;
-      })();
-
-      if (genderValue === "male") maleCount += 1;
-      else if (genderValue === "female") femaleCount += 1;
+      const approvalCategory = determineApprovalCategory(row as Record<string, unknown>);
+      const isApproved = approvalCategory === "Approved";
+      const isCanceled = approvalCategory === "Canceled";
+      const isNotApproved = approvalCategory === "Not Approved";
 
       if (ogstepPath) {
         pathTotals[ogstepPath] += 1;
@@ -407,14 +396,14 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
         return;
       }
 
-      const approvalStatus = determineApprovalStatus(row);
-      const isApproved = approvalStatus === "Approved" || approvalCategory === "approved";
+      if (genderValue === "male") maleCount += 1;
+      else if (genderValue === "female") femaleCount += 1;
 
-      if (approvalCategory === "canceled") {
+      if (isCanceled) {
         canceledCount += 1;
       } else if (isApproved) {
         approvedCount += 1;
-      } else {
+      } else if (isNotApproved) {
         notApprovedCount += 1;
       }
     });
@@ -480,7 +469,11 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     return {
       summary,
       quotaSummary,
-      statusBreakdown: { approved: approvedCount, notApproved: notApprovedCount },
+      statusBreakdown: {
+        approved: approvedCount,
+        notApproved: notApprovedCount,
+        canceled: canceledCount,
+      },
     };
   }, [
     dashboardData.quotaByLGA,
@@ -503,6 +496,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     let totalSubmissions = 0;
     let approvedCount = 0;
     let notApprovedCount = 0;
+    let canceledCount = 0;
     let maleCount = 0;
     let femaleCount = 0;
 
@@ -656,14 +650,20 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
 
       const existing = productivityMap.get(key)!;
 
-      const approvalStatus = determineApprovalStatus(row);
-      const isApproved = approvalStatus === "Approved";
+      const approvalCategory = determineApprovalCategory(row as Record<string, unknown>);
+      const isApproved = approvalCategory === "Approved";
+      const isCanceled = approvalCategory === "Canceled";
+      const isNotApproved = approvalCategory === "Not Approved";
+
       if (isApproved) {
         existing.validSubmissions += 1;
         approvedCount += 1;
-      } else {
+      } else if (isNotApproved) {
         existing.invalidSubmissions += 1;
         notApprovedCount += 1;
+      } else if (isCanceled) {
+        existing.invalidSubmissions += 1;
+        canceledCount += 1;
       }
       existing.totalSubmissions += 1;
 
@@ -722,7 +722,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       const interviewerEntry = achievementsByInterviewerMap.get(interviewerKey)!;
       interviewerEntry.total += 1;
       if (isApproved) interviewerEntry.approved += 1;
-      else interviewerEntry.notApproved += 1;
+      else if (isNotApproved) interviewerEntry.notApproved += 1;
       if (ogstepPath === "treatment") interviewerEntry.treatmentPathCount += 1;
       else if (ogstepPath === "control") interviewerEntry.controlPathCount += 1;
       else if (ogstepPath === "unknown") interviewerEntry.unknownPathCount += 1;
@@ -743,7 +743,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       const lgaEntry = achievementsByLGAMap.get(lgaKey)!;
       lgaEntry.total += 1;
       if (isApproved) lgaEntry.approved += 1;
-      else lgaEntry.notApproved += 1;
+      else if (isNotApproved) lgaEntry.notApproved += 1;
       if (ogstepPath === "treatment") lgaEntry.treatmentPathCount += 1;
       else if (ogstepPath === "control") lgaEntry.controlPathCount += 1;
       else if (ogstepPath === "unknown") lgaEntry.unknownPathCount += 1;
