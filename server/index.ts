@@ -95,10 +95,27 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
   }
 
   const readTopbreaks = (params: URLSearchParams): string[] => {
-    const candidateKeys = ["topbreak", "topbreaks", "topbreak[]", "topBreak", "topBreaks"];
-    const values = candidateKeys.flatMap((key) => params.getAll(key));
-    const unique = Array.from(new Set(values.map((value) => value?.trim()).filter(Boolean)));
-    return unique;
+    const candidateKeys = new Set(["topbreak", "topbreaks", "topbreak[]", "topBreak", "topBreaks"]);
+
+    for (const key of params.keys()) {
+      if (/topbreak/i.test(key)) {
+        candidateKeys.add(key);
+      }
+    }
+
+    const rawValues = Array.from(candidateKeys).flatMap((key) => params.getAll(key));
+
+    const splitValues = rawValues.flatMap((value) => {
+      if (!value) {
+        return [] as string[];
+      }
+      return value
+        .split(",")
+        .map((part) => part?.trim())
+        .filter((part): part is string => Boolean(part));
+    });
+
+    return Array.from(new Set(splitValues));
   };
 
   if (method === "GET" && parsedUrl.pathname === "/api/analysis/table") {
