@@ -171,7 +171,9 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const renderMetric = (metric: CardMetric) => (
     <div
       key={metric.label}
-      className={`flex flex-col gap-2 ${metric.colSpan ? `col-span-${metric.colSpan}` : ""}`.trim()}
+      className={`flex flex-col items-start gap-2 ${
+        metric.colSpan ? `col-span-${metric.colSpan}` : ""
+      }`.trim()}
     >
       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
         {metric.label}
@@ -206,7 +208,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     const gridColumns = card.metrics.length > 1 ? "grid grid-cols-2" : "grid grid-cols-1";
 
     return (
-      <div className={`${gridColumns} gap-4 sm:gap-6`}>
+      <div className={`${gridColumns} items-start gap-4 sm:gap-6`}>
         {card.metrics.map((metric) => renderMetric(metric))}
       </div>
     );
