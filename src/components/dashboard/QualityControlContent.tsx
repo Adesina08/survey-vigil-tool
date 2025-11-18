@@ -79,21 +79,28 @@ const getAgeBucketFromRow = (row: NormalisedRow): "youth" | "adult" | "unknown" 
     return "adult";
   }
 
+  // 👉 Numeric age (no age grouping in survey)
   const numericMatch = lower.match(/\d+/);
   if (numericMatch) {
     const ageValue = Number.parseInt(numericMatch[0] ?? "", 10);
     if (Number.isFinite(ageValue)) {
-      if (ageValue <= 35) return "youth";
+      // 15–35 → youth
+      if (ageValue >= 15 && ageValue <= 35) return "youth";
+      // >35 → adult
       if (ageValue > 35) return "adult";
+      // anything else (e.g. <15) → unknown
+      return "unknown";
     }
   }
 
+  // Handle answers like "15-24", "36-49" if they ever appear
   const rangeMatch = lower.match(/(\d+)\s*[-–]\s*(\d+)/);
   if (rangeMatch) {
     const upper = Number.parseInt(rangeMatch[2] ?? "", 10);
     if (Number.isFinite(upper)) {
-      if (upper <= 35) return "youth";
+      if (upper >= 15 && upper <= 35) return "youth";
       if (upper > 35) return "adult";
+      return "unknown";
     }
   }
 
@@ -106,6 +113,11 @@ const getFirstTextValue = (row: NormalisedRow, keys: string[]): string | null =>
     const value = row[key];
     if (typeof value === "string" && value.trim().length > 0) {
       return value.trim();
+    }
+
+    // 👇 NEW: handle numeric ages coming directly from Sheets
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
     }
   }
   return null;
