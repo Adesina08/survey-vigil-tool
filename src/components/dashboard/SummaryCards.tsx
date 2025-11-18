@@ -47,8 +47,16 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     return `${percentage.toFixed(1)}% of respondents with recorded gender`;
   };
 
+  const validSubmissions = Math.max(
+    summary.totalSubmissions - summary.terminatedInterviews - summary.wrongVersionFlagCount,
+    0
+  );
+
   const totalSubmissionRate =
     summary.overallTarget > 0 ? (summary.totalSubmissions / summary.overallTarget) * 100 : 0;
+
+  const validSubmissionRate =
+    summary.overallTarget > 0 ? (validSubmissions / summary.overallTarget) * 100 : 0;
 
   type MetricTone = "default" | "success" | "destructive" | "treatment" | "control";
 
@@ -58,6 +66,8 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     helper?: string;
     tone?: MetricTone;
     colSpan?: number;
+    valueClassName?: string;
+    labelClassName?: string;
   }
 
   interface CardConfig {
@@ -84,13 +94,20 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       variant: "default",
       metrics: [
         {
-          label: "Collected interviews",
+          label: "Total submissions",
           value: formatNumber(summary.totalSubmissions),
           helper:
             summary.overallTarget > 0
               ? `${formatPercentage(totalSubmissionRate)} of target volume`
               : "",
-          colSpan: 2,
+        },
+        {
+          label: "Valid submissions",
+          value: formatNumber(validSubmissions),
+          helper:
+            summary.overallTarget > 0
+              ? `${formatPercentage(validSubmissionRate)} of target volume`
+              : "",
         },
         {
           label: "Terminated interviews",
@@ -98,7 +115,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           helper: "",
         },
         {
-          label: "Wrong version flags",
+          label: "Wrong Version",
           value: formatNumber(summary.wrongVersionFlagCount),
           helper: "",
         },
@@ -113,12 +130,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           value: formatNumber(summary.approvedSubmissions),
           helper: `Approval rate: ${formatPercentage(summary.approvalRate)}`,
           tone: "success",
+          valueClassName: "mt-1",
         },
         {
           label: "Not Approved",
           value: formatNumber(summary.notApprovedSubmissions),
           helper: `Not approved rate: ${formatPercentage(summary.notApprovedRate)}`,
           tone: "destructive",
+          labelClassName: "whitespace-nowrap",
         },
         {
           label: "Canceled",
@@ -171,12 +190,22 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const renderMetric = (metric: CardMetric) => (
     <div
       key={metric.label}
-      className={`flex flex-col gap-2 ${metric.colSpan ? `col-span-${metric.colSpan}` : ""}`.trim()}
+      className={`flex flex-col items-start gap-2 ${
+        metric.colSpan ? `col-span-${metric.colSpan}` : ""
+      }`.trim()}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+      <div
+        className={`text-[11px] font-semibold uppercase tracking-wide text-slate-400 ${
+          metric.labelClassName ?? ""
+        }`.trim()}
+      >
         {metric.label}
       </div>
-      <div className={`text-3xl font-semibold leading-tight sm:text-4xl ${getMetricToneStyles(metric.tone)}`}>
+      <div
+        className={`text-3xl font-semibold leading-tight sm:text-4xl ${getMetricToneStyles(
+          metric.tone
+        )} ${metric.valueClassName ?? ""}`.trim()}
+      >
         {metric.value}
       </div>
       <div className="min-h-[18px] text-xs text-slate-400">{metric.helper ?? ""}</div>
@@ -185,18 +214,28 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
 
   const renderMetrics = (card: CardConfig) => {
     if (card.title === "Submissions") {
-      const [collected, ...rest] = card.metrics;
+      const [totalSubmissions, validSubmissionsMetric, ...invalidMetrics] = card.metrics;
 
       return (
-        <div className="space-y-5">
-          {collected ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
-              {renderMetric({ ...collected, colSpan: 2 })}
-            </div>
-          ) : null}
-          {rest.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4 sm:gap-6">
-              {rest.map((metric) => renderMetric(metric))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+            {totalSubmissions ? renderMetric(totalSubmissions) : null}
+            {validSubmissionsMetric ? renderMetric(validSubmissionsMetric) : null}
+          </div>
+          {invalidMetrics.length > 0 ? (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 pb-2">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-200">
+                <span aria-label="Caution" role="img">
+                  🚨
+                </span>
+                <span>Invalid Submissions</span>
+              </div>
+              <div className="grid grid-cols-2 gap-4 sm:gap-6">
+                {invalidMetrics.map((metric) => renderMetric(metric))}
+              </div>
+              <div className="mt-2 text-right text-xs text-amber-200/80">
+                Sum<sub className="text-[10px] align-sub">subscript</sub>
+              </div>
             </div>
           ) : null}
         </div>
@@ -206,7 +245,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     const gridColumns = card.metrics.length > 1 ? "grid grid-cols-2" : "grid grid-cols-1";
 
     return (
-      <div className={`${gridColumns} gap-4 sm:gap-6`}>
+      <div className={`${gridColumns} items-start gap-4 sm:gap-6`}>
         {card.metrics.map((metric) => renderMetric(metric))}
       </div>
     );
@@ -268,7 +307,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold leading-tight text-slate-100">{card.title}</CardTitle>
           </CardHeader>
-          <CardContent className="flex h-full flex-col gap-5">
+          <CardContent className="flex h-full flex-col gap-4">
             {renderMetrics(card)}
             {card.footer ? (
               <div className="rounded-lg bg-slate-800/60 px-3 py-2 text-xs text-slate-200/80">{card.footer}</div>
