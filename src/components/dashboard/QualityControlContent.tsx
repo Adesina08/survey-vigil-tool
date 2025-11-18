@@ -1,4 +1,9 @@
-import { useMemo } from "react";
+const quotaAchievements: QuotaAchievementsByPillar = {
+      treatment: {},
+      control: {},
+    };
+    
+    const productivityMap = new Mapimport { useMemo } from "react";
 import type { DashboardData } from "@/types/dashboard";
 import { determineApprovalStatus } from "@/utils/approval";
 import {
@@ -222,18 +227,40 @@ interface QualityControlContentProps {
 }
 
 export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChange }: QualityControlContentProps) => {
-  // Filter map submissions by selectedLga
-  const filteredMapSubmissions = useMemo(() => {
-    if (!selectedLga) return dashboardData.mapSubmissions || [];
-    return (dashboardData.mapSubmissions || []).filter((submission) =>
-      matchesSelectedLga(submission.lga, selectedLga),
-    );
-  }, [dashboardData.mapSubmissions, selectedLga]);
-
-  // Filter analysis rows by selectedLga
-  const filteredAnalysisRows = useMemo(() => {
+  // Compute available LGAs from ALL analysis rows (unfiltered)
+  const availableLgas = useMemo(() => {
+    const set = new Set<string>();
     const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
-    if (!selectedLga) return rows;
+    
+    rows.forEach((row) => {
+      const lgaValue =
+        getFirstTextValue(row, [
+          "A3. select the LGA",
+          "A3. Select the LGA",
+          "a3_select_the_lga",
+          "lga",
+          "local_government_area",
+          "local_government",
+          "location_lga",
+        ]) ?? "";
+      
+      if (lgaValue && lgaValue.trim().length > 0) {
+        set.add(lgaValue.trim());
+      }
+    });
+    
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [dashboardData.analysisRows]);
+
+  // Map submissions - ALWAYS unfiltered (not affected by LGA filter)
+  const filteredMapSubmissions = useMemo(() => {
+    return dashboardData.mapSubmissions || [];
+  }, [dashboardData.mapSubmissions]);
+
+  // Analysis rows for KPI cards - filtered by selectedLga
+  const filteredAnalysisRowsForKPI = useMemo(() => {
+    const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
+    if (!selectedLga || selectedLga === "all") return rows;
 
     return rows.filter((row) => {
       const lgaValue =
@@ -249,6 +276,11 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       return matchesSelectedLga(lgaValue, selectedLga);
     });
   }, [dashboardData.analysisRows, selectedLga]);
+
+  // Analysis rows for other components - ALWAYS unfiltered
+  const allAnalysisRows = useMemo(() => {
+    return (dashboardData.analysisRows || []) as NormalisedRow[];
+  }, [dashboardData.analysisRows]);
 
   const allQualityFlagSlugs = useMemo(() => {
     const slugs = new Set<string>();
@@ -289,6 +321,98 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     summary,
     quotaSummary,
     statusBreakdown,
+  } = useMemo(() => {
+    const relevantQuotaByLGA = selectedLga && selectedLga !== "all"
+      ? (dashboardData.quotaByLGA || []).filter((row) => matchesSelectedLga(row.lga, selectedLga))
+      : dashboardData.quotaByLGA || [];
+
+    const rows = filteredAnalysisRowsForKPI as NormalisedRow[];
+    let totalSubmissions = 0;
+    let approvedCount = 0;
+    let notApprovedCount = 0;
+    let maleCount = 0;
+    let femaleCount = 0;
+
+    const pathTotals: Record<OgstepPath, number> = { treatment: 0, control: 0, unknown: 0 };
+
+    rows.forEach((row) => {
+      totalSubmissions += 1;
+
+      const ogstepPath = getOgstepPathFromRow(row);
+      const genderValue = getGenderFromRow(row);
+      
+      if (genderValue === "male") maleCount += 1;
+      else if (genderValue === "female") femaleCount += 1;
+
+      pathTotals[ogstepPath] += 1;
+
+      const approvalStatus = determineApprovalStatus(row);
+      const isApproved = approvalStatus === "Approved";
+      
+      if (isApproved) {
+        approvedCount += 1;
+      } else {
+        notApprovedCount += 1;
+      }
+    });
+
+    const totalTarget = selectedLga && selectedLga !== "all"
+      ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
+      : dashboardData.summary?.overallTarget || 0;
+
+    const approvedAgainstTarget = selectedLga && selectedLga !== "all"
+      ? relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0)
+      : approvedCount;
+
+    const completionRate =
+      totalTarget > 0 ? Number(((approvedAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
+
+    const submissionsAgainstTarget = totalSubmissions;
+    const submissionProgressPercent =
+      totalTarget > 0 ? Number(((submissionsAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
+
+    const quotaSummary = {
+      achieved: submissionsAgainstTarget,
+      remaining: Math.max(totalTarget - submissionsAgainstTarget, 0),
+      target: totalTarget,
+      achievedPercent: submissionProgressPercent,
+    };
+
+    const approvalRatePercent =
+      totalSubmissions > 0 ? Number(((approvedCount / totalSubmissions) * 100).toFixed(1)) : 0;
+
+    const notApprovedRatePercent =
+      totalSubmissions > 0 ? Number(((notApprovedCount / totalSubmissions) * 100).toFixed(1)) : 0;
+
+    const summary = {
+      overallTarget: totalTarget,
+      totalSubmissions,
+      approvedSubmissions: approvedCount,
+      approvalRate: approvalRatePercent,
+      notApprovedSubmissions: notApprovedCount,
+      notApprovedRate: notApprovedRatePercent,
+      completionRate,
+      treatmentPathCount: pathTotals.treatment,
+      controlPathCount: pathTotals.control,
+      unknownPathCount: pathTotals.unknown,
+      maleCount,
+      femaleCount,
+    };
+
+    return {
+      summary,
+      quotaSummary,
+      statusBreakdown: { approved: approvedCount, notApproved: notApprovedCount },
+    };
+  }, [
+    dashboardData.quotaByLGA,
+    dashboardData.summary,
+    filteredAnalysisRowsForKPI,
+    selectedLga,
+  ]);
+
+  // Compute other metrics from UNFILTERED data
+  const {
     productivity,
     errorBreakdown,
     achievementsByInterviewer,
@@ -297,17 +421,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     errorLabels,
     quotaAchievementsByPillar,
   } = useMemo(() => {
-    const relevantQuotaByLGA = selectedLga
-      ? (dashboardData.quotaByLGA || []).filter((row) => matchesSelectedLga(row.lga, selectedLga))
-      : dashboardData.quotaByLGA || [];
-    const relevantQuotaByLGAAge = selectedLga
-      ? (dashboardData.quotaByLGAAge || []).filter((row) => matchesSelectedLga(row.lga, selectedLga))
-      : dashboardData.quotaByLGAAge || [];
-    const relevantQuotaByLGAGender = selectedLga
-      ? (dashboardData.quotaByLGAGender || []).filter((row) => matchesSelectedLga(row.lga, selectedLga))
-      : dashboardData.quotaByLGAGender || [];
-
-    const rows = filteredAnalysisRows as NormalisedRow[];
+    const rows = allAnalysisRows as NormalisedRow[];
     let totalSubmissions = 0;
     let approvedCount = 0;
     let notApprovedCount = 0;
@@ -320,8 +434,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     const quotaAchievements: QuotaAchievementsByPillar = {
       treatment: {},
       control: {},
-    };
-    const productivityMap = new Map<
+    };<
       string,
       {
         interviewerId: string;
@@ -579,11 +692,11 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
       }))
       .sort((a, b) => a.lga.localeCompare(b.lga));
 
-    const totalTarget = selectedLga
+    const totalTarget = selectedLga && selectedLga !== "all"
       ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
       : dashboardData.summary?.overallTarget || 0;
 
-    const approvedAgainstTarget = selectedLga
+    const approvedAgainstTarget = selectedLga && selectedLga !== "all"
       ? relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0)
       : approvedCount;
 
@@ -660,24 +773,16 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     );
 
     return {
-      summary,
-      quotaSummary,
-      statusBreakdown: { approved: approvedCount, notApproved: notApprovedCount },
       productivity,
       errorBreakdown,
       achievementsByInterviewer,
       achievementsByLGA,
       errorTypes: errorBreakdown.map((item) => item.code),
       errorLabels: errorLabelLookup,
-      quotaAchievementsByPillar: quotaAchievements, // NEW
+      quotaAchievementsByPillar: quotaAchievements,
     };
   }, [
-    dashboardData.quotaByLGA,
-    dashboardData.quotaByLGAAge,
-    dashboardData.quotaByLGAGender,
-    dashboardData.summary,
-    filteredAnalysisRows,
-    selectedLga,
+    allAnalysisRows,
     allQualityFlagSlugs,
     dashboardData.filters?.errorTypes,
   ]);
@@ -686,11 +791,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga, onFilterChan
     <div className="space-y-8">
       <FilterControls
         selectedLga={selectedLga}
-        lgas={
-          Array.isArray(dashboardData.lgas) && dashboardData.lgas.length > 0
-            ? dashboardData.lgas
-            : dashboardData.filters?.lgas || []
-        }
+        lgas={availableLgas}
         onFilterChange={onFilterChange}
       />
       <div className="space-y-1">
