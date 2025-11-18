@@ -47,16 +47,16 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     return `${percentage.toFixed(1)}% of respondents with recorded gender`;
   };
 
+  const validSubmissions = Math.max(
+    summary.totalSubmissions - summary.terminatedInterviews - summary.wrongVersionFlagCount,
+    0
+  );
+
   const totalSubmissionRate =
     summary.overallTarget > 0 ? (summary.totalSubmissions / summary.overallTarget) * 100 : 0;
 
   const validSubmissionRate =
     summary.overallTarget > 0 ? (validSubmissions / summary.overallTarget) * 100 : 0;
-
-  const validSubmissions = Math.max(
-    summary.totalSubmissions - summary.terminatedInterviews - summary.wrongVersionFlagCount,
-    0
-  );
 
   type MetricTone = "default" | "success" | "destructive" | "treatment" | "control";
 
