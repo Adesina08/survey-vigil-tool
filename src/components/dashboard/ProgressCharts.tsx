@@ -50,7 +50,7 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
       <Card className="slide-in overflow-hidden border-none shadow-lg shadow-primary/10">
         <CardHeader className="bg-gradient-to-r from-primary to-primary/70 text-primary-foreground">
           <CardTitle>Quota Progress</CardTitle>
-          <CardDescription className="text-primary-foreground/90">
+          <CardDescription className="text-primary-foreground/90 text-sm">
             Monitor how fieldwork is tracking against the planned target and where effort should shift next.
           </CardDescription>
         </CardHeader>
