@@ -369,16 +369,16 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
   const tabsWithAchievements = applyAchievementsToQuotaTabs(quotaTabs, achievements);
 
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="flex flex-col gap-2 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+    <Card className="overflow-hidden border-none shadow-lg shadow-primary/10">
+      <CardHeader className="flex flex-col gap-2 space-y-0 bg-gradient-to-r from-primary to-primary/70 text-primary-foreground sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Quota Tracker</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-primary-foreground/90">
             Targets vs achieved interviews by pillar, gender, and age for Treatment and Control.
           </CardDescription>
         </div>
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           className="mt-2 inline-flex items-center gap-2 sm:mt-0"
           onClick={() => exportToExcel(tabsWithAchievements)}

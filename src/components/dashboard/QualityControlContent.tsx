@@ -375,14 +375,12 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       const approvalStatus = determineApprovalStatus(row);
       const isApproved = approvalStatus === "Approved" || approvalCategory === "approved";
 
-      if (isApproved) {
+      if (approvalCategory === "canceled") {
+        canceledCount += 1;
+      } else if (isApproved) {
         approvedCount += 1;
       } else {
         notApprovedCount += 1;
-      }
-
-      if (approvalCategory === "canceled") {
-        canceledCount += 1;
       }
 
       const consentLower = consentValue.trim().toLowerCase();
