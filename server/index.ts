@@ -94,11 +94,36 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
     return;
   }
 
+  const readTopbreaks = (params: URLSearchParams): string[] => {
+    const candidateKeys = new Set(["topbreak", "topbreaks", "topbreak[]", "topBreak", "topBreaks"]);
+
+    for (const key of params.keys()) {
+      if (/topbreak/i.test(key)) {
+        candidateKeys.add(key);
+      }
+    }
+
+    const rawValues = Array.from(candidateKeys).flatMap((key) => params.getAll(key));
+
+    const splitValues = rawValues.flatMap((value) => {
+      if (!value) {
+        return [] as string[];
+      }
+      return value
+        .split(",")
+        .map((part) => part?.trim())
+        .filter((part): part is string => Boolean(part));
+    });
+
+    return Array.from(new Set(splitValues));
+  };
+
   if (method === "GET" && parsedUrl.pathname === "/api/analysis/table") {
     try {
+      const topbreaks = readTopbreaks(parsedUrl.searchParams);
       const params = Object.fromEntries(parsedUrl.searchParams.entries());
       const table = await generateAnalysisTable({
-        topbreak: params.topbreak ?? null,
+        topbreaks: topbreaks.length > 0 ? topbreaks : params.topbreak ? [params.topbreak] : null,
         variable: params.variable ?? null,
         stat: params.stat ?? null,
         limitCategories: params.limit_categories ?? null,

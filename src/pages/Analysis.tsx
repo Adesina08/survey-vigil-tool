@@ -27,7 +27,7 @@ const DISPLAY_MODES: { label: string; value: DisplayMode; description: string }[
   { label: "Total %", value: "totalpct", description: "Share of all included interviews" },
 ];
 
-const selectStyles: StylesConfig<Option, false, GroupBase<Option>> = {
+const selectStyles: StylesConfig<Option, true, GroupBase<Option>> = {
   control: (provided) => ({
     ...provided,
     borderRadius: "0.75rem",
@@ -102,8 +102,9 @@ const formatStatLabel = (stat: string): string => {
 };
 
 const describeMeta = (meta: AnalysisResult["tables"][number]["meta"]): string => {
-  if (meta.topbreak) {
-    return `${formatFieldLabel(meta.variable)} by ${formatFieldLabel(meta.topbreak)}`;
+  if (meta.topbreaks?.length) {
+    const topBreakLabel = meta.topbreaks.map(formatFieldLabel).join(", ");
+    return `${formatFieldLabel(meta.variable)} by ${topBreakLabel}`;
   }
   return `Distribution of ${formatFieldLabel(meta.variable)}`;
 };
@@ -112,8 +113,8 @@ const Analysis = () => {
   const [schema, setSchema] = useState<AnalysisSchema | null>(null);
   const [schemaError, setSchemaError] = useState<string | null>(null);
   const [isSchemaLoading, setIsSchemaLoading] = useState(true);
-  const [topBreakSelection, setTopBreakSelection] = useState<Option | null>(null);
-  const [sideBreakSelection, setSideBreakSelection] = useState<Option | null>(null);
+  const [topBreakSelection, setTopBreakSelection] = useState<Option[]>([]);
+  const [sideBreakSelection, setSideBreakSelection] = useState<Option[]>([]);
   const [mode, setMode] = useState<DisplayMode>(DISPLAY_MODES[0].value);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,10 +130,10 @@ const Analysis = () => {
       .then((data) => {
         setSchema(data);
         if (data.topbreak_candidates.length > 0) {
-          setTopBreakSelection(toOption(data.topbreak_candidates[0]));
+          setTopBreakSelection([toOption(data.topbreak_candidates[0])]);
         }
         if (data.categorical_candidates.length > 0) {
-          setSideBreakSelection(toOption(data.categorical_candidates[0]));
+          setSideBreakSelection([toOption(data.categorical_candidates[0])]);
         }
       })
       .catch((err) => {
@@ -163,11 +164,11 @@ const Analysis = () => {
   const sideBreakOptions = useMemo(() => buildVariableOptions(schema), [schema]);
 
   const handleGenerate = async () => {
-    if (!topBreakSelection) {
+    if (topBreakSelection.length === 0) {
       setError("Select a top-break variable to continue.");
       return;
     }
-    if (!sideBreakSelection) {
+    if (sideBreakSelection.length === 0) {
       setError("Select a variable to analyse.");
       return;
     }
@@ -177,8 +178,8 @@ const Analysis = () => {
 
     try {
       const response = await generateAnalysis({
-        topBreak: topBreakSelection.value,
-        variables: [sideBreakSelection.value],
+        topBreaks: topBreakSelection.map((option) => option.value),
+        variables: sideBreakSelection.map((option) => option.value),
         mode,
       });
       setAnalysis(response);
@@ -193,8 +194,8 @@ const Analysis = () => {
   const handleReset = () => {
     const defaultTopBreak = topBreakOptions[0] ?? null;
     const defaultVariable = sideBreakOptions[0]?.options?.[0] ?? null;
-    setTopBreakSelection(defaultTopBreak);
-    setSideBreakSelection(defaultVariable ?? null);
+    setTopBreakSelection(defaultTopBreak ? [defaultTopBreak] : []);
+    setSideBreakSelection(defaultVariable ? [defaultVariable] : []);
     setMode(DISPLAY_MODES[0].value);
     setAnalysis(null);
     setError(null);
@@ -274,14 +275,14 @@ const Analysis = () => {
                 <h3 className="text-sm font-medium">Top break (columns)</h3>
                 <Badge variant="secondary">Recommended</Badge>
               </div>
-              <Select<Option, false, GroupBase<Option>>
+              <Select<Option, true, GroupBase<Option>>
                 closeMenuOnSelect
                 components={animatedComponents}
-                isMulti={false}
+                isMulti
                 options={topBreakOptions}
                 value={topBreakSelection}
                 styles={selectStyles}
-                onChange={(value) => setTopBreakSelection(value as Option)}
+                onChange={(value) => setTopBreakSelection((value as Option[]) ?? [])}
                 placeholder={isSchemaLoading ? "Loading options..." : "Choose respondent attribute"}
                 isDisabled={isSchemaLoading || topBreakOptions.length === 0}
               />
@@ -291,14 +292,14 @@ const Analysis = () => {
                 <h3 className="text-sm font-medium">Variables (rows)</h3>
                 <Badge variant="secondary">Dataset</Badge>
               </div>
-              <Select<Option, false, GroupBase<Option>>
+              <Select<Option, true, GroupBase<Option>>
                 closeMenuOnSelect
                 components={animatedComponents}
-                isMulti={false}
+                isMulti
                 options={sideBreakOptions}
                 value={sideBreakSelection}
                 styles={selectStyles}
-                onChange={(value) => setSideBreakSelection((value as Option) ?? null)}
+                onChange={(value) => setSideBreakSelection((value as Option[]) ?? [])}
                 placeholder={isSchemaLoading ? "Loading variables..." : "Choose outcome indicator"}
                 isDisabled={isSchemaLoading || sideBreakOptions.length === 0}
               />
@@ -388,7 +389,10 @@ const Analysis = () => {
 
           <div ref={tableContainerRef} className="space-y-6">
             {analysis.tables.map((table) => (
-              <Card key={`${table.meta.variable}-${table.meta.topbreak ?? "overall"}`} className="overflow-hidden">
+              <Card
+                key={`${table.meta.variable}-${table.meta.topbreaks?.join("-") ?? "overall"}`}
+                className="overflow-hidden"
+              >
                 <CardHeader>
                   <CardTitle>{describeMeta(table.meta)}</CardTitle>
                   <CardDescription>
