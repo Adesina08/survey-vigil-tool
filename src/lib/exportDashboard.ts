@@ -78,7 +78,7 @@ const toSheetValue = (
   return String(value);
 };
 
-const buildHeaderOrder = (rows: DashboardExportRow[], stopKey?: string): string[] => {
+const buildHeaderOrder = (rows: DashboardExportRow[]): string[] => {
   const seen = new Set<string>();
   const order: string[] = [];
 
@@ -90,13 +90,6 @@ const buildHeaderOrder = (rows: DashboardExportRow[], stopKey?: string): string[
       }
     });
   });
-
-  if (stopKey) {
-    const stopIndex = order.findIndex((key) => key === stopKey);
-    if (stopIndex >= 0) {
-      return order.slice(0, stopIndex + 1);
-    }
-  }
 
   return order;
 };
@@ -166,17 +159,6 @@ const triggerWorkbookDownload = async (
   }
 };
 
-const trimRowToIndex = (row: DashboardExportRow): DashboardExportRow => {
-  const output: DashboardExportRow = {};
-  for (const [key, value] of Object.entries(row)) {
-    output[key] = value;
-    if (key === "_index") {
-      break;
-    }
-  }
-  return output;
-};
-
 const normaliseApproval = (value: unknown): string => {
   if (typeof value !== "string") {
     return "";
@@ -204,18 +186,18 @@ const createSheetLabel = (label: string) =>
   );
 
 const prepareRows = (rows: DashboardExportRow[]): DashboardExportRow[] =>
-  rows.map(trimRowToIndex);
+  rows.map((row) => ({ ...row }));
 
 export const createDashboardExcelExporter = ({
   rows,
   errorBreakdown = [],
 }: ExporterOptions): DashboardExcelExporter => {
   const preparedRows = prepareRows(Array.isArray(rows) ? rows : []);
-  const baseHeaders = buildHeaderOrder(preparedRows, "_index");
+  const baseHeaders = buildHeaderOrder(preparedRows);
 
   const download = (label: string, dataset: DashboardExportRow[]) => {
     const trimmed = prepareRows(dataset);
-    const headersToUse = baseHeaders.length > 0 ? baseHeaders : buildHeaderOrder(trimmed, "_index");
+    const headersToUse = baseHeaders.length > 0 ? baseHeaders : buildHeaderOrder(trimmed);
 
     if (headersToUse.length === 0) {
       console.warn(`No headers available for ${label} export.`);

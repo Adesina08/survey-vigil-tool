@@ -5,8 +5,8 @@ interface SummaryData {
   totalSubmissions: number;
   approvedSubmissions: number;
   approvalRate: number;
-  flaggedSubmissions: number;
-  flaggedRate: number;
+  notApprovedSubmissions: number;
+  notApprovedRate: number;
   canceledSubmissions: number;
   canceledRate: number;
   wrongVersionFlagCount: number;
@@ -69,7 +69,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
 
   const cards: CardConfig[] = [
     {
-      title: "Target interviews",
+      title: "Target Interviews",
       variant: "default",
       metrics: [
         {
@@ -89,21 +89,23 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           helper:
             summary.overallTarget > 0
               ? `${formatPercentage(totalSubmissionRate)} of target volume`
-              : undefined,
+              : "",
           colSpan: 2,
         },
         {
           label: "Terminated interviews",
           value: formatNumber(summary.terminatedInterviews),
+          helper: "",
         },
         {
           label: "Wrong version flags",
           value: formatNumber(summary.wrongVersionFlagCount),
+          helper: "",
         },
       ],
     },
     {
-      title: "Interview outcomes",
+      title: "Interview Outcomes",
       variant: "success",
       metrics: [
         {
@@ -113,9 +115,9 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           tone: "success",
         },
         {
-          label: "Flagged",
-          value: formatNumber(summary.flaggedSubmissions),
-          helper: `Flag rate: ${formatPercentage(summary.flaggedRate)}`,
+          label: "Not Approved",
+          value: formatNumber(summary.notApprovedSubmissions),
+          helper: `Not approved rate: ${formatPercentage(summary.notApprovedRate)}`,
           tone: "destructive",
         },
         {
@@ -126,7 +128,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       ],
     },
     {
-      title: "OGSTEP paths",
+      title: "OGSTEP Paths",
       variant: "treatment",
       metrics: [
         {
@@ -144,11 +146,12 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         {
           label: "Unqualified Respondent",
           value: formatNumber(summary.unknownPathCount),
+          helper: "",
         },
       ],
     },
     {
-      title: "Gender distribution",
+      title: "Gender Distribution",
       variant: "default",
       metrics: [
         {
@@ -168,7 +171,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
   const renderMetric = (metric: CardMetric) => (
     <div
       key={metric.label}
-      className={`space-y-1 ${metric.colSpan ? `col-span-${metric.colSpan}` : ""}`.trim()}
+      className={`flex flex-col gap-2 ${metric.colSpan ? `col-span-${metric.colSpan}` : ""}`.trim()}
     >
       <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
         {metric.label}
@@ -176,7 +179,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       <div className={`text-3xl font-semibold leading-tight sm:text-4xl ${getMetricToneStyles(metric.tone)}`}>
         {metric.value}
       </div>
-      {metric.helper ? <div className="text-xs text-slate-400">{metric.helper}</div> : null}
+      <div className="min-h-[18px] text-xs text-slate-400">{metric.helper ?? ""}</div>
     </div>
   );
 
@@ -185,10 +188,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       const [collected, ...rest] = card.metrics;
 
       return (
-        <div className="space-y-4">
-          {collected ? <div className="grid grid-cols-1">{renderMetric(collected)}</div> : null}
+        <div className="space-y-5">
+          {collected ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+              {renderMetric({ ...collected, colSpan: 2 })}
+            </div>
+          ) : null}
           {rest.length > 0 ? (
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-2 gap-4 sm:gap-6">
               {rest.map((metric) => renderMetric(metric))}
             </div>
           ) : null}
@@ -196,8 +203,10 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       );
     }
 
+    const gridColumns = card.metrics.length > 1 ? "grid grid-cols-2" : "grid grid-cols-1";
+
     return (
-      <div className={card.metrics.length > 1 ? "grid grid-cols-2 gap-6" : "space-y-3"}>
+      <div className={`${gridColumns} gap-4 sm:gap-6`}>
         {card.metrics.map((metric) => renderMetric(metric))}
       </div>
     );
@@ -259,7 +268,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold leading-tight text-slate-100">{card.title}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="flex h-full flex-col gap-5">
             {renderMetrics(card)}
             {card.footer ? (
               <div className="rounded-lg bg-slate-800/60 px-3 py-2 text-xs text-slate-200/80">{card.footer}</div>
