@@ -1,3 +1,4 @@
+import { determineApprovalStatus } from "@/utils/approval";
 import { formatErrorLabel } from "@/lib/utils";
 
 type SheetJS = typeof import("xlsx");
@@ -159,13 +160,6 @@ const triggerWorkbookDownload = async (
   }
 };
 
-const normaliseApproval = (value: unknown): string => {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return value.trim().toLowerCase();
-};
-
 const formatCurrentDateLabel = () => {
   const now = new Date();
   const year = now.getFullYear();
@@ -232,12 +226,16 @@ export const createDashboardExcelExporter = ({
     exportApproved: () =>
       download(
         "ApprovedData",
-        (rows ?? []).filter((row) => normaliseApproval(row["Approval"]) === "approved"),
+        (rows ?? []).filter(
+          (row) => determineApprovalStatus(row as Record<string, unknown>) === "Approved",
+        ),
       ),
     exportNotApproved: () =>
       download(
         "NotApprovedData",
-        (rows ?? []).filter((row) => normaliseApproval(row["Approval"]) === "not approved"),
+        (rows ?? []).filter(
+          (row) => determineApprovalStatus(row as Record<string, unknown>) === "Not Approved",
+        ),
       ),
     exportErrorFlags: downloadErrorBreakdown,
   };
