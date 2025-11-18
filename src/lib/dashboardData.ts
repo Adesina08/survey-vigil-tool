@@ -15,7 +15,11 @@ import {
   extractQualityIndicatorCounts,
   collectQualityIndicatorLabels,
 } from "@/utils/errors";
-import { determineApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
+import {
+  determineApprovalCategory,
+  determineApprovalStatus,
+  findApprovalFieldValue,
+} from "@/utils/approval";
 import {
   normalizeMapMetadata,
   type MapMetadataConfig,
@@ -68,6 +72,9 @@ interface SummaryData {
   approvalRate: number;
   notApprovedSubmissions: number;
   notApprovedRate: number;
+  canceledSubmissions: number;
+  canceledRate: number;
+  validSubmissions: number;
   completionRate: number;
   latestSubmissionTime?: string | null;
   treatmentPathCount: number;
@@ -80,6 +87,7 @@ interface SummaryData {
 interface StatusBreakdown {
   approved: number;
   notApproved: number;
+  canceled: number;
 }
 
 interface PathCounts {
@@ -159,12 +167,10 @@ function buildUserProductivity(submissions: SheetSubmissionRow[]): ProductivityR
 
     existing.total += 1;
 
-    const approvalStatus = determineApprovalStatus(
-      row as unknown as Record<string, unknown>,
-    );
-    if (approvalStatus === "Approved") {
+    const approvalCategory = determineApprovalCategory(row as unknown as Record<string, unknown>);
+    if (approvalCategory === "Approved") {
       existing.approved += 1;
-    } else {
+    } else if (approvalCategory === "Not Approved") {
       existing.flagged += 1;
     }
 
@@ -742,6 +748,7 @@ export const buildDashboardData = ({
   let latestTimestamp: Date | null = null;
   let maleCount = 0;
   let femaleCount = 0;
+  let canceledCount = 0;
 
   processedSubmissions.forEach((row) => {
     const state = row.State ?? "Unknown State";
@@ -852,6 +859,15 @@ export const buildDashboardData = ({
     const consentValue = pickFirstText(row, ["A6. Consent to participate", "Consent"]);
     const qcStatusLabel = pickFirstText(row, ["QC Status", "qc_status"]);
 
+    const approvalCategory = determineApprovalCategory(row as unknown as Record<string, unknown>);
+    const isApproved = approvalCategory === "Approved";
+    const isNotApproved = approvalCategory === "Not Approved";
+    const isCanceled = approvalCategory === "Canceled";
+
+    if (isCanceled) {
+      canceledCount += 1;
+    }
+
     const genderValue = getGender(row);
     if (genderValue === "male") {
       maleCount += 1;
@@ -900,8 +916,6 @@ export const buildDashboardData = ({
     interviewerNames.set(interviewerId, interviewerName);
     const interviewerError = interviewerErrors.get(interviewerId) ?? {};
 
-    const isApproved = approvalStatus === "Approved";
-
     if (isApproved) {
       incrementMap(approvedByState, state);
       incrementMap(approvedByStateAge, `${state}|${ageGroup}`);
@@ -912,7 +926,7 @@ export const buildDashboardData = ({
         incrementMap(approvedByLGAAge, `${state}|${lga}|${ageGroup}`);
         incrementMap(approvedByLGAGender, `${state}|${lga}|${gender}`);
       }
-    } else {
+    } else if (isNotApproved) {
       incrementMap(notApprovedByState, state);
       incrementMap(notApprovedByInterviewer, interviewerId);
       if (hasValidLGA) {
@@ -1013,6 +1027,8 @@ export const buildDashboardData = ({
 
   const totalApproved = metrics.approved;
   const totalNotApproved = metrics.notApproved;
+  const totalCanceled = metrics.canceled;
+  const validSubmissions = metrics.valid;
 
   const effectiveStateTargets =
     stateTargets.length > 0
@@ -1051,8 +1067,9 @@ export const buildDashboardData = ({
     0
   );
 
-  const approvalRate = totalSubmissions > 0 ? (totalApproved / totalSubmissions) * 100 : 0;
-  const notApprovedRate = totalSubmissions > 0 ? (totalNotApproved / totalSubmissions) * 100 : 0;
+  const approvalRate = validSubmissions > 0 ? (totalApproved / validSubmissions) * 100 : 0;
+  const notApprovedRate = validSubmissions > 0 ? (totalNotApproved / validSubmissions) * 100 : 0;
+  const canceledRate = validSubmissions > 0 ? (totalCanceled / validSubmissions) * 100 : 0;
 
   const quotaProgress = overallTarget > 0 ? (totalApproved / overallTarget) * 100 : 0;
 
@@ -1244,6 +1261,9 @@ export const buildDashboardData = ({
     approvalRate: Number(approvalRate.toFixed(1)),
     notApprovedSubmissions: totalNotApproved,
     notApprovedRate: Number(notApprovedRate.toFixed(1)),
+    canceledSubmissions: totalCanceled,
+    canceledRate: Number(canceledRate.toFixed(1)),
+    validSubmissions,
     completionRate: Number(quotaProgress.toFixed(1)),
     treatmentPathCount: ogstepTotals.treatment,
     controlPathCount: ogstepTotals.control,
@@ -1255,6 +1275,7 @@ export const buildDashboardData = ({
   const statusBreakdown: StatusBreakdown = {
     approved: totalApproved,
     notApproved: totalNotApproved,
+    canceled: totalCanceled,
   };
 
   const sortedMapSubmissions = mapSubmissions
@@ -1355,6 +1376,9 @@ function createEmptyDashboardData(): DashboardData {
       approvalRate: 0,
       notApprovedSubmissions: 0,
       notApprovedRate: 0,
+      canceledSubmissions: 0,
+      canceledRate: 0,
+      validSubmissions: 0,
       completionRate: 0,
       treatmentPathCount: 0,
       controlPathCount: 0,
@@ -1365,6 +1389,7 @@ function createEmptyDashboardData(): DashboardData {
     statusBreakdown: {
       approved: 0,
       notApproved: 0,
+      canceled: 0,
     },
     quotaProgress: 0,
     quotaByLGA: [],

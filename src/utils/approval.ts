@@ -1,4 +1,5 @@
 export type NormalisedApprovalStatus = "Approved" | "Not Approved";
+export type NormalisedApprovalCategory = NormalisedApprovalStatus | "Canceled";
 
 const truthyTokens = new Set([
   "approved",
@@ -18,6 +19,14 @@ const falsyTokens = new Set([
   "false",
   "no",
   "0",
+]);
+
+const cancellationTokens = new Set([
+  "cancel",
+  "canceled",
+  "cancelled",
+  "cancellation",
+  "cancelation",
 ]);
 
 const normaliseCandidate = (value: unknown): NormalisedApprovalStatus | null => {
@@ -53,6 +62,28 @@ const normaliseCandidate = (value: unknown): NormalisedApprovalStatus | null => 
   }
 
   return null;
+};
+
+const normaliseCandidateWithCancellation = (
+  value: unknown,
+): NormalisedApprovalCategory | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    const cleaned = value.trim();
+    if (!cleaned) {
+      return null;
+    }
+
+    const lower = cleaned.toLowerCase();
+    if ([...cancellationTokens].some((token) => lower.includes(token))) {
+      return "Canceled";
+    }
+  }
+
+  return normaliseCandidate(value);
 };
 
 export const APPROVAL_FIELD_CANDIDATES = [
@@ -130,6 +161,38 @@ export const determineApprovalStatus = (
     "isValid" in qualityMetadata
   ) {
     const metaValid = normaliseCandidate(
+      (qualityMetadata as Record<string, unknown>).isValid,
+    );
+    if (metaValid) {
+      return metaValid;
+    }
+  }
+
+  return "Not Approved";
+};
+
+export const determineApprovalCategory = (
+  row: Record<string, unknown>,
+): NormalisedApprovalCategory => {
+  for (const key of APPROVAL_FIELD_CANDIDATES) {
+    if (!(key in row)) {
+      continue;
+    }
+
+    const value = (row as Record<string, unknown>)[key];
+    const status = normaliseCandidateWithCancellation(value);
+    if (status) {
+      return status;
+    }
+  }
+
+  const qualityMetadata = row.qualityMetadata;
+  if (
+    qualityMetadata &&
+    typeof qualityMetadata === "object" &&
+    "isValid" in qualityMetadata
+  ) {
+    const metaValid = normaliseCandidateWithCancellation(
       (qualityMetadata as Record<string, unknown>).isValid,
     );
     if (metaValid) {
