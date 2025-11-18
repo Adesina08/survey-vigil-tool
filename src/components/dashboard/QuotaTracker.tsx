@@ -124,26 +124,26 @@ const quotaTabs: QuotaTabDefinition[] = [
       },
       {
         panel: "VCDF / Agric",
-        sampleSize: { target: 2000, achieved: null },
+        sampleSize: { target: 2200, achieved: null },
         gender: {
-          female: { target: 400, achieved: null },
-          male: { target: 600, achieved: null },
+          female: { target: 440, achieved: null },
+          male: { target: 660, achieved: null },
         },
         age: {
-          youth: { target: 500, achieved: null },
-          adult: { target: 500, achieved: null },
+          youth: { target: 550, achieved: null },
+          adult: { target: 550, achieved: null },
         },
       },
       {
         panel: "COFO",
-        sampleSize: { target: 780, achieved: null },
+        sampleSize: { target: 800, achieved: null },
         gender: {
-          female: { target: 200, achieved: null },
-          male: { target: 200, achieved: null },
+          female: { target: 120, achieved: null },
+          male: { target: 280, achieved: null },
         },
         age: {
-          youth: { target: 390, achieved: null },
-          adult: { target: 390, achieved: null },
+          youth: { target: 160, achieved: null },
+          adult: { target: 240, achieved: null },
         },
       },
     ],
