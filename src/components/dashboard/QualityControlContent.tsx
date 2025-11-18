@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { DashboardData } from "@/types/dashboard";
-import { determineApprovalStatus } from "@/utils/approval";
+import { determineApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
 import {
   QUALITY_INDICATOR_COUNT_REGEX,
   QUALITY_INDICATOR_PREFIX_REGEX,
@@ -316,11 +316,15 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       relevantQuotaCount: relevantQuotaByLGA.length 
     });
     
-    let totalSubmissions = 0;
+    let totalRows = 0;
     let approvedCount = 0;
+    let flaggedCount = 0;
+    let canceledCount = 0;
     let notApprovedCount = 0;
     let maleCount = 0;
     let femaleCount = 0;
+    let wrongVersionFlagCount = 0;
+    let terminatedInterviews = 0;
 
     const pathTotals: Record<Exclude<OgstepPath, null>, number> = {
       treatment: 0,
@@ -328,12 +332,28 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       unknown: 0,
     };
 
+    const wrongVersionSlug = normaliseErrorType("wrong_version").slug;
+
     rows.forEach((row) => {
-      totalSubmissions += 1;
+      totalRows += 1;
 
       const ogstepPath = getOgstepPathFromRow(row);
       const genderValue = getGenderFromRow(row);
-      
+      const consentValue =
+        getFirstTextValue(row, ["A6. Consent to participate", "Consent"]) ?? "";
+      const approvalFieldValue = findApprovalFieldValue(row as Record<string, unknown>);
+      const approvalLabel = approvalFieldValue?.value?.toString().trim() ?? "";
+      const approvalLower = approvalLabel.toLowerCase();
+
+      const approvalCategory = (() => {
+        if (!approvalLower) return null;
+        if (approvalLower.includes("cancel")) return "canceled" as const;
+        if (approvalLower.includes("flag")) return "flagged" as const;
+        if (approvalLower.includes("approved") && !approvalLower.includes("not"))
+          return "approved" as const;
+        return null;
+      })();
+
       if (genderValue === "male") maleCount += 1;
       else if (genderValue === "female") femaleCount += 1;
 
@@ -342,14 +362,44 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       }
 
       const approvalStatus = determineApprovalStatus(row);
-      const isApproved = approvalStatus === "Approved";
-      
+      const isApproved = approvalStatus === "Approved" || approvalCategory === "approved";
+
       if (isApproved) {
         approvedCount += 1;
       } else {
         notApprovedCount += 1;
       }
+
+      if (approvalCategory === "flagged") {
+        flaggedCount += 1;
+      } else if (approvalCategory === "canceled") {
+        canceledCount += 1;
+      }
+
+      const consentLower = consentValue.trim().toLowerCase();
+      if (
+        consentLower === "no" ||
+        consentLower === "0" ||
+        consentLower === "false" ||
+        consentLower === "n"
+      ) {
+        terminatedInterviews += 1;
+      }
+
+      const indicatorCounts = extractQualityIndicatorCounts(row as Record<string, unknown>);
+      const wrongVersionIndicators = indicatorCounts[wrongVersionSlug] ?? 0;
+      const hasWrongVersionCode = extractErrorCodes(row as Record<string, unknown>).some(
+        (code) => normaliseErrorType(code).slug === wrongVersionSlug,
+      );
+
+      if (wrongVersionIndicators > 0) {
+        wrongVersionFlagCount += wrongVersionIndicators;
+      } else if (hasWrongVersionCode) {
+        wrongVersionFlagCount += 1;
+      }
     });
+
+    const collectedInterviews = Math.max(totalRows - terminatedInterviews - wrongVersionFlagCount, 0);
 
     const totalTarget = shouldFilter
       ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
@@ -362,7 +412,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     const completionRate =
       totalTarget > 0 ? Number(((approvedAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
 
-    const submissionsAgainstTarget = totalSubmissions;
+    const submissionsAgainstTarget = collectedInterviews;
     const submissionProgressPercent =
       totalTarget > 0 ? Number(((submissionsAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
 
@@ -374,18 +424,25 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     };
 
     const approvalRatePercent =
-      totalSubmissions > 0 ? Number(((approvedCount / totalSubmissions) * 100).toFixed(1)) : 0;
+      totalRows > 0 ? Number(((approvedCount / totalRows) * 100).toFixed(1)) : 0;
 
-    const notApprovedRatePercent =
-      totalSubmissions > 0 ? Number(((notApprovedCount / totalSubmissions) * 100).toFixed(1)) : 0;
+    const flaggedRatePercent =
+      totalRows > 0 ? Number(((flaggedCount / totalRows) * 100).toFixed(1)) : 0;
+
+    const canceledRatePercent =
+      totalRows > 0 ? Number(((canceledCount / totalRows) * 100).toFixed(1)) : 0;
 
     const summary = {
       overallTarget: totalTarget,
-      totalSubmissions,
+      totalSubmissions: collectedInterviews,
       approvedSubmissions: approvedCount,
       approvalRate: approvalRatePercent,
-      notApprovedSubmissions: notApprovedCount,
-      notApprovedRate: notApprovedRatePercent,
+      flaggedSubmissions: flaggedCount,
+      flaggedRate: flaggedRatePercent,
+      canceledSubmissions: canceledCount,
+      canceledRate: canceledRatePercent,
+      wrongVersionFlagCount,
+      terminatedInterviews,
       completionRate,
       treatmentPathCount: pathTotals.treatment,
       controlPathCount: pathTotals.control,

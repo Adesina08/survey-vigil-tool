@@ -5,8 +5,12 @@ interface SummaryData {
   totalSubmissions: number;
   approvedSubmissions: number;
   approvalRate: number;
-  notApprovedSubmissions: number;
-  notApprovedRate: number;
+  flaggedSubmissions: number;
+  flaggedRate: number;
+  canceledSubmissions: number;
+  canceledRate: number;
+  wrongVersionFlagCount: number;
+  terminatedInterviews: number;
   completionRate: number;
   treatmentPathCount: number;
   controlPathCount: number;
@@ -53,6 +57,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
     value: string;
     helper?: string;
     tone?: MetricTone;
+    colSpan?: number;
   }
 
   interface CardConfig {
@@ -75,7 +80,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       ],
     },
     {
-      title: "Total submissions",
+      title: "Submissions",
       variant: "default",
       metrics: [
         {
@@ -85,6 +90,15 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             summary.overallTarget > 0
               ? `${formatPercentage(totalSubmissionRate)} of target volume`
               : undefined,
+          colSpan: 2,
+        },
+        {
+          label: "Terminated interviews",
+          value: formatNumber(summary.terminatedInterviews),
+        },
+        {
+          label: "Wrong version flags",
+          value: formatNumber(summary.wrongVersionFlagCount),
         },
       ],
     },
@@ -100,9 +114,14 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         },
         {
           label: "Flagged",
-          value: formatNumber(summary.notApprovedSubmissions),
-          helper: `Flag rate: ${formatPercentage(summary.notApprovedRate)}`,
+          value: formatNumber(summary.flaggedSubmissions),
+          helper: `Flag rate: ${formatPercentage(summary.flaggedRate)}`,
           tone: "destructive",
+        },
+        {
+          label: "Canceled",
+          value: formatNumber(summary.canceledSubmissions),
+          helper: `Cancellation rate: ${formatPercentage(summary.canceledRate)}`,
         },
       ],
     },
@@ -145,6 +164,44 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       ],
     },
   ];
+
+  const renderMetric = (metric: CardMetric) => (
+    <div
+      key={metric.label}
+      className={`space-y-1 ${metric.colSpan ? `col-span-${metric.colSpan}` : ""}`.trim()}
+    >
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+        {metric.label}
+      </div>
+      <div className={`text-3xl font-semibold leading-tight sm:text-4xl ${getMetricToneStyles(metric.tone)}`}>
+        {metric.value}
+      </div>
+      {metric.helper ? <div className="text-xs text-slate-400">{metric.helper}</div> : null}
+    </div>
+  );
+
+  const renderMetrics = (card: CardConfig) => {
+    if (card.title === "Submissions") {
+      const [collected, ...rest] = card.metrics;
+
+      return (
+        <div className="space-y-4">
+          {collected ? <div className="grid grid-cols-1">{renderMetric(collected)}</div> : null}
+          {rest.length > 0 ? (
+            <div className="grid grid-cols-2 gap-6">
+              {rest.map((metric) => renderMetric(metric))}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+
+    return (
+      <div className={card.metrics.length > 1 ? "grid grid-cols-2 gap-6" : "space-y-3"}>
+        {card.metrics.map((metric) => renderMetric(metric))}
+      </div>
+    );
+  };
 
   const getCardStyles = (variant: string) => {
     switch (variant) {
@@ -203,25 +260,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             <CardTitle className="text-base font-semibold leading-tight text-slate-100">{card.title}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div
-              className={
-                card.metrics.length > 1
-                  ? "grid grid-cols-2 gap-6"
-                  : "space-y-3"
-              }
-            >
-              {card.metrics.map((metric) => (
-                <div key={metric.label} className="space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                    {metric.label}
-                  </div>
-                  <div className={`text-3xl font-semibold leading-tight sm:text-4xl ${getMetricToneStyles(metric.tone)}`}>
-                    {metric.value}
-                  </div>
-                  {metric.helper ? <div className="text-xs text-slate-400">{metric.helper}</div> : null}
-                </div>
-              ))}
-            </div>
+            {renderMetrics(card)}
             {card.footer ? (
               <div className="rounded-lg bg-slate-800/60 px-3 py-2 text-xs text-slate-200/80">{card.footer}</div>
             ) : null}
