@@ -291,6 +291,44 @@ const formatNumber = (value: number | null | undefined): string => {
   return value.toLocaleString("en-NG");
 };
 
+const calculateTotals = (rows: QuotaRow[]) =>
+  rows.reduce(
+    (totals, row) => ({
+      sampleSize: totals.sampleSize + (row.sampleSize.target ?? 0),
+      gender: {
+        female: {
+          target: totals.gender.female.target + (row.gender.female.target ?? 0),
+          achieved: totals.gender.female.achieved + (row.gender.female.achieved ?? 0),
+        },
+        male: {
+          target: totals.gender.male.target + (row.gender.male.target ?? 0),
+          achieved: totals.gender.male.achieved + (row.gender.male.achieved ?? 0),
+        },
+      },
+      age: {
+        youth: {
+          target: totals.age.youth.target + (row.age.youth.target ?? 0),
+          achieved: totals.age.youth.achieved + (row.age.youth.achieved ?? 0),
+        },
+        adult: {
+          target: totals.age.adult.target + (row.age.adult.target ?? 0),
+          achieved: totals.age.adult.achieved + (row.age.adult.achieved ?? 0),
+        },
+      },
+    }),
+    {
+      sampleSize: 0,
+      gender: {
+        female: { target: 0, achieved: 0 },
+        male: { target: 0, achieved: 0 },
+      },
+      age: {
+        youth: { target: 0, achieved: 0 },
+        adult: { target: 0, achieved: 0 },
+      },
+    },
+  );
+
 const safePanelKey = (panel: string): string => {
   const cleaned = panel.replace(/[^\p{L}\p{N}]+/gu, "_").toUpperCase();
   return cleaned.length > 31 ? cleaned.slice(0, 31) : cleaned;
@@ -330,46 +368,80 @@ export function QuotaTracker({ achievements }: QuotaTrackerProps) {
             <TabsTrigger value="control">Control</TabsTrigger>
           </TabsList>
 
-          {tabsWithAchievements.map((tab) => (
-            <TabsContent key={tab.value} value={tab.value}>
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Pillar</TableHead>
-                      <TableHead>Target Sample Size</TableHead>
-                      <TableHead>Achieved Sample Size</TableHead>
-                      <TableHead>Target Female</TableHead>
-                      <TableHead>Achieved Female</TableHead>
-                      <TableHead>Target Male</TableHead>
-                      <TableHead>Achieved Male</TableHead>
-                      <TableHead>Target Youth</TableHead>
-                      <TableHead>Achieved Youth</TableHead>
-                      <TableHead>Target Adult</TableHead>
-                      <TableHead>Achieved Adult</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tab.rows.map((row) => (
-                      <TableRow key={`${tab.value}-${safePanelKey(row.panel)}`}>
-                        <TableCell className="font-medium">{row.panel}</TableCell>
-                        <TableCell>{formatNumber(row.sampleSize.target)}</TableCell>
-                        <TableCell>{formatNumber(row.sampleSize.achieved)}</TableCell>
-                        <TableCell>{formatNumber(row.gender.female.target)}</TableCell>
-                        <TableCell>{formatNumber(row.gender.female.achieved)}</TableCell>
-                        <TableCell>{formatNumber(row.gender.male.target)}</TableCell>
-                        <TableCell>{formatNumber(row.gender.male.achieved)}</TableCell>
-                        <TableCell>{formatNumber(row.age.youth.target)}</TableCell>
-                        <TableCell>{formatNumber(row.age.youth.achieved)}</TableCell>
-                        <TableCell>{formatNumber(row.age.adult.target)}</TableCell>
-                        <TableCell>{formatNumber(row.age.adult.achieved)}</TableCell>
+          {tabsWithAchievements.map((tab) => {
+            const totals = calculateTotals(tab.rows);
+
+            return (
+              <TabsContent key={tab.value} value={tab.value}>
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead rowSpan={3}>Pillar</TableHead>
+                        <TableHead rowSpan={3}>N</TableHead>
+                        <TableHead className="text-center" colSpan={4}>
+                          Gender
+                        </TableHead>
+                        <TableHead className="text-center" colSpan={4}>Age</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </TabsContent>
-          ))}
+                      <TableRow>
+                        <TableHead className="text-center" colSpan={2}>
+                          Target
+                        </TableHead>
+                        <TableHead className="text-center" colSpan={2}>
+                          Achieved
+                        </TableHead>
+                        <TableHead className="text-center" colSpan={2}>
+                          Target
+                        </TableHead>
+                        <TableHead className="text-center" colSpan={2}>
+                          Achieved
+                        </TableHead>
+                      </TableRow>
+                      <TableRow>
+                        <TableHead>Female</TableHead>
+                        <TableHead>Male</TableHead>
+                        <TableHead>Female</TableHead>
+                        <TableHead>Male</TableHead>
+                        <TableHead>&lt;35 (Youth)</TableHead>
+                        <TableHead>&gt;35 (Adult)</TableHead>
+                        <TableHead>&lt;35 (Youth)</TableHead>
+                        <TableHead>&gt;35 (Adult)</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {tab.rows.map((row) => (
+                        <TableRow key={`${tab.value}-${safePanelKey(row.panel)}`}>
+                          <TableCell className="font-medium">{row.panel}</TableCell>
+                          <TableCell>{formatNumber(row.sampleSize.target)}</TableCell>
+                          <TableCell>{formatNumber(row.gender.female.target)}</TableCell>
+                          <TableCell>{formatNumber(row.gender.male.target)}</TableCell>
+                          <TableCell>{formatNumber(row.gender.female.achieved)}</TableCell>
+                          <TableCell>{formatNumber(row.gender.male.achieved)}</TableCell>
+                          <TableCell>{formatNumber(row.age.youth.target)}</TableCell>
+                          <TableCell>{formatNumber(row.age.adult.target)}</TableCell>
+                          <TableCell>{formatNumber(row.age.youth.achieved)}</TableCell>
+                          <TableCell>{formatNumber(row.age.adult.achieved)}</TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="font-semibold">
+                        <TableCell>Total</TableCell>
+                        <TableCell>{formatNumber(totals.sampleSize)}</TableCell>
+                        <TableCell>{formatNumber(totals.gender.female.target)}</TableCell>
+                        <TableCell>{formatNumber(totals.gender.male.target)}</TableCell>
+                        <TableCell>{formatNumber(totals.gender.female.achieved)}</TableCell>
+                        <TableCell>{formatNumber(totals.gender.male.achieved)}</TableCell>
+                        <TableCell>{formatNumber(totals.age.youth.target)}</TableCell>
+                        <TableCell>{formatNumber(totals.age.adult.target)}</TableCell>
+                        <TableCell>{formatNumber(totals.age.youth.achieved)}</TableCell>
+                        <TableCell>{formatNumber(totals.age.adult.achieved)}</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            );
+          })}
         </Tabs>
       </CardContent>
     </Card>
