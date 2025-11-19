@@ -8,6 +8,7 @@ import type {
   SheetStateTargetRow,
   SheetSubmissionRow,
 } from "@/types/sheets";
+import { PILLAR_FIELD_NAME } from "@/constants/pillar";
 
 type NormalisedRow = Map<string, unknown>;
 
@@ -94,8 +95,7 @@ export const HEADER_ALIASES: Record<string, string> = {
   username: "username",
   submission_time: "_submission_time",
   submission_id: "_id",
-  ogstep: "B2. Did you participate in OGSTEP?",
-  "b2_did_you_participate_in_ogstep": "B2. Did you participate in OGSTEP?",
+  pillar: PILLAR_FIELD_NAME,
   direction: "Direction",
   directions: "Direction",
   minutes_difference: "Minutes Difference",
@@ -271,21 +271,6 @@ const normaliseGender = (value: unknown): Gender => {
     return "Female";
   }
   return "Unknown";
-};
-
-const normaliseOgstepParticipation = (value: unknown): string | undefined => {
-  const text = normaliseChoiceText(value);
-  if (!text) {
-    return undefined;
-  }
-  const lower = text.toLowerCase();
-  if (lower.startsWith("y") || lower === "1" || lower === "yes" || lower === "true") {
-    return "Yes";
-  }
-  if (lower.startsWith("n") || lower === "0" || lower === "no" || lower === "false") {
-    return "No";
-  }
-  return text;
 };
 
 const interpretApprovalStatus = (value: unknown): ApprovalStatus | null => {
@@ -509,13 +494,7 @@ export const mapSheetRowsToSubmissions = (
       const errorFlags = parseErrorFlags(
         getFromRow(normalisedRow, "Error Flags", "Errors", "Error Flag")
       );
-      const ogstepParticipation = normaliseOgstepParticipation(
-        getFromRow(
-          normalisedRow,
-          "B2. Did you participate in OGSTEP?",
-          "Did you participate in OGSTEP?"
-        )
-      );
+      const pillarAssignment = toStringValue(getFromRow(normalisedRow, PILLAR_FIELD_NAME));
       const qcStatusRaw = toStringValue(
         getFromRow(normalisedRow, "Outcome Status", "QC Status")
       );
@@ -550,8 +529,8 @@ export const mapSheetRowsToSubmissions = (
         "_A5. GPS Coordinates_latitude": resolvedLatitude ?? 0,
         "_A5. GPS Coordinates_longitude": resolvedLongitude ?? 0,
       };
-      if (ogstepParticipation) {
-        submission["B2. Did you participate in OGSTEP?"] = ogstepParticipation;
+      if (pillarAssignment) {
+        submission[PILLAR_FIELD_NAME] = pillarAssignment.trim();
       }
       let outcomeStatus: SheetSubmissionRow["Outcome Status"];
       if (qcStatusRaw) {

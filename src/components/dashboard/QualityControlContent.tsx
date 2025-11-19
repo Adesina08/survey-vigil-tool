@@ -17,21 +17,19 @@ import { QuotaTracker } from "./QuotaTracker";
 import { UserProductivity } from "./UserProductivity";
 import { ErrorBreakdown } from "./ErrorBreakdown";
 import { AchievementsTables } from "./AchievementsTables";
+import { PILLAR_FIELD_NAME } from "@/constants/pillar";
 
 type NormalisedRow = Record<string, unknown>;
-type OgstepPath = "treatment" | "control" | "unknown" | null;
-
-const OGSTEP_PILLAR_FIELD =
-  "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target";
+type PillarPath = "treatment" | "control" | "unknown" | null;
 
 // NEW: read Pillar from the row
 const getPillarFromRow = (row: NormalisedRow): string | null => {
-  const raw = row[OGSTEP_PILLAR_FIELD];
+  const raw = row[PILLAR_FIELD_NAME];
   return typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
 };
 
-// NEW: classify OGSTEP path from Pillar
-const getOgstepPathFromPillar = (pillar: string | null): OgstepPath => {
+// NEW: classify path from Pillar
+const getPillarPathFromPillar = (pillar: string | null): PillarPath => {
   if (!pillar) return null;
 
   const normalised = pillar.toUpperCase();
@@ -43,7 +41,7 @@ const getOgstepPathFromPillar = (pillar: string | null): OgstepPath => {
 };
 
 // NEW: parse panel + path from Pillar
-const parsePillar = (value: string | null): { panel: string; path: OgstepPath } => {
+const parsePillar = (value: string | null): { panel: string; path: PillarPath } => {
   if (!value) return { panel: "UNKNOWN", path: null };
 
   const lower = value.toLowerCase();
@@ -54,7 +52,7 @@ const parsePillar = (value: string | null): { panel: string; path: OgstepPath } 
   else if (lower.includes("cofo") || lower.includes("cofdo")) panel = "COFO";
   else if (lower.includes("unqualified")) panel = "UNQUALIFIED RESPONDENT";
 
-  const path = getOgstepPathFromPillar(value);
+  const path = getPillarPathFromPillar(value);
 
   return { panel, path };
 };
@@ -181,11 +179,11 @@ const matchesSelectedLga = (value: unknown, selectedLga: string): boolean => {
   return normalisedCandidates.has(target);
 };
 
-const getOgstepPathFromRow = (row: NormalisedRow): OgstepPath => {
+const getPillarPathFromRow = (row: NormalisedRow): PillarPath => {
   const pillar = getPillarFromRow(row);
 
-  // OGSTEP path is determined solely by the Pillar field
-  return getOgstepPathFromPillar(pillar);
+  // Path is determined solely by the Pillar field
+  return getPillarPathFromPillar(pillar);
 };
 
 const getGenderFromRow = (row: NormalisedRow): "male" | "female" | "unknown" => {
@@ -338,7 +336,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     let terminatedInterviews = 0;
     let unqualifiedRespondents = 0;
 
-    const pathTotals: Record<Exclude<OgstepPath, null>, number> = {
+    const pathTotals: Record<Exclude<PillarPath, null>, number> = {
       treatment: 0,
       control: 0,
       unknown: 0,
@@ -349,7 +347,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     rows.forEach((row) => {
       totalRows += 1;
 
-      const ogstepPath = getOgstepPathFromRow(row);
+      const pillarPath = getPillarPathFromRow(row);
       const genderValue = getGenderFromRow(row);
       const consentValue =
         getFirstTextValue(row, ["A6. Consent to participate", "Consent"]) ?? "";
@@ -358,8 +356,8 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       const isCanceled = approvalCategory === "Canceled";
       const isNotApproved = approvalCategory === "Not Approved";
 
-      if (ogstepPath) {
-        pathTotals[ogstepPath] += 1;
+      if (pillarPath) {
+        pathTotals[pillarPath] += 1;
       }
 
       const consentLower = consentValue.trim().toLowerCase();
@@ -373,7 +371,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
         terminatedInterviews += 1;
       }
 
-      const isUnqualified = ogstepPath === "unknown";
+      const isUnqualified = pillarPath === "unknown";
       if (isUnqualified) {
         unqualifiedRespondents += 1;
       }
@@ -500,7 +498,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     let maleCount = 0;
     let femaleCount = 0;
 
-    const pathTotals: Record<Exclude<OgstepPath, null>, number> = {
+    const pathTotals: Record<Exclude<PillarPath, null>, number> = {
       treatment: 0,
       control: 0,
       unknown: 0,
@@ -596,7 +594,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
           "location_lga",
         ]) ?? "Unknown";
 
-      const ogstepPath = getOgstepPathFromRow(row);
+      const pillarPath = getPillarPathFromRow(row);
 
       const key = `${interviewerId}::${interviewerName}`;
 
@@ -667,12 +665,12 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       }
       existing.totalSubmissions += 1;
 
-      if (ogstepPath === "treatment") existing.treatmentPathCount += 1;
-      else if (ogstepPath === "control") existing.controlPathCount += 1;
-      else if (ogstepPath === "unknown") existing.unknownPathCount += 1;
+      if (pillarPath === "treatment") existing.treatmentPathCount += 1;
+      else if (pillarPath === "control") existing.controlPathCount += 1;
+      else if (pillarPath === "unknown") existing.unknownPathCount += 1;
 
-      if (ogstepPath) {
-        pathTotals[ogstepPath] += 1;
+      if (pillarPath) {
+        pathTotals[pillarPath] += 1;
       }
 
       const qualityCounts = extractQualityIndicatorCounts(row);
@@ -723,9 +721,9 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       interviewerEntry.total += 1;
       if (isApproved) interviewerEntry.approved += 1;
       else if (isNotApproved) interviewerEntry.notApproved += 1;
-      if (ogstepPath === "treatment") interviewerEntry.treatmentPathCount += 1;
-      else if (ogstepPath === "control") interviewerEntry.controlPathCount += 1;
-      else if (ogstepPath === "unknown") interviewerEntry.unknownPathCount += 1;
+      if (pillarPath === "treatment") interviewerEntry.treatmentPathCount += 1;
+      else if (pillarPath === "control") interviewerEntry.controlPathCount += 1;
+      else if (pillarPath === "unknown") interviewerEntry.unknownPathCount += 1;
 
       // Achievements by LGA
       const lgaKey = lga;
@@ -744,9 +742,9 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       lgaEntry.total += 1;
       if (isApproved) lgaEntry.approved += 1;
       else if (isNotApproved) lgaEntry.notApproved += 1;
-      if (ogstepPath === "treatment") lgaEntry.treatmentPathCount += 1;
-      else if (ogstepPath === "control") lgaEntry.controlPathCount += 1;
-      else if (ogstepPath === "unknown") lgaEntry.unknownPathCount += 1;
+      if (pillarPath === "treatment") lgaEntry.treatmentPathCount += 1;
+      else if (pillarPath === "control") lgaEntry.controlPathCount += 1;
+      else if (pillarPath === "unknown") lgaEntry.unknownPathCount += 1;
       achievementsByLGAMap.set(lgaKey, lgaEntry);
     });
 
@@ -837,7 +835,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
           Fieldwork Snapshot
         </h2>
         <p className="text-sm text-muted-foreground">
-          Review overall submissions, approvals, and OGSTEP paths at a glance to understand the survey pulse.
+          Review overall submissions, approvals, and Pillar paths at a glance to understand the survey pulse.
         </p>
       </div>
       <SummaryCards summary={summary} />

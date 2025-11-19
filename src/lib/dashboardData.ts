@@ -6,6 +6,7 @@ import {
   type SheetStateAgeTargetRow,
   type SheetStateGenderTargetRow,
 } from "@/types/sheets";
+import { PILLAR_FIELD_NAME } from "@/constants/pillar";
 import { applyQualityChecks, type ProcessedSubmissionRow } from "./qualityChecks";
 import { normaliseHeaderKey } from "./googleSheets";
 import { normaliseErrorType } from "./errorTypes";
@@ -26,7 +27,7 @@ import {
   type NormalizedMapMetadata,
 } from "./mapMetadata";
 
-type OgstepPath = "treatment" | "control" | "unknown" | null;
+type PillarPath = "treatment" | "control" | "unknown" | null;
 
 const QC_FLAG_REGEX = /^QC_(FLAG|WARN)_/i;
 const getAgeGroupSortIndex = (ageGroup: string): number => {
@@ -52,8 +53,8 @@ interface MapSubmission {
   status: "approved" | "not_approved";
   approvalLabel: string;
   approvalSource: string | null;
-  ogstepPath: OgstepPath;
-  ogstepResponse: string | null;
+  pillarPath: PillarPath;
+  pillarAssignment: string | null;
   directions: string | null;
   respondentName: string | null;
   respondentPhone: string | null;
@@ -348,10 +349,7 @@ const shouldIgnoreErrorType = (code: string): boolean => {
   return /^QC[\s_]*(?:FLAG|WARN)[\s_]*COUNT$/i.test(code.trim());
 };
 
-const OGSTEP_PILLAR_FIELD =
-  "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target";
-
-const determineOgstepPath = (pillar?: string | null): OgstepPath => {
+const determinePillarPath = (pillar?: string | null): PillarPath => {
   if (!pillar) {
     return null;
   }
@@ -376,18 +374,12 @@ const determineOgstepPath = (pillar?: string | null): OgstepPath => {
   return null;
 };
 
-const extractOgstepDetails = (row: SheetSubmissionRow): { response: string | null; path: OgstepPath } => {
-  const rawResponse = row["B2. Did you participate in OGSTEP?"];
-  const rawPillar = row[OGSTEP_PILLAR_FIELD];
+const extractPillarDetails = (row: SheetSubmissionRow): { assignment: string | null; path: PillarPath } => {
+  const rawPillar = row[PILLAR_FIELD_NAME];
   const pillar = typeof rawPillar === "string" ? rawPillar : null;
+  const assignment = pillar && pillar.trim().length > 0 ? pillar.trim() : null;
 
-  if (rawResponse === undefined || rawResponse === null) {
-    return { response: null, path: determineOgstepPath(pillar) };
-  }
-
-  const response = String(rawResponse).trim();
-  const normalised = response.length > 0 ? response : null;
-  return { response: normalised, path: determineOgstepPath(pillar) };
+  return { assignment, path: determinePillarPath(pillar) };
 };
 
 const extractDirections = (row: SheetSubmissionRow): string | null => {
@@ -432,7 +424,7 @@ const extractDirections = (row: SheetSubmissionRow): string | null => {
   return null;
 };
 
-const incrementPathCount = (counts: PathCounts, path: OgstepPath) => {
+const incrementPathCount = (counts: PathCounts, path: PillarPath) => {
   if (path === "treatment") {
     counts.treatment += 1;
   } else if (path === "control") {
@@ -442,7 +434,7 @@ const incrementPathCount = (counts: PathCounts, path: OgstepPath) => {
   }
 };
 
-const incrementPathCountsMap = (map: Map<string, PathCounts>, key: string, path: OgstepPath) => {
+const incrementPathCountsMap = (map: Map<string, PathCounts>, key: string, path: PillarPath) => {
   if (!path) {
     return;
   }
@@ -730,10 +722,10 @@ export const buildDashboardData = ({
 
   const interviewerNames = new Map<string, string>();
 
-  const ogstepTotals: PathCounts = createEmptyPathCounts();
-  const ogstepByState = new Map<string, PathCounts>();
-  const ogstepByInterviewer = new Map<string, PathCounts>();
-  const ogstepByLGA = new Map<string, PathCounts>();
+  const pillarTotals: PathCounts = createEmptyPathCounts();
+  const pillarByState = new Map<string, PathCounts>();
+  const pillarByInterviewer = new Map<string, PathCounts>();
+  const pillarByLGA = new Map<string, PathCounts>();
 
   const errorCounts: Record<string, number> = {};
 
@@ -839,7 +831,7 @@ export const buildDashboardData = ({
     const qualityFlags = Array.from(new Set(qcFlagSlugs));
     const otherFlags = Array.from(combinedFlagSet).filter((slug) => !qualityFlags.includes(slug));
     const combinedFlags = Array.from(combinedFlagSet);
-    const { response: ogstepResponse, path: ogstepPath } = extractOgstepDetails(row);
+    const { assignment: pillarAssignment, path: pillarPath } = extractPillarDetails(row);
 
     const respondentName = pickFirstText(row, [
       "Respondent name",
@@ -881,11 +873,11 @@ export const buildDashboardData = ({
     const hasValidCoordinates = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
     const hasValidLGA = typeof lga === "string" && lga.length > 0;
 
-    incrementPathCount(ogstepTotals, ogstepPath);
-    incrementPathCountsMap(ogstepByState, state, ogstepPath);
-    incrementPathCountsMap(ogstepByInterviewer, interviewerId, ogstepPath);
+    incrementPathCount(pillarTotals, pillarPath);
+    incrementPathCountsMap(pillarByState, state, pillarPath);
+    incrementPathCountsMap(pillarByInterviewer, interviewerId, pillarPath);
     if (hasValidLGA) {
-      incrementPathCountsMap(ogstepByLGA, `${state}|${lga}`, ogstepPath);
+      incrementPathCountsMap(pillarByLGA, `${state}|${lga}`, pillarPath);
     }
 
     const submissionTimestamp = parseSubmissionTimestamp(row);
@@ -1010,8 +1002,8 @@ export const buildDashboardData = ({
         approvalLabel,
         approvalSource,
         sortKey,
-        ogstepPath,
-        ogstepResponse: ogstepResponse,
+        pillarPath,
+        pillarAssignment,
         directions: extractDirections(row),
         respondentName: respondentName ?? null,
         respondentPhone: respondentPhone ?? null,
@@ -1193,7 +1185,7 @@ export const buildDashboardData = ({
     const approved = approvedByState.get(state) ?? 0;
     const notApproved = notApprovedByState.get(state) ?? (total - approved);
     const computedTotal = approved + notApproved;
-    const pathCounts = ogstepByState.get(state) ?? createEmptyPathCounts();
+    const pathCounts = pillarByState.get(state) ?? createEmptyPathCounts();
 
     return {
       state,
@@ -1213,7 +1205,7 @@ export const buildDashboardData = ({
       const notApproved = notApprovedByInterviewer.get(interviewerId) ?? (total - approved);
       const name = interviewerNames.get(interviewerId) ?? "";
       const label = name && name !== interviewerId ? `${interviewerId} · ${name}` : interviewerId;
-      const pathCounts = ogstepByInterviewer.get(interviewerId) ?? createEmptyPathCounts();
+      const pathCounts = pillarByInterviewer.get(interviewerId) ?? createEmptyPathCounts();
 
       return {
         interviewerId,
@@ -1237,7 +1229,7 @@ export const buildDashboardData = ({
     const approved = approvedByLGA.get(key) ?? 0;
     const notApproved = notApprovedByLGA.get(key) ?? (total - approved);
     const computedTotal = approved + notApproved;
-    const pathCounts = ogstepByLGA.get(key) ?? createEmptyPathCounts();
+    const pathCounts = pillarByLGA.get(key) ?? createEmptyPathCounts();
 
     return {
       lga: lga ?? "Unknown",
@@ -1265,9 +1257,9 @@ export const buildDashboardData = ({
     canceledRate: Number(canceledRate.toFixed(1)),
     validSubmissions,
     completionRate: Number(quotaProgress.toFixed(1)),
-    treatmentPathCount: ogstepTotals.treatment,
-    controlPathCount: ogstepTotals.control,
-    unknownPathCount: ogstepTotals.unknown,
+    treatmentPathCount: pillarTotals.treatment,
+    controlPathCount: pillarTotals.control,
+    unknownPathCount: pillarTotals.unknown,
     maleCount,
     femaleCount,
   };

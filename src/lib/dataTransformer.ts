@@ -1,7 +1,8 @@
 /**
- * Google Sheets Data Transformer for OGSTEP Survey Dashboard
+ * Google Sheets Data Transformer for the survey dashboard
  * Maps raw Google Sheets data to dashboard-ready format
  */
+import { PILLAR_FIELD_NAME } from "@/constants/pillar";
 import { normaliseErrorType, type ErrorTypeInfo } from "./errorTypes";
 
 import { determineApprovalStatus as normaliseApprovalStatus, findApprovalFieldValue } from "@/utils/approval";
@@ -61,9 +62,8 @@ export interface RawSurveyRow {
   "A7. Sex"?: string;
   "A8. Age"?: string | number;
 
-  // OGSTEP Participation
-  "B1. Are you aware of OGSTEP?"?: string;
-  "B2. Did you participate in OGSTEP?"?: string;
+  // Pillar assignment
+  "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target"?: string;
 
   // Quality Control Flags (FLAGS)
   QC_FLAG_LOW_LOI?: string | number;
@@ -159,13 +159,10 @@ function isTruthy(value: any): boolean {
 }
 
 /**
- * Determine OGSTEP path from the Pillar field
+ * Determine respondent path from the Pillar field
  */
-const OGSTEP_PILLAR_FIELD =
-  "Pillar. Interviewers,  kindly recruit the respondent into the right Pillar according to your target";
-
-function getOgstepPath(row: RawSurveyRow): "treatment" | "control" | "unknown" | null {
-  const pillar = getTextValue(row, [OGSTEP_PILLAR_FIELD]);
+function getPillarPath(row: RawSurveyRow): "treatment" | "control" | "unknown" | null {
+  const pillar = getTextValue(row, [PILLAR_FIELD_NAME]);
 
   if (!pillar) return null;
 
@@ -381,8 +378,8 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
         status,
         approvalLabel,
         approvalSource,
-        ogstepPath: getOgstepPath(row),
-        ogstepResponse: getTextValue(row, ["B2. Did you participate in OGSTEP?"]),
+        pillarPath: getPillarPath(row),
+        pillarAssignment: getTextValue(row, [PILLAR_FIELD_NAME]),
         directions: row.Direction || null,
         respondentName,
         respondentPhone,
@@ -449,7 +446,7 @@ export function calculateAchievementsByInterviewer(rawData: RawSurveyRow[]) {
       entry.notApproved += 1;
     }
 
-    const path = getOgstepPath(row);
+    const path = getPillarPath(row);
     if (path === "treatment") entry.treatmentPathCount += 1;
     else if (path === "control") entry.controlPathCount += 1;
     else if (path === "unknown") entry.unknownPathCount += 1;
@@ -494,7 +491,7 @@ export function calculateAchievementsByLGA(rawData: RawSurveyRow[]) {
       entry.notApproved += 1;
     }
 
-    const path = getOgstepPath(row);
+    const path = getPillarPath(row);
     if (path === "treatment") entry.treatmentPathCount += 1;
     else if (path === "control") entry.controlPathCount += 1;
     else if (path === "unknown") entry.unknownPathCount += 1;
@@ -577,7 +574,7 @@ export function calculateAchievementsByState(rawData: RawSurveyRow[]) {
       entry.notApproved += 1;
     }
 
-    const path = getOgstepPath(row);
+    const path = getPillarPath(row);
     if (path === "treatment") entry.treatmentPathCount += 1;
     else if (path === "control") entry.controlPathCount += 1;
     else if (path === "unknown") entry.unknownPathCount += 1;
@@ -626,7 +623,7 @@ export function calculateSummary(rawData: RawSurveyRow[], overallTarget: number 
       notApprovedSubmissions += 1;
     }
 
-    const path = getOgstepPath(row);
+    const path = getPillarPath(row);
     if (path === "treatment") treatmentPathCount += 1;
     else if (path === "control") controlPathCount += 1;
     else if (path === "unknown") unknownPathCount += 1;
