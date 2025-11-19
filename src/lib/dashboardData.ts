@@ -64,6 +64,9 @@ interface MapSubmission {
   community: string | null;
   consent: string | null;
   qcStatus: string | null;
+  submissionUuid: string | null;
+  submissionIndex: string | null;
+  minutesDifference: string | null;
 }
 
 interface SummaryData {
@@ -87,6 +90,7 @@ interface SummaryData {
 
 interface StatusBreakdown {
   approved: number;
+  /** Includes both Not Approved + Canceled to reflect total invalid interviews */
   notApproved: number;
   canceled: number;
 }
@@ -494,6 +498,41 @@ const sanitiseText = (value: unknown): string | null => {
   if (typeof value === "string") {
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+  }
+
+  return null;
+};
+
+const normaliseMetadataValue = (value: unknown): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value.toString() : null;
+  }
+
+  if (typeof value === "string") {
+    return sanitiseText(value);
+  }
+
+  return sanitiseText(String(value));
+};
+
+const getMinutesDifferenceValue = (row: SheetSubmissionRow): string | null => {
+  const record = row as Record<string, unknown>;
+  const candidates = [
+    record["Minutes Difference"],
+    record.minutes_difference,
+    record.minutesDifference,
+    record["minutes difference"],
+  ];
+
+  for (const candidate of candidates) {
+    const value = normaliseMetadataValue(candidate);
+    if (value) {
+      return value;
+    }
   }
 
   return null;
@@ -918,7 +957,7 @@ export const buildDashboardData = ({
         incrementMap(approvedByLGAAge, `${state}|${lga}|${ageGroup}`);
         incrementMap(approvedByLGAGender, `${state}|${lga}|${gender}`);
       }
-    } else if (isNotApproved) {
+    } else if (isNotApproved || isCanceled) {
       incrementMap(notApprovedByState, state);
       incrementMap(notApprovedByInterviewer, interviewerId);
       if (hasValidLGA) {
@@ -984,6 +1023,10 @@ export const buildDashboardData = ({
       const approvalLabel = approvalField?.value ?? approvalStatus;
       const approvalSource = approvalField?.key ?? null;
       const normalisedStatus = approvalStatus === "Approved" ? "approved" : "not_approved";
+      const submissionUuid = sanitiseText(row._uuid);
+      const submissionIndexValue = (row as Record<string, unknown>)._index;
+      const submissionIndexLabel = normaliseMetadataValue(submissionIndexValue);
+      const minutesDifference = getMinutesDifferenceValue(row);
 
       mapSubmissions.push({
         id: submissionId,
@@ -1013,14 +1056,18 @@ export const buildDashboardData = ({
         community: communityName ?? null,
         consent: consentValue ?? null,
         qcStatus: qcStatusLabel ?? null,
+        submissionUuid: submissionUuid ?? null,
+        submissionIndex: submissionIndexLabel,
+        minutesDifference,
       });
     }
   });
 
   const totalApproved = metrics.approved;
-  const totalNotApproved = metrics.notApproved;
-  const totalCanceled = metrics.canceled;
-  const validSubmissions = metrics.valid;
+  const baseNotApproved = metrics.notApproved;
+  const totalCanceled = canceledCount;
+  const totalNotApproved = baseNotApproved + totalCanceled;
+  const validSubmissions = totalApproved + totalNotApproved;
 
   const effectiveStateTargets =
     stateTargets.length > 0

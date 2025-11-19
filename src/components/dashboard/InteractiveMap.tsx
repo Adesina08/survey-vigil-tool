@@ -54,6 +54,9 @@ interface Submission {
   community?: string | null;
   consent?: string | null;
   qcStatus?: string | null;
+  submissionUuid?: string | null;
+  submissionIndex?: string | null;
+  minutesDifference?: string | null;
 }
 
 interface InterviewerOption {
@@ -240,6 +243,11 @@ const createPopupHtml = (submission: Submission): string => {
   const pillarAssignment = submission.pillarAssignment ? escapeHtml(submission.pillarAssignment) : null;
   const respondentPhone = submission.respondentPhone ? escapeHtml(submission.respondentPhone) : null;
   const respondentAge = submission.respondentAge ? escapeHtml(submission.respondentAge) : null;
+  const submissionUuid = submission.submissionUuid ? escapeHtml(submission.submissionUuid) : null;
+  const submissionIndex = submission.submissionIndex ? escapeHtml(submission.submissionIndex) : null;
+  const minutesDifferenceLabel = submission.minutesDifference
+    ? escapeHtml(submission.minutesDifference)
+    : null;
   const rawDirection = submission.directions?.trim() ?? "";
   const directionsHtml =
     rawDirection.length > 0 && isLikelyUrl(rawDirection)
@@ -305,6 +313,9 @@ const createPopupHtml = (submission: Submission): string => {
         <span style="font-weight:700;color:#0f172a;">${approvalSourceLabel}:</span>
         <span style="padding:6px 10px;border-radius:9999px;background:${statusColor}1a;color:${statusColor};font-weight:700;">${approvalLabel}</span>
      </div>`,
+    buildDetailRow("_uuid", submissionUuid),
+    buildDetailRow("_index", submissionIndex),
+    buildDetailRow("Minutes Difference", minutesDifferenceLabel),
     buildDetailRow("Pillar Path", pathLabel, { isHtml: true }),
     buildDetailRow("Pillar Assignment", pillarAssignment),
     buildDetailRow("Phone", respondentPhone),
