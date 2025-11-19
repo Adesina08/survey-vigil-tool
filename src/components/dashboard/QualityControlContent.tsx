@@ -388,14 +388,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
         wrongVersionFlagCount += 1;
       }
 
-      const isInvalidSubmission = isUnqualified || hasWrongVersionFlag || isTerminated;
-
-      if (isInvalidSubmission) {
-        return;
-      }
-
-      if (genderValue === "male") maleCount += 1;
-      else if (genderValue === "female") femaleCount += 1;
+      const isInvalidSubmission = !isCanceled && (isUnqualified || hasWrongVersionFlag || isTerminated);
 
       if (isCanceled) {
         canceledCount += 1;
@@ -404,11 +397,19 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       } else if (isNotApproved) {
         notApprovedCount += 1;
       }
+
+      if (isInvalidSubmission) {
+        return;
+      }
+
+      if (genderValue === "male") maleCount += 1;
+      else if (genderValue === "female") femaleCount += 1;
     });
 
     const combinedUnqualifiedRespondents = unqualifiedRespondents + terminatedInterviews;
     const totalSubmissions = totalRows;
-    const validSubmissions = approvedCount + notApprovedCount + canceledCount;
+    const combinedNotApprovedCount = notApprovedCount + canceledCount;
+    const validSubmissions = approvedCount + combinedNotApprovedCount;
     const collectedInterviews = validSubmissions;
 
     const totalTarget = shouldFilter
@@ -437,7 +438,9 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       validSubmissions > 0 ? Number(((approvedCount / validSubmissions) * 100).toFixed(1)) : 0;
 
     const notApprovedRatePercent =
-      validSubmissions > 0 ? Number(((notApprovedCount / validSubmissions) * 100).toFixed(1)) : 0;
+      validSubmissions > 0
+        ? Number(((combinedNotApprovedCount / validSubmissions) * 100).toFixed(1))
+        : 0;
 
     const canceledRatePercent =
       validSubmissions > 0 ? Number(((canceledCount / validSubmissions) * 100).toFixed(1)) : 0;
@@ -447,7 +450,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       totalSubmissions,
       approvedSubmissions: approvedCount,
       approvalRate: approvalRatePercent,
-      notApprovedSubmissions: notApprovedCount,
+      notApprovedSubmissions: combinedNotApprovedCount,
       notApprovedRate: notApprovedRatePercent,
       canceledSubmissions: canceledCount,
       canceledRate: canceledRatePercent,
@@ -469,7 +472,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       quotaSummary,
       statusBreakdown: {
         approved: approvedCount,
-        notApproved: notApprovedCount,
+        notApproved: combinedNotApprovedCount,
         canceled: canceledCount,
       },
     };
