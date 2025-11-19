@@ -43,8 +43,8 @@ interface Submission {
   status: "approved" | "not_approved";
   approvalLabel?: string | null;
   approvalSource?: string | null;
-  ogstepPath: "treatment" | "control" | "unknown" | null;
-  ogstepResponse: string | null;
+  pillarPath: "treatment" | "control" | "unknown" | null;
+  pillarAssignment: string | null;
   directions: string | null;
   respondentName?: string | null;
   respondentPhone?: string | null;
@@ -72,7 +72,7 @@ interface InteractiveMapProps {
 type ColorMode = "path" | "approval";
 
 const getPathMetadata = (submission: Submission) => {
-  switch (submission.ogstepPath) {
+  switch (submission.pillarPath) {
     case "treatment":
       return {
         color: "#8b5cf6",
@@ -237,7 +237,7 @@ const createPopupHtml = (submission: Submission): string => {
   const approvalSourceLabel = escapeHtml(
     submission.approvalSource ? formatColumnLabel(submission.approvalSource) : "Approval",
   );
-  const ogstepResponse = submission.ogstepResponse ? escapeHtml(submission.ogstepResponse) : null;
+  const pillarAssignment = submission.pillarAssignment ? escapeHtml(submission.pillarAssignment) : null;
   const respondentPhone = submission.respondentPhone ? escapeHtml(submission.respondentPhone) : null;
   const respondentAge = submission.respondentAge ? escapeHtml(submission.respondentAge) : null;
   const rawDirection = submission.directions?.trim() ?? "";
@@ -305,8 +305,8 @@ const createPopupHtml = (submission: Submission): string => {
         <span style="font-weight:700;color:#0f172a;">${approvalSourceLabel}:</span>
         <span style="padding:6px 10px;border-radius:9999px;background:${statusColor}1a;color:${statusColor};font-weight:700;">${approvalLabel}</span>
      </div>`,
-    buildDetailRow("OGSTEP Path", pathLabel, { isHtml: true }),
-    buildDetailRow("OGSTEP Response", ogstepResponse),
+    buildDetailRow("Pillar Path", pathLabel, { isHtml: true }),
+    buildDetailRow("Pillar Assignment", pillarAssignment),
     buildDetailRow("Phone", respondentPhone),
     buildDetailRow("Age", respondentAge),
     buildDetailRow("Ward", wardLabel),

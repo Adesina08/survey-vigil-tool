@@ -34,11 +34,11 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
 
   const formatPathHelper = (count: number) => {
     if (knownPathTotal === 0) {
-      return "No submissions with recorded OGSTEP path.";
+      return "No submissions with recorded Pillar path.";
     }
 
     const percentage = (count / knownPathTotal) * 100;
-    return `${percentage.toFixed(1)}% of submissions with OGSTEP path`;
+    return `${percentage.toFixed(1)}% of submissions with Pillar path`;
   };
 
   const formatGenderHelper = (count: number) => {
@@ -153,7 +153,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
       ],
     },
     {
-      title: "OGSTEP Paths",
+      title: "Pillar Paths",
       variant: "treatment",
       metrics: [
         {

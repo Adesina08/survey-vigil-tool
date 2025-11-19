@@ -1,4 +1,5 @@
 // src/services/googleSheets.ts
+import { PILLAR_FIELD_NAME } from "@/constants/pillar";
 
 const SHEET_ID = import.meta.env.VITE_GOOGLE_SHEET_ID;
 const SHEET_NAME = import.meta.env.VITE_GOOGLE_SHEET_NAME ?? "Form Responses 1";
@@ -72,7 +73,7 @@ export async function fetchFromGoogleSheets(): Promise<Record<string, unknown>[]
     console.log("First row sample:", {
       "A1. Enumerator ID": firstRow["A1. Enumerator ID"],
       "A3. select the LGA": firstRow["A3. select the LGA"],
-      "B2. Did you participate in OGSTEP?": firstRow["B2. Did you participate in OGSTEP?"],
+      [PILLAR_FIELD_NAME]: firstRow[PILLAR_FIELD_NAME],
       Approval: firstRow["Approval"],
       "QC Status": firstRow["QC Status"],
       _id: firstRow["_id"],
