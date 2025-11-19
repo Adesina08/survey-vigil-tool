@@ -446,7 +446,7 @@ export function calculateAchievementsByInterviewer(rawData: RawSurveyRow[]) {
       entry.notApproved += 1;
     }
 
-    const path = getOgstepPath(row);
+    const path = getPillarPath(row);
     if (path === "treatment") entry.treatmentPathCount += 1;
     else if (path === "control") entry.controlPathCount += 1;
     else if (path === "unknown") entry.unknownPathCount += 1;
@@ -491,7 +491,7 @@ export function calculateAchievementsByLGA(rawData: RawSurveyRow[]) {
       entry.notApproved += 1;
     }
 
-    const path = getOgstepPath(row);
+    const path = getPillarPath(row);
     if (path === "treatment") entry.treatmentPathCount += 1;
     else if (path === "control") entry.controlPathCount += 1;
     else if (path === "unknown") entry.unknownPathCount += 1;
@@ -574,7 +574,7 @@ export function calculateAchievementsByState(rawData: RawSurveyRow[]) {
       entry.notApproved += 1;
     }
 
-    const path = getOgstepPath(row);
+    const path = getPillarPath(row);
     if (path === "treatment") entry.treatmentPathCount += 1;
     else if (path === "control") entry.controlPathCount += 1;
     else if (path === "unknown") entry.unknownPathCount += 1;
@@ -623,7 +623,7 @@ export function calculateSummary(rawData: RawSurveyRow[], overallTarget: number 
       notApprovedSubmissions += 1;
     }
 
-    const path = getOgstepPath(row);
+    const path = getPillarPath(row);
     if (path === "treatment") treatmentPathCount += 1;
     else if (path === "control") controlPathCount += 1;
     else if (path === "unknown") unknownPathCount += 1;
