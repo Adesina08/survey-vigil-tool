@@ -53,10 +53,12 @@ const normaliseCandidate = (value: unknown): NormalisedApprovalStatus | null => 
     return "Not Approved";
   }
 
+  // e.g. "Approved - QC passed"
   if (lower.includes("approved") && !lower.includes("not")) {
     return "Approved";
   }
 
+  // e.g. "Not approved - failed QC"
   if (lower.includes("not") && lower.includes("approved")) {
     return "Not Approved";
   }
@@ -78,16 +80,30 @@ const normaliseCandidateWithCancellation = (
     }
 
     const lower = cleaned.toLowerCase();
+
+    // 🔥 Anything containing a cancel token is treated as Canceled
+    // e.g. "Canceled", "Cancelled interview", "Interview canceled by respondent"
     if ([...cancellationTokens].some((token) => lower.includes(token))) {
       return "Canceled";
     }
   }
 
+  // Otherwise, fall back to normal Approved / Not Approved logic
   return normaliseCandidate(value);
 };
 
+// 👇 Expanded to cover common header variants for the Approval column
 export const APPROVAL_FIELD_CANDIDATES = [
-  "Approval"
+  "Approval",
+  "approval",
+  "Approval Status",
+  "Approval status",
+  "approval_status",
+  "ApprovalStatus",
+  "Outcome Status",
+  "outcome_status",
+  "QC Status",
+  "qc_status",
 ] as const;
 
 export type ApprovalFieldKey = (typeof APPROVAL_FIELD_CANDIDATES)[number];
@@ -132,6 +148,7 @@ export const findApprovalFieldValue = (
 export const determineApprovalStatus = (
   row: Record<string, unknown>,
 ): NormalisedApprovalStatus => {
+  // 1) Try all approval-like fields
   for (const key of APPROVAL_FIELD_CANDIDATES) {
     if (!(key in row)) {
       continue;
@@ -144,7 +161,8 @@ export const determineApprovalStatus = (
     }
   }
 
-  const qualityMetadata = row.qualityMetadata;
+  // 2) Fallback to qualityMetadata.isValid if present
+  const qualityMetadata = (row as Record<string, unknown>).qualityMetadata;
   if (
     qualityMetadata &&
     typeof qualityMetadata === "object" &&
@@ -158,12 +176,14 @@ export const determineApprovalStatus = (
     }
   }
 
+  // 3) Default
   return "Not Approved";
 };
 
 export const determineApprovalCategory = (
   row: Record<string, unknown>,
 ): NormalisedApprovalCategory => {
+  // 1) Try all approval-like fields, including cancellation handling
   for (const key of APPROVAL_FIELD_CANDIDATES) {
     if (!(key in row)) {
       continue;
@@ -176,7 +196,8 @@ export const determineApprovalCategory = (
     }
   }
 
-  const qualityMetadata = row.qualityMetadata;
+  // 2) Fallback to qualityMetadata.isValid, including cancellation
+  const qualityMetadata = (row as Record<string, unknown>).qualityMetadata;
   if (
     qualityMetadata &&
     typeof qualityMetadata === "object" &&
@@ -190,6 +211,6 @@ export const determineApprovalCategory = (
     }
   }
 
+  // 3) Default
   return "Not Approved";
 };
-
