@@ -76,17 +76,17 @@ const getPathMetadata = (submission: Submission) => {
     case "treatment":
       return {
         color: "#8b5cf6",
-        label: "Treatment path",
+        label: "Treatment Pillar",
       } as const;
     case "control":
       return {
         color: "#f97316",
-        label: "Control path",
+        label: "Control Pillar",
       } as const;
     case "unknown":
       return {
         color: "#0ea5e9",
-        label: "Unqualified respondent",
+        label: "Pillar unavailable",
       } as const;
     default:
       return {
@@ -855,9 +855,8 @@ export function InteractiveMap({
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             {(colorMode === "path"
               ? [
-                  { label: "Treatment path (B2 = Yes)", color: "#8b5cf6" },
-                  { label: "Control path (B2 = No)", color: "#f97316" },
-                  { label: "Path unavailable", color: "#0ea5e9" },
+                  { label: "Treatment Pillar", color: "#8b5cf6" },
+                  { label: "Control Pillar", color: "#f97316" },
                 ]
               : [
                   { label: "Approved", color: "#16a34a" },
