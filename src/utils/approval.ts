@@ -29,6 +29,8 @@ const cancellationTokens = new Set([
   "cancelation",
 ]);
 
+const cancellationCodeTokens = new Set(["cn", "cnl", "2"]);
+
 const normaliseCandidate = (value: unknown): NormalisedApprovalStatus | null => {
   if (value === null || value === undefined) {
     return null;
@@ -73,19 +75,27 @@ const normaliseCandidateWithCancellation = (
     return null;
   }
 
-  if (typeof value === "string") {
-    const cleaned = value.trim();
-    if (!cleaned) {
-      return null;
-    }
+  const cleaned =
+    typeof value === "string"
+      ? value.trim()
+      : typeof value === "number" && Number.isFinite(value)
+        ? String(value)
+        : String(value ?? "").trim();
 
-    const lower = cleaned.toLowerCase();
+  if (!cleaned) {
+    return null;
+  }
 
-    // 🔥 Anything containing a cancel token is treated as Canceled
-    // e.g. "Canceled", "Cancelled interview", "Interview canceled by respondent"
-    if ([...cancellationTokens].some((token) => lower.includes(token))) {
-      return "Canceled";
-    }
+  const lower = cleaned.toLowerCase();
+
+  if (cancellationCodeTokens.has(lower)) {
+    return "Canceled";
+  }
+
+  // 🔥 Anything containing a cancel token is treated as Canceled
+  // e.g. "Canceled", "Cancelled interview", "Interview canceled by respondent"
+  if ([...cancellationTokens].some((token) => lower.includes(token))) {
+    return "Canceled";
   }
 
   // Otherwise, fall back to normal Approved / Not Approved logic
