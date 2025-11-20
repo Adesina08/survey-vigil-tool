@@ -313,7 +313,6 @@ const createPopupHtml = (submission: Submission): string => {
         <span style="font-weight:700;color:#0f172a;">${approvalSourceLabel}:</span>
         <span style="padding:6px 10px;border-radius:9999px;background:${statusColor}1a;color:${statusColor};font-weight:700;">${approvalLabel}</span>
      </div>`,
-    buildDetailRow("_uuid", submissionUuid),
     buildDetailRow("_index", submissionIndex),
     buildDetailRow("Minutes Difference", minutesDifferenceLabel),
     buildDetailRow("Pillar Path", pathLabel, { isHtml: true }),

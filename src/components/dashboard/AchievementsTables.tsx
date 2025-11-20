@@ -131,9 +131,38 @@ interface AchievementsTablesProps {
 }
 
 export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesProps) {
-  // Add defensive checks to ensure arrays are valid
-  const safeByInterviewer = Array.isArray(byInterviewer) ? byInterviewer : [];
-  const safeByLGA = Array.isArray(byLGA) ? byLGA : [];
+  const safeByInterviewer = useMemo(() => {
+    const rows = Array.isArray(byInterviewer) ? byInterviewer : [];
+    return rows.filter((row) => {
+      const trimmedId = row?.interviewerId?.trim() ?? "";
+      const trimmedLabel = row?.displayLabel?.trim() ?? "";
+
+      if (!trimmedId) {
+        return false;
+      }
+
+      if (trimmedId.toLowerCase() === "unknown") {
+        return false;
+      }
+
+      if (trimmedLabel && trimmedLabel.toLowerCase() === "unknown") {
+        return false;
+      }
+
+      return true;
+    });
+  }, [byInterviewer]);
+
+  const safeByLGA = useMemo(() => {
+    const rows = Array.isArray(byLGA) ? byLGA : [];
+    return rows.filter((row) => {
+      const lga = row?.lga?.trim();
+      if (!lga) {
+        return false;
+      }
+      return lga.toLowerCase() !== "unknown";
+    });
+  }, [byLGA]);
   const safeByState = useMemo<StateAchievement[]>(() => {
     if (safeByLGA.length === 0) {
       return [];
