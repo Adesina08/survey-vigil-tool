@@ -140,7 +140,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
         {
           label: "Not Approved",
           value: formatNumber(summary.notApprovedSubmissions),
-          helper: `Not approved rate (incl. canceled): ${formatPercentage(summary.notApprovedRate)}`,
+          helper: `Not approved rate: ${formatPercentage(summary.notApprovedRate)}`,
           tone: "destructive",
           labelClassName: "whitespace-nowrap",
           extraHelperLine: true,

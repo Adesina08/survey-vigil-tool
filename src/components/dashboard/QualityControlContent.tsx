@@ -356,10 +356,6 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       const isCanceled = approvalCategory === "Canceled";
       const isNotApproved = approvalCategory === "Not Approved";
 
-      if (pillarPath) {
-        pathTotals[pillarPath] += 1;
-      }
-
       const consentLower = consentValue.trim().toLowerCase();
       const isTerminated =
         consentLower === "no" ||
@@ -367,14 +363,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
         consentLower === "false" ||
         consentLower === "n";
 
-      if (isTerminated) {
-        terminatedInterviews += 1;
-      }
-
       const isUnqualified = pillarPath === "unknown";
-      if (isUnqualified) {
-        unqualifiedRespondents += 1;
-      }
 
       const indicatorCounts = extractQualityIndicatorCounts(row as Record<string, unknown>);
       const wrongVersionIndicators = indicatorCounts[wrongVersionSlug] ?? 0;
@@ -386,9 +375,20 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
 
       if (hasWrongVersionFlag) {
         wrongVersionFlagCount += 1;
+        return;
       }
 
-      const isInvalidSubmission = !isCanceled && (isUnqualified || hasWrongVersionFlag || isTerminated);
+      if (isUnqualified || isTerminated) {
+        if (isTerminated) {
+          terminatedInterviews += 1;
+        }
+        unqualifiedRespondents += 1;
+        return;
+      }
+
+      if (pillarPath) {
+        pathTotals[pillarPath] += 1;
+      }
 
       if (isCanceled) {
         canceledCount += 1;
@@ -398,18 +398,13 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
         notApprovedCount += 1;
       }
 
-      if (isInvalidSubmission) {
-        return;
-      }
-
       if (genderValue === "male") maleCount += 1;
       else if (genderValue === "female") femaleCount += 1;
     });
 
-    const combinedUnqualifiedRespondents = unqualifiedRespondents + terminatedInterviews;
     const totalSubmissions = totalRows;
-    const combinedNotApprovedCount = notApprovedCount + canceledCount;
-    const validSubmissions = approvedCount + combinedNotApprovedCount;
+    const combinedUnqualifiedRespondents = unqualifiedRespondents + terminatedInterviews;
+    const validSubmissions = approvedCount + notApprovedCount + canceledCount;
     const collectedInterviews = validSubmissions;
 
     const totalTarget = shouldFilter
@@ -438,9 +433,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       validSubmissions > 0 ? Number(((approvedCount / validSubmissions) * 100).toFixed(1)) : 0;
 
     const notApprovedRatePercent =
-      validSubmissions > 0
-        ? Number(((combinedNotApprovedCount / validSubmissions) * 100).toFixed(1))
-        : 0;
+      validSubmissions > 0 ? Number(((notApprovedCount / validSubmissions) * 100).toFixed(1)) : 0;
 
     const canceledRatePercent =
       validSubmissions > 0 ? Number(((canceledCount / validSubmissions) * 100).toFixed(1)) : 0;
@@ -450,7 +443,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       totalSubmissions,
       approvedSubmissions: approvedCount,
       approvalRate: approvalRatePercent,
-      notApprovedSubmissions: combinedNotApprovedCount,
+      notApprovedSubmissions: notApprovedCount,
       notApprovedRate: notApprovedRatePercent,
       canceledSubmissions: canceledCount,
       canceledRate: canceledRatePercent,
@@ -472,7 +465,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
       quotaSummary,
       statusBreakdown: {
         approved: approvedCount,
-        notApproved: combinedNotApprovedCount,
+        notApproved: notApprovedCount,
         canceled: canceledCount,
       },
     };
