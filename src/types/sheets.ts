@@ -1,4 +1,4 @@
-export type ApprovalStatus = "Approved" | "Not Approved";
+export type ApprovalStatus = "Approved" | "Not Approved" | "Canceled";
 export type Gender = "Male" | "Female" | "Unknown";
 export type AgeGroup = "Youth" | ">35" | "Unknown";
 export const AGE_GROUP_ORDER: AgeGroup[] = ["Youth", ">35", "Unknown"];
