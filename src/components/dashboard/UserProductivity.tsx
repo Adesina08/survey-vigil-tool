@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { AriaAttributes } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -181,7 +181,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
     return rows;
   }, [rankedProductivity, sortState]);
 
-  const handleSort = (column: string, type: "string" | "number" = "string") => {
+  const handleSort = useCallback((column: string, type: "string" | "number" = "string") => {
     setSortState((previous) => {
       if (previous.column === column) {
         return { column, direction: previous.direction === "asc" ? "desc" : "asc" };
@@ -189,6 +189,56 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
 
       return { column, direction: type === "string" ? "asc" : "desc" };
     });
+  }, []);
+
+  const renderSortableHeaderCell = (
+    column: string,
+    label: string,
+    options?: {
+      dataType?: "string" | "number";
+      align?: "left" | "right";
+      className?: string;
+      labelClassName?: string;
+    },
+  ) => {
+    const { dataType = "string", align = "left", className, labelClassName } = options ?? {};
+    const alignmentClasses =
+      align === "right" ? "justify-end text-right" : "justify-between text-left";
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        handleSort(column, dataType);
+      }
+    };
+
+    return (
+      <TableHead
+        key={column}
+        className={cn(
+          "top-0 z-20 bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+          align === "right" ? "text-right" : "text-left",
+          className,
+          "cursor-pointer select-none",
+        )}
+        aria-sort={getAriaSort(column)}
+        role="button"
+        tabIndex={0}
+        onClick={() => handleSort(column, dataType)}
+        onKeyDown={handleKeyDown}
+      >
+        <div
+          className={cn(
+            "flex w-full items-center gap-1 text-xs font-semibold sm:text-sm",
+            alignmentClasses,
+            labelClassName,
+          )}
+        >
+          <span>{label}</span>
+          {renderSortIcon(column)}
+        </div>
+      </TableHead>
+    );
   };
 
   const renderSortIcon = (column: string) => {
@@ -621,74 +671,35 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
               >
                   <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
                     <TableRow className="bg-muted/60">
-                      <TableHead
-                        className="z-30 w-[26%] bg-background md:sticky md:left-0 md:top-0"
-                        aria-sort={getAriaSort("interviewerId")}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleSort("interviewerId", "string")}
-                          className="flex w-full items-center justify-between gap-1 text-left text-xs font-semibold text-foreground sm:text-sm"
-                        >
-                          <span>Interviewer ID</span>
-                          {renderSortIcon("interviewerId")}
-                        </button>
-                      </TableHead>
-                      <TableHead
-                        className="top-0 z-20 bg-background text-right"
-                        aria-sort={getAriaSort("totalSubmissions")}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleSort("totalSubmissions", "number")}
-                          className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-foreground sm:text-sm"
-                        >
-                          <span>Total interviews</span>
-                          {renderSortIcon("totalSubmissions")}
-                        </button>
-                      </TableHead>
-                      <TableHead
-                        className="top-0 z-20 bg-background text-right text-success"
-                        aria-sort={getAriaSort("validSubmissions")}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleSort("validSubmissions", "number")}
-                          className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-success sm:text-sm"
-                        >
-                          <span>Approved interviews</span>
-                          {renderSortIcon("validSubmissions")}
-                        </button>
-                      </TableHead>
-                      <TableHead
-                        className="top-0 z-20 bg-background text-right text-destructive"
-                        aria-sort={getAriaSort("invalidSubmissions")}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleSort("invalidSubmissions", "number")}
-                          className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-destructive sm:text-sm"
-                        >
-                          <span>Flagged interviews</span>
-                          {renderSortIcon("invalidSubmissions")}
-                        </button>
-                      </TableHead>
-                      {errorColumns.map((errorType) => (
-                        <TableHead
-                          key={errorType}
-                          className="top-0 z-20 bg-background text-right"
-                          aria-sort={getAriaSort(errorType)}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleSort(errorType, "number")}
-                            className="flex w-full items-center justify-end gap-1 text-right text-xs font-semibold text-foreground sm:text-sm"
-                          >
-                            <span>{formatErrorLabel(safeErrorLabelMap[errorType] ?? errorType)}</span>
-                            {renderSortIcon(errorType)}
-                          </button>
-                        </TableHead>
-                      ))}
+                      {renderSortableHeaderCell("interviewerId", "Interviewer ID", {
+                        dataType: "string",
+                        className: "z-30 w-[26%] bg-background md:sticky md:left-0 md:top-0",
+                        labelClassName: "text-foreground",
+                      })}
+                      {renderSortableHeaderCell("totalSubmissions", "Total interviews", {
+                        dataType: "number",
+                        align: "right",
+                      })}
+                      {renderSortableHeaderCell("validSubmissions", "Approved interviews", {
+                        dataType: "number",
+                        align: "right",
+                        labelClassName: "text-success",
+                      })}
+                      {renderSortableHeaderCell("invalidSubmissions", "Flagged interviews", {
+                        dataType: "number",
+                        align: "right",
+                        labelClassName: "text-destructive",
+                      })}
+                      {errorColumns.map((errorType) =>
+                        renderSortableHeaderCell(
+                          errorType,
+                          formatErrorLabel(safeErrorLabelMap[errorType] ?? errorType),
+                          {
+                            dataType: "number",
+                            align: "right",
+                          },
+                        ),
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>

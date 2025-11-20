@@ -31,6 +31,8 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
     canceled: Math.max(statusBreakdown?.canceled ?? 0, 0),
   };
 
+  const notApprovedOnly = safeStatus.notApproved;
+
   const quotaData = [
     { name: "Achieved", value: safeQuota.achieved },
     { name: "Remaining", value: safeQuota.remaining },
@@ -38,7 +40,7 @@ export function ProgressCharts({ quotaSummary, statusBreakdown }: ProgressCharts
 
   const statusData = [
     { name: "Approved", value: safeStatus.approved },
-    { name: "Not Approved", value: safeStatus.notApproved },
+    { name: "Not Approved", value: notApprovedOnly },
     { name: "Canceled", value: safeStatus.canceled },
   ];
 

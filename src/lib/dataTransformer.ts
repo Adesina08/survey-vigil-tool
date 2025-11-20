@@ -145,6 +145,41 @@ function parseNumber(value: any): number {
   return 0;
 }
 
+const normaliseMetadataValue = (value: unknown): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value.toString() : null;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  return String(value).trim() || null;
+};
+
+const getMinutesDifferenceLabel = (row: RawSurveyRow): string | null => {
+  const candidates = [
+    row["Minutes Difference"],
+    (row as Record<string, unknown>).minutes_difference,
+    (row as Record<string, unknown>).minutesDifference,
+    (row as Record<string, unknown>)["minutes difference"],
+  ];
+
+  for (const candidate of candidates) {
+    const value = normaliseMetadataValue(candidate);
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
 /**
  * Check if a value represents "true" or "1"
  */
@@ -356,6 +391,9 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
       const community = getTextValue(row, ["A4. Community / Village", "Community", "Village"]);
       const consent = getTextValue(row, ["A6. Consent to participate", "Consent"]);
       const qcStatus = getTextValue(row, ["QC Status", "qc_status"]);
+      const submissionUuid = normaliseMetadataValue(row._uuid);
+      const submissionIndex = normaliseMetadataValue(row._index);
+      const minutesDifference = getMinutesDifferenceLabel(row);
 
       const allFlags = Array.from(combinedFlagSlugs);
 
@@ -389,6 +427,9 @@ export function transformToMapSubmissions(rawData: RawSurveyRow[]) {
         community,
         consent,
         qcStatus,
+        submissionUuid,
+        submissionIndex,
+        minutesDifference,
       };
     });
 }

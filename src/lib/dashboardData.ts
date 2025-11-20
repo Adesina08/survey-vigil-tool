@@ -64,6 +64,9 @@ interface MapSubmission {
   community: string | null;
   consent: string | null;
   qcStatus: string | null;
+  submissionUuid: string | null;
+  submissionIndex: string | null;
+  minutesDifference: string | null;
 }
 
 interface SummaryData {
@@ -87,6 +90,7 @@ interface SummaryData {
 
 interface StatusBreakdown {
   approved: number;
+  /** Includes both Not Approved + Canceled to reflect total invalid interviews */
   notApproved: number;
   canceled: number;
 }
@@ -499,6 +503,41 @@ const sanitiseText = (value: unknown): string | null => {
   return null;
 };
 
+const normaliseMetadataValue = (value: unknown): string | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value.toString() : null;
+  }
+
+  if (typeof value === "string") {
+    return sanitiseText(value);
+  }
+
+  return sanitiseText(String(value));
+};
+
+const getMinutesDifferenceValue = (row: SheetSubmissionRow): string | null => {
+  const record = row as Record<string, unknown>;
+  const candidates = [
+    record["Minutes Difference"],
+    record.minutes_difference,
+    record.minutesDifference,
+    record["minutes difference"],
+  ];
+
+  for (const candidate of candidates) {
+    const value = normaliseMetadataValue(candidate);
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
 const pickFirstText = (row: SheetSubmissionRow, keys: string[]): string | null => {
   const record = row as Record<string, unknown>;
   for (const key of keys) {
@@ -700,14 +739,17 @@ export const buildDashboardData = ({
   const approvedByStateGender = new Map<string, number>();
   const totalsByState = new Map<string, number>();
   const notApprovedByState = new Map<string, number>();
+  const canceledByState = new Map<string, number>();
 
   const totalsByInterviewer = new Map<string, number>();
   const approvedByInterviewer = new Map<string, number>();
   const notApprovedByInterviewer = new Map<string, number>();
+  const canceledByInterviewer = new Map<string, number>();
 
   const totalsByLGA = new Map<string, number>();
   const approvedByLGA = new Map<string, number>();
   const notApprovedByLGA = new Map<string, number>();
+  const canceledByLGA = new Map<string, number>();
 
   const totalsByLGAAge = new Map<string, number>();
   const approvedByLGAAge = new Map<string, number>();
@@ -918,13 +960,23 @@ export const buildDashboardData = ({
         incrementMap(approvedByLGAAge, `${state}|${lga}|${ageGroup}`);
         incrementMap(approvedByLGAGender, `${state}|${lga}|${gender}`);
       }
-    } else if (isNotApproved) {
+    }
+
+    if (isNotApproved) {
       incrementMap(notApprovedByState, state);
       incrementMap(notApprovedByInterviewer, interviewerId);
       if (hasValidLGA) {
         incrementMap(notApprovedByLGA, `${state}|${lga}`);
         incrementMap(notApprovedByLGAAge, `${state}|${lga}|${ageGroup}`);
         incrementMap(notApprovedByLGAGender, `${state}|${lga}|${gender}`);
+      }
+    }
+
+    if (isCanceled) {
+      incrementMap(canceledByState, state);
+      incrementMap(canceledByInterviewer, interviewerId);
+      if (hasValidLGA) {
+        incrementMap(canceledByLGA, `${state}|${lga}`);
       }
     }
 
@@ -984,6 +1036,10 @@ export const buildDashboardData = ({
       const approvalLabel = approvalField?.value ?? approvalStatus;
       const approvalSource = approvalField?.key ?? null;
       const normalisedStatus = approvalStatus === "Approved" ? "approved" : "not_approved";
+      const submissionUuid = sanitiseText(row._uuid);
+      const submissionIndexValue = (row as Record<string, unknown>)._index;
+      const submissionIndexLabel = normaliseMetadataValue(submissionIndexValue);
+      const minutesDifference = getMinutesDifferenceValue(row);
 
       mapSubmissions.push({
         id: submissionId,
@@ -1013,14 +1069,18 @@ export const buildDashboardData = ({
         community: communityName ?? null,
         consent: consentValue ?? null,
         qcStatus: qcStatusLabel ?? null,
+        submissionUuid: submissionUuid ?? null,
+        submissionIndex: submissionIndexLabel,
+        minutesDifference,
       });
     }
   });
 
   const totalApproved = metrics.approved;
-  const totalNotApproved = metrics.notApproved;
-  const totalCanceled = metrics.canceled;
-  const validSubmissions = metrics.valid;
+  const baseNotApproved = metrics.notApproved;
+  const totalCanceled = canceledCount;
+  const totalNotApproved = baseNotApproved;
+  const validSubmissions = totalApproved + baseNotApproved + totalCanceled;
 
   const effectiveStateTargets =
     stateTargets.length > 0
@@ -1130,15 +1190,18 @@ export const buildDashboardData = ({
         name && name !== interviewerId ? `${interviewerId} · ${name}` : interviewerId;
       const errorStats = interviewerErrors.get(interviewerId) ?? {};
       const approvedCount = approvedByInterviewer.get(interviewerId) ?? 0;
-      const invalidCount = notApprovedByInterviewer.get(interviewerId) ?? Math.max(total - approvedCount, 0);
-      const approvalRate = total > 0 ? (approvedCount / total) * 100 : 0;
+      const notApprovedCount = notApprovedByInterviewer.get(interviewerId) ?? 0;
+      const canceledCountForInterviewer = canceledByInterviewer.get(interviewerId) ?? 0;
+      const invalidCount = notApprovedCount + canceledCountForInterviewer || Math.max(total - approvedCount, 0);
+      const computedTotal = approvedCount + notApprovedCount + canceledCountForInterviewer;
+      const approvalRate = computedTotal > 0 ? (approvedCount / computedTotal) * 100 : 0;
       const totalErrors = Object.values(errorStats).reduce((sum, value) => sum + value, 0);
 
       return {
         interviewerId,
         interviewerName: name || interviewerId,
         displayLabel: label,
-        totalSubmissions: total,
+        totalSubmissions: computedTotal,
         validSubmissions: approvedCount,
         invalidSubmissions: invalidCount,
         approvalRate,
@@ -1183,8 +1246,9 @@ export const buildDashboardData = ({
 
   const achievementsByState: AchievementByStateRow[] = [...totalsByState.entries()].map(([state, total]) => {
     const approved = approvedByState.get(state) ?? 0;
-    const notApproved = notApprovedByState.get(state) ?? (total - approved);
-    const computedTotal = approved + notApproved;
+    const notApproved = notApprovedByState.get(state) ?? 0;
+    const canceled = canceledByState.get(state) ?? Math.max(total - approved - notApproved, 0);
+    const computedTotal = approved + notApproved + canceled;
     const pathCounts = pillarByState.get(state) ?? createEmptyPathCounts();
 
     return {
@@ -1201,20 +1265,22 @@ export const buildDashboardData = ({
 
   const achievementsByInterviewer: AchievementByInterviewerRow[] = [...totalsByInterviewer.entries()]
     .map(([interviewerId, total]) => {
-      const approved = approvedByInterviewer.get(interviewerId) ?? 0;
-      const notApproved = notApprovedByInterviewer.get(interviewerId) ?? (total - approved);
-      const name = interviewerNames.get(interviewerId) ?? "";
-      const label = name && name !== interviewerId ? `${interviewerId} · ${name}` : interviewerId;
-      const pathCounts = pillarByInterviewer.get(interviewerId) ?? createEmptyPathCounts();
+    const approved = approvedByInterviewer.get(interviewerId) ?? 0;
+    const notApproved = notApprovedByInterviewer.get(interviewerId) ?? 0;
+    const canceled = canceledByInterviewer.get(interviewerId) ?? Math.max(total - approved - notApproved, 0);
+    const computedTotal = approved + notApproved + canceled;
+    const name = interviewerNames.get(interviewerId) ?? "";
+    const label = name && name !== interviewerId ? `${interviewerId} · ${name}` : interviewerId;
+    const pathCounts = pillarByInterviewer.get(interviewerId) ?? createEmptyPathCounts();
 
       return {
         interviewerId,
         interviewerName: name || interviewerId,
         displayLabel: label,
-        total,
+        total: computedTotal,
         approved,
         notApproved,
-        percentageApproved: total > 0 ? Number(((approved / total) * 100).toFixed(1)) : 0,
+        percentageApproved: computedTotal > 0 ? Number(((approved / computedTotal) * 100).toFixed(1)) : 0,
         treatmentPathCount: pathCounts.treatment,
         controlPathCount: pathCounts.control,
         unknownPathCount: pathCounts.unknown,
@@ -1227,8 +1293,9 @@ export const buildDashboardData = ({
   const achievementsByLGA: AchievementByLGARow[] = [...totalsByLGA.entries()].map(([key, total]) => {
     const [state, lga] = key.split("|");
     const approved = approvedByLGA.get(key) ?? 0;
-    const notApproved = notApprovedByLGA.get(key) ?? (total - approved);
-    const computedTotal = approved + notApproved;
+    const notApproved = notApprovedByLGA.get(key) ?? 0;
+    const canceled = canceledByLGA.get(key) ?? Math.max(total - approved - notApproved, 0);
+    const computedTotal = approved + notApproved + canceled;
     const pathCounts = pillarByLGA.get(key) ?? createEmptyPathCounts();
 
     return {
