@@ -251,7 +251,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           "Not Approved",
           "Treatment",
           "Control",
-          "Unknown",
           "% Approved",
         ];
 
@@ -262,7 +261,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           "Not Approved": row?.notApproved ?? 0,
           Treatment: row?.treatmentPathCount ?? 0,
           Control: row?.controlPathCount ?? 0,
-          Unknown: row?.unknownPathCount ?? 0,
           "% Approved": toOneDecimal(row?.percentageApproved ?? 0),
         }));
 
@@ -273,7 +271,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           "Not Approved": interviewerTotals.notApproved,
           Treatment: interviewerTotals.treatmentPathCount,
           Control: interviewerTotals.controlPathCount,
-          Unknown: interviewerTotals.unknownPathCount,
           "% Approved":
             interviewerTotals.total > 0
               ? toOneDecimal((interviewerTotals.approved / interviewerTotals.total) * 100)
@@ -290,7 +287,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           "Not Approved",
           "Treatment",
           "Control",
-          "Unknown",
           "% Approved",
         ];
 
@@ -302,7 +298,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           "Not Approved": row?.notApproved ?? 0,
           Treatment: row?.treatmentPathCount ?? 0,
           Control: row?.controlPathCount ?? 0,
-          Unknown: row?.unknownPathCount ?? 0,
           "% Approved": toOneDecimal(row?.percentageApproved ?? 0),
         }));
 
@@ -314,7 +309,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           "Not Approved": lgaTotals.notApproved,
           Treatment: lgaTotals.treatmentPathCount,
           Control: lgaTotals.controlPathCount,
-          Unknown: lgaTotals.unknownPathCount,
           "% Approved":
             lgaTotals.total > 0 ? toOneDecimal((lgaTotals.approved / lgaTotals.total) * 100) : 0,
         });
@@ -328,7 +322,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           "Not Approved",
           "Treatment",
           "Control",
-          "Unknown",
           "% Approved",
         ];
 
@@ -339,7 +332,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           "Not Approved": row?.notApproved ?? 0,
           Treatment: row?.treatmentPathCount ?? 0,
           Control: row?.controlPathCount ?? 0,
-          Unknown: row?.unknownPathCount ?? 0,
           "% Approved": toOneDecimal(row?.percentageApproved ?? 0),
         }));
 
@@ -350,7 +342,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
           "Not Approved": stateTotals.notApproved,
           Treatment: stateTotals.treatmentPathCount,
           Control: stateTotals.controlPathCount,
-          Unknown: stateTotals.unknownPathCount,
           "% Approved":
             stateTotals.total > 0 ? toOneDecimal((stateTotals.approved / stateTotals.total) * 100) : 0,
         });
@@ -430,7 +421,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
                       <TableHead className="top-0 z-20 bg-background text-right">Not Approved</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Treatment</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Control</TableHead>
-                      <TableHead className="top-0 z-20 bg-background text-right">Unknown</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">% Approved</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -460,9 +450,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
                           <TableCell className="text-right">
                             {renderPathCell(row?.controlPathCount ?? 0, "control")}
                           </TableCell>
-                          <TableCell className="text-right">
-                            {renderPathCell(row?.unknownPathCount ?? 0, "unknown")}
-                          </TableCell>
                           <TableCell className="text-right font-semibold">
                             {formatPercentage(row?.percentageApproved ?? 0)}
                           </TableCell>
@@ -487,9 +474,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
                       </TableCell>
                       <TableCell className="text-right">
                         {renderPathCell(interviewerTotals.controlPathCount, "control")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {renderPathCell(interviewerTotals.unknownPathCount, "unknown")}
                       </TableCell>
                       <TableCell className="text-right font-bold">
                         {interviewerTotals.total > 0
@@ -522,14 +506,13 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
                       <TableHead className="top-0 z-20 bg-background text-right">Not Approved</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Treatment</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">Control</TableHead>
-                      <TableHead className="top-0 z-20 bg-background text-right">Unknown</TableHead>
                       <TableHead className="top-0 z-20 bg-background text-right">% Approved</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {safeByLGA.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No LGA data available
                         </TableCell>
                       </TableRow>
@@ -551,9 +534,6 @@ export function AchievementsTables({ byInterviewer, byLGA }: AchievementsTablesP
                           </TableCell>
                           <TableCell className="text-right">
                             {renderPathCell(row?.controlPathCount ?? 0, "control")}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {renderPathCell(row?.unknownPathCount ?? 0, "unknown")}
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {formatPercentage(row?.percentageApproved ?? 0)}

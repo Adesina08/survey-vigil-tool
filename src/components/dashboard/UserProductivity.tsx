@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import type { AriaAttributes, KeyboardEvent } from "react";
+import type { AriaAttributes } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -191,18 +191,6 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
     });
   }, []);
 
-  const buildHeaderKeyHandler = (
-    column: string,
-    type: "string" | "number",
-  ): ((event: KeyboardEvent<HTMLTableCellElement>) => void) => {
-    return (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        handleSort(column, type);
-      }
-    };
-  };
-
   const renderSortableHeaderCell = (
     column: string,
     label: string,
@@ -221,25 +209,24 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
       <TableHead
         key={column}
         className={cn(
-          "top-0 z-20 bg-background cursor-pointer select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+          "top-0 z-20 bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
           align === "right" ? "text-right" : "text-left",
           className,
         )}
         aria-sort={getAriaSort(column)}
-        tabIndex={0}
-        onClick={() => handleSort(column, dataType)}
-        onKeyDown={buildHeaderKeyHandler(column, dataType)}
       >
-        <span
+        <button
+          type="button"
           className={cn(
-            "flex w-full items-center gap-1 text-xs font-semibold sm:text-sm",
+            "flex w-full items-center gap-1 text-xs font-semibold sm:text-sm cursor-pointer select-none focus-visible:outline-none",
             alignmentClasses,
             labelClassName,
           )}
+          onClick={() => handleSort(column, dataType)}
         >
           <span>{label}</span>
           {renderSortIcon(column)}
-        </span>
+        </button>
       </TableHead>
     );
   };
