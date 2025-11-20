@@ -131,7 +131,7 @@ const normaliseApprovalFieldValue = (value: unknown): string | null => {
 
 export const findApprovalFieldValue = (
   row: Record<string, unknown>,
-): { key: ApprovalFieldKey; value: string } | null => {
+): { key: string; value: string } | null => {
   for (const key of APPROVAL_FIELD_CANDIDATES) {
     if (key in row) {
       const rawValue = (row as Record<string, unknown>)[key];
@@ -142,20 +142,34 @@ export const findApprovalFieldValue = (
     }
   }
 
+  const normalizeKey = (key: string) => key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  const approvalLikeKeys = Object.keys(row).filter((key) => {
+    const normalisedKey = normalizeKey(key);
+    return (
+      normalisedKey.includes("approval") ||
+      normalisedKey.includes("approvalstatus") ||
+      normalisedKey.includes("outcomestatus") ||
+      normalisedKey.includes("qcstatus")
+    );
+  });
+
+  for (const key of approvalLikeKeys) {
+    const rawValue = (row as Record<string, unknown>)[key];
+    const normalised = normaliseApprovalFieldValue(rawValue);
+    if (normalised) {
+      return { key, value: normalised };
+    }
+  }
+
   return null;
 };
 
 export const determineApprovalStatus = (
   row: Record<string, unknown>,
 ): NormalisedApprovalStatus => {
-  // 1) Try all approval-like fields
-  for (const key of APPROVAL_FIELD_CANDIDATES) {
-    if (!(key in row)) {
-      continue;
-    }
-
-    const value = (row as Record<string, unknown>)[key];
-    const status = normaliseCandidate(value);
+  const approvalField = findApprovalFieldValue(row);
+  if (approvalField) {
+    const status = normaliseCandidate(approvalField.value);
     if (status) {
       return status;
     }
@@ -183,14 +197,9 @@ export const determineApprovalStatus = (
 export const determineApprovalCategory = (
   row: Record<string, unknown>,
 ): NormalisedApprovalCategory => {
-  // 1) Try all approval-like fields, including cancellation handling
-  for (const key of APPROVAL_FIELD_CANDIDATES) {
-    if (!(key in row)) {
-      continue;
-    }
-
-    const value = (row as Record<string, unknown>)[key];
-    const status = normaliseCandidateWithCancellation(value);
+  const approvalField = findApprovalFieldValue(row);
+  if (approvalField) {
+    const status = normaliseCandidateWithCancellation(approvalField.value);
     if (status) {
       return status;
     }
