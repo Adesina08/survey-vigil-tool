@@ -205,6 +205,13 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
     const alignmentClasses =
       align === "right" ? "justify-end text-right" : "justify-between text-left";
 
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLTableCellElement>) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        handleSort(column, dataType);
+      }
+    };
+
     return (
       <TableHead
         key={column}
@@ -212,21 +219,24 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
           "top-0 z-20 bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
           align === "right" ? "text-right" : "text-left",
           className,
+          "cursor-pointer select-none",
         )}
         aria-sort={getAriaSort(column)}
+        role="button"
+        tabIndex={0}
+        onClick={() => handleSort(column, dataType)}
+        onKeyDown={handleKeyDown}
       >
-        <button
-          type="button"
+        <div
           className={cn(
-            "flex w-full items-center gap-1 text-xs font-semibold sm:text-sm cursor-pointer select-none focus-visible:outline-none",
+            "flex w-full items-center gap-1 text-xs font-semibold sm:text-sm",
             alignmentClasses,
             labelClassName,
           )}
-          onClick={() => handleSort(column, dataType)}
         >
           <span>{label}</span>
           {renderSortIcon(column)}
-        </button>
+        </div>
       </TableHead>
     );
   };
