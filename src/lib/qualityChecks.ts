@@ -7,7 +7,7 @@ import type {
   Position,
 } from "geojson";
 
-import type { ErrorType, SheetSubmissionRow } from "@/types/sheets";
+import type { ApprovalStatus, ErrorType, SheetSubmissionRow } from "@/types/sheets";
 
 const EARTH_RADIUS_METERS = 6371e3;
 const DEFAULT_CLUSTER_RADIUS_METERS = 5;
@@ -127,7 +127,7 @@ const calculateDistance = (
   const a =
     Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
     Math.cos(phi1) * Math.cos(phi2) *
-      Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return EARTH_RADIUS_METERS * c;
 };
@@ -441,9 +441,9 @@ export const applyQualityChecks = (
             previous.end ??
             (previous.start
               ? new Date(
-                  previous.start.getTime() +
-                    Math.max(previous.row["Interview Length (mins)"] ?? 0, 0) * 60000
-                )
+                previous.start.getTime() +
+                Math.max(previous.row["Interview Length (mins)"] ?? 0, 0) * 60000
+              )
               : undefined);
           if (previousEnd && !Number.isNaN(previousEnd.getTime())) {
             const diffMinutes = (start.getTime() - previousEnd.getTime()) / 60000;
@@ -517,10 +517,17 @@ export const applyQualityChecks = (
       ? record.metadata.proximityDistance
       : null;
 
+    const isTerminated = uniqueErrors.includes("Terminated");
+    const approvalStatus: ApprovalStatus = isTerminated
+      ? "Canceled"
+      : isValid
+        ? "Approved"
+        : "Not Approved";
+
     const baseRow: SheetSubmissionRow = {
       ...record.row,
       "Error Flags": uniqueErrors,
-      "Approval Status": isValid ? "Approved" : "Not Approved",
+      "Approval Status": approvalStatus,
       "Outcome Status": isValid ? "Valid" : "Invalid",
     };
 
@@ -528,9 +535,7 @@ export const applyQualityChecks = (
       typeof (baseRow as Record<string, unknown>).Approval !== "string" ||
       !String((baseRow as Record<string, unknown>).Approval).trim()
     ) {
-      (baseRow as Record<string, unknown>).Approval = isValid
-        ? "Approved"
-        : "Not Approved";
+      (baseRow as Record<string, unknown>).Approval = approvalStatus;
     }
 
     const qualityMetadata: SubmissionQualityMetadata = {
