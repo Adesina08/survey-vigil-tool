@@ -131,7 +131,7 @@ export const compareUserProductivityRows = (
 
   const aLabel = (a.displayLabel || a.interviewerId).toLowerCase();
   const bLabel = (b.displayLabel || b.interviewerId).toLowerCase();
-  return aLabel.localeCompare(bLabel);
+  return aLabel.localeCompare(bLabel) * multiplier;
 };
 
 export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} }: UserProductivityProps) {

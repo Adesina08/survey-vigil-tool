@@ -56,4 +56,42 @@ describe("UserProductivity sorting", () => {
       "charlie",
     ]);
   });
+
+  it("applies sort direction to tie-breakers when values are equal", () => {
+    const rows: InterviewerData[] = [
+      buildRow("bravo", "10"),
+      buildRow("alpha", "10"),
+      buildRow("charlie", "10"),
+    ];
+
+    const ascending: UserProductivitySortState = {
+      column: "invalidSubmissions",
+      direction: "asc",
+    };
+
+    const sortedAscending = [...rows].sort((a, b) =>
+      compareUserProductivityRows(a, b, ascending, getUserProductivitySortValue),
+    );
+
+    expect(sortedAscending.map((row) => row.interviewerId)).toEqual([
+      "alpha",
+      "bravo",
+      "charlie",
+    ]);
+
+    const descending: UserProductivitySortState = {
+      column: "invalidSubmissions",
+      direction: "desc",
+    };
+
+    const sortedDescending = [...rows].sort((a, b) =>
+      compareUserProductivityRows(a, b, descending, getUserProductivitySortValue),
+    );
+
+    expect(sortedDescending.map((row) => row.interviewerId)).toEqual([
+      "charlie",
+      "bravo",
+      "alpha",
+    ]);
+  });
 });
