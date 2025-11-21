@@ -122,6 +122,11 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
     () => ({ column: "default", direction: "desc" })
   );
 
+  const stringCollator = useMemo(
+    () => new Intl.Collator(undefined, { numeric: true, sensitivity: "base" }),
+    [],
+  );
+
   const getSortValue = (row: InterviewerData, column: string): number | string => {
     if (column === "interviewerId") {
       return row.displayLabel || row.interviewerId;
@@ -159,15 +164,18 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
       const aValue = getSortValue(a, column);
       const bValue = getSortValue(b, column);
 
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        if (aValue !== bValue) {
-          return (aValue - bValue) * multiplier;
+      const bothNumbers =
+        typeof aValue === "number" && typeof bValue === "number" &&
+        Number.isFinite(aValue) &&
+        Number.isFinite(bValue);
+
+      if (bothNumbers) {
+        const numericComparison = aValue - bValue;
+        if (numericComparison !== 0) {
+          return numericComparison * multiplier;
         }
       } else {
-        const comparison = String(aValue).localeCompare(String(bValue), undefined, {
-          sensitivity: "base",
-          numeric: true,
-        });
+        const comparison = stringCollator.compare(String(aValue ?? ""), String(bValue ?? ""));
         if (comparison !== 0) {
           return comparison * multiplier;
         }
@@ -175,11 +183,11 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
 
       const aLabel = (a.displayLabel || a.interviewerId).toLowerCase();
       const bLabel = (b.displayLabel || b.interviewerId).toLowerCase();
-      return aLabel.localeCompare(bLabel);
+      return stringCollator.compare(aLabel, bLabel);
     });
 
     return rows;
-  }, [rankedProductivity, sortState]);
+  }, [rankedProductivity, sortState, stringCollator]);
 
   const handleSort = useCallback((column: string, type: "string" | "number" = "string") => {
     setSortState((previous) => {
@@ -668,6 +676,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
               <Table
                 containerClassName="max-h-[420px] overflow-auto rounded-2xl border bg-background/80"
                 className="min-w-[960px]"
+                data-testid="submission-quality-table"
               >
                   <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur">
                     <TableRow className="bg-muted/60">
