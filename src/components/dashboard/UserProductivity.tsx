@@ -36,7 +36,7 @@ const sanitizeFileName = (value: string) =>
     .replace(/--+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-interface InterviewerData {
+export interface InterviewerData {
   interviewerId: string;
   interviewerName: string;
   displayLabel: string;
@@ -48,11 +48,91 @@ interface InterviewerData {
   totalErrors: number;
 }
 
+export type UserProductivitySortState = { column: string; direction: "asc" | "desc" };
+
+const coerceSortValue = (value: unknown): number | string => {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalised = value.replace(/,/g, "").trim();
+    if (normalised.length === 0) {
+      return 0;
+    }
+
+    const parsed = Number(normalised);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  return value as number | string;
+};
+
 interface UserProductivityProps {
   data?: InterviewerData[];      // 👈 Optional
   errorTypes?: string[];
   errorLabels?: Record<string, string>;
 }
+
+export const getUserProductivitySortValue = (
+  row: InterviewerData,
+  column: string,
+): number | string => {
+  if (column === "interviewerId") {
+    return row.displayLabel || row.interviewerId;
+  }
+
+  if (column === "totalSubmissions") {
+    return coerceSortValue(row.totalSubmissions ?? 0);
+  }
+
+  if (column === "validSubmissions") {
+    return coerceSortValue(row.validSubmissions ?? 0);
+  }
+
+  if (column === "invalidSubmissions") {
+    return coerceSortValue(row.invalidSubmissions ?? 0);
+  }
+
+  if (row.errors && column in row.errors) {
+    return coerceSortValue(row.errors[column] ?? 0);
+  }
+
+  return coerceSortValue(0);
+};
+
+export const compareUserProductivityRows = (
+  a: InterviewerData,
+  b: InterviewerData,
+  sortState: UserProductivitySortState,
+  getSortValue: (row: InterviewerData, column: string) => number | string = getUserProductivitySortValue,
+) => {
+  const { column, direction } = sortState;
+  const multiplier = direction === "asc" ? 1 : -1;
+
+  const aValue = getSortValue(a, column);
+  const bValue = getSortValue(b, column);
+
+  if (typeof aValue === "number" && typeof bValue === "number") {
+    if (aValue !== bValue) {
+      return (aValue - bValue) * multiplier;
+    }
+  } else {
+    const comparison = String(aValue).localeCompare(String(bValue), undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
+    if (comparison !== 0) {
+      return comparison * multiplier;
+    }
+  }
+
+  const aLabel = (a.displayLabel || a.interviewerId).toLowerCase();
+  const bLabel = (b.displayLabel || b.interviewerId).toLowerCase();
+  return aLabel.localeCompare(bLabel);
+};
 
 export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} }: UserProductivityProps) {
   // 👇 Safely handle undefined/null data
@@ -118,33 +198,10 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
     return map;
   }, [rankedProductivity]);
 
-  const [sortState, setSortState] = useState<{ column: string; direction: "asc" | "desc" }>(
-    () => ({ column: "default", direction: "desc" })
-  );
-
-  const getSortValue = (row: InterviewerData, column: string): number | string => {
-    if (column === "interviewerId") {
-      return row.displayLabel || row.interviewerId;
-    }
-
-    if (column === "totalSubmissions") {
-      return row.totalSubmissions ?? 0;
-    }
-
-    if (column === "validSubmissions") {
-      return row.validSubmissions ?? 0;
-    }
-
-    if (column === "invalidSubmissions") {
-      return row.invalidSubmissions ?? 0;
-    }
-
-    if (row.errors && column in row.errors) {
-      return row.errors[column] ?? 0;
-    }
-
-    return 0;
-  };
+  const [sortState, setSortState] = useState<UserProductivitySortState>(() => ({
+    column: "default",
+    direction: "desc",
+  }));
 
   const tableData = useMemo(() => {
     const rows = [...rankedProductivity];
@@ -152,31 +209,7 @@ export function UserProductivity({ data = [], errorTypes = [], errorLabels = {} 
       return rows;
     }
 
-    const { column, direction } = sortState;
-    const multiplier = direction === "asc" ? 1 : -1;
-
-    rows.sort((a, b) => {
-      const aValue = getSortValue(a, column);
-      const bValue = getSortValue(b, column);
-
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        if (aValue !== bValue) {
-          return (aValue - bValue) * multiplier;
-        }
-      } else {
-        const comparison = String(aValue).localeCompare(String(bValue), undefined, {
-          sensitivity: "base",
-          numeric: true,
-        });
-        if (comparison !== 0) {
-          return comparison * multiplier;
-        }
-      }
-
-      const aLabel = (a.displayLabel || a.interviewerId).toLowerCase();
-      const bLabel = (b.displayLabel || b.interviewerId).toLowerCase();
-      return aLabel.localeCompare(bLabel);
-    });
+    rows.sort((a, b) => compareUserProductivityRows(a, b, sortState));
 
     return rows;
   }, [rankedProductivity, sortState]);
