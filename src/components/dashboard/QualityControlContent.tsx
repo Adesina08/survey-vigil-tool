@@ -186,6 +186,173 @@ const getPillarPathFromRow = (row: NormalisedRow): PillarPath => {
   return getPillarPathFromPillar(pillar);
 };
 
+export const computeKpiMetrics = (
+  rows: NormalisedRow[],
+  dashboardData: Pick<DashboardData, "quotaByLGA" | "summary">,
+  selectedLga: string | null,
+) => {
+  const shouldFilter = selectedLga && selectedLga.trim() !== "" && selectedLga.toLowerCase() !== "all";
+
+  const relevantQuotaByLGA = shouldFilter
+    ? (dashboardData.quotaByLGA || []).filter((row) => matchesSelectedLga(row.lga, selectedLga))
+    : dashboardData.quotaByLGA || [];
+
+  console.log('Computing KPI metrics:', {
+    selectedLga,
+    shouldFilter,
+    rowCount: rows.length,
+    relevantQuotaCount: relevantQuotaByLGA.length
+  });
+
+  let totalRows = 0;
+  let approvedCount = 0;
+  let canceledCount = 0;
+  let notApprovedCount = 0;
+  let maleCount = 0;
+  let femaleCount = 0;
+  let wrongVersionFlagCount = 0;
+  let terminatedInterviews = 0;
+  let unqualifiedRespondents = 0;
+
+  const pathTotals: Record<Exclude<PillarPath, null>, number> = {
+    treatment: 0,
+    control: 0,
+    unknown: 0,
+  };
+
+  const wrongVersionSlug = normaliseErrorType("wrong_version").slug;
+
+  rows.forEach((row) => {
+    totalRows += 1;
+
+    const pillarPath = getPillarPathFromRow(row);
+    const genderValue = getGenderFromRow(row);
+    const consentValue =
+      getFirstTextValue(row, ["A6. Consent to participate", "Consent"]) ?? "";
+    const approvalCategory = determineApprovalCategory(row as Record<string, unknown>);
+    const isApproved = approvalCategory === "Approved";
+    const isCanceled = approvalCategory === "Canceled";
+    const isNotApproved = approvalCategory === "Not Approved";
+
+    if (isCanceled) {
+      canceledCount += 1;
+    }
+
+    const consentLower = consentValue.trim().toLowerCase();
+    const isTerminated =
+      consentLower === "no" ||
+      consentLower === "0" ||
+      consentLower === "false" ||
+      consentLower === "n";
+
+    const isUnqualified = pillarPath === "unknown";
+
+    const indicatorCounts = extractQualityIndicatorCounts(row as Record<string, unknown>);
+    const wrongVersionIndicators = indicatorCounts[wrongVersionSlug] ?? 0;
+    const hasWrongVersionCode = extractErrorCodes(row as Record<string, unknown>).some(
+      (code) => normaliseErrorType(code).slug === wrongVersionSlug,
+    );
+
+    const hasWrongVersionFlag = wrongVersionIndicators > 0 || hasWrongVersionCode;
+
+    if (hasWrongVersionFlag) {
+      wrongVersionFlagCount += 1;
+      return;
+    }
+
+    if (isUnqualified || isTerminated) {
+      if (isTerminated) {
+        terminatedInterviews += 1;
+      }
+      unqualifiedRespondents += 1;
+      return;
+    }
+
+    if (pillarPath) {
+      pathTotals[pillarPath] += 1;
+    }
+
+    if (!isCanceled) {
+      if (isApproved) {
+        approvedCount += 1;
+      } else if (isNotApproved) {
+        notApprovedCount += 1;
+      }
+    }
+
+    if (genderValue === "male") maleCount += 1;
+    else if (genderValue === "female") femaleCount += 1;
+  });
+
+  const totalSubmissions = totalRows;
+  const combinedUnqualifiedRespondents = unqualifiedRespondents + terminatedInterviews;
+  const validSubmissions = approvedCount + notApprovedCount + canceledCount;
+  const collectedInterviews = validSubmissions;
+
+  const totalTarget = shouldFilter
+    ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
+    : dashboardData.summary?.overallTarget || 0;
+
+  const approvedAgainstTarget = shouldFilter
+    ? relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0)
+    : approvedCount;
+
+  const completionRate =
+    totalTarget > 0 ? Number(((approvedAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
+
+  const submissionsAgainstTarget = collectedInterviews;
+  const submissionProgressPercent =
+    totalTarget > 0 ? Number(((submissionsAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
+
+  const quotaSummary = {
+    achieved: submissionsAgainstTarget,
+    remaining: Math.max(totalTarget - submissionsAgainstTarget, 0),
+    target: totalTarget,
+    achievedPercent: submissionProgressPercent,
+  };
+
+  const approvalRatePercent =
+    validSubmissions > 0 ? Number(((approvedCount / validSubmissions) * 100).toFixed(1)) : 0;
+
+  const notApprovedRatePercent =
+    validSubmissions > 0 ? Number(((notApprovedCount / validSubmissions) * 100).toFixed(1)) : 0;
+
+  const canceledRatePercent =
+    validSubmissions > 0 ? Number(((canceledCount / validSubmissions) * 100).toFixed(1)) : 0;
+
+  const summary = {
+    overallTarget: totalTarget,
+    totalSubmissions,
+    approvedSubmissions: approvedCount,
+    approvalRate: approvalRatePercent,
+    notApprovedSubmissions: notApprovedCount,
+    notApprovedRate: notApprovedRatePercent,
+    canceledSubmissions: canceledCount,
+    canceledRate: canceledRatePercent,
+    wrongVersionFlagCount,
+    unqualifiedRespondents: combinedUnqualifiedRespondents,
+    validSubmissions,
+    completionRate,
+    treatmentPathCount: pathTotals.treatment,
+    controlPathCount: pathTotals.control,
+    unknownPathCount: pathTotals.unknown,
+    maleCount,
+    femaleCount,
+  };
+
+  console.log('KPI Summary:', summary);
+
+  return {
+    summary,
+    quotaSummary,
+    statusBreakdown: {
+      approved: approvedCount,
+      notApproved: notApprovedCount,
+      canceled: canceledCount,
+    },
+  };
+};
+
 const getGenderFromRow = (row: NormalisedRow): "male" | "female" | "unknown" => {
   const value =
     getFirstTextValue(row, [
@@ -306,175 +473,18 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
   };
 
   // Compute KPI metrics from FILTERED data
-  const {
-    summary,
-    quotaSummary,
-    statusBreakdown,
-  } = useMemo(() => {
-    const shouldFilter = selectedLga && selectedLga.trim() !== "" && selectedLga.toLowerCase() !== "all";
-    
-    const relevantQuotaByLGA = shouldFilter
-      ? (dashboardData.quotaByLGA || []).filter((row) => matchesSelectedLga(row.lga, selectedLga))
-      : dashboardData.quotaByLGA || [];
-
-    const rows = filteredAnalysisRowsForKPI as NormalisedRow[];
-    
-    console.log('Computing KPI metrics:', { 
-      selectedLga, 
-      shouldFilter,
-      rowCount: rows.length,
-      relevantQuotaCount: relevantQuotaByLGA.length 
-    });
-    
-    let totalRows = 0;
-    let approvedCount = 0;
-    let canceledCount = 0;
-    let notApprovedCount = 0;
-    let maleCount = 0;
-    let femaleCount = 0;
-    let wrongVersionFlagCount = 0;
-    let terminatedInterviews = 0;
-    let unqualifiedRespondents = 0;
-
-    const pathTotals: Record<Exclude<PillarPath, null>, number> = {
-      treatment: 0,
-      control: 0,
-      unknown: 0,
-    };
-
-    const wrongVersionSlug = normaliseErrorType("wrong_version").slug;
-
-    rows.forEach((row) => {
-      totalRows += 1;
-
-      const pillarPath = getPillarPathFromRow(row);
-      const genderValue = getGenderFromRow(row);
-      const consentValue =
-        getFirstTextValue(row, ["A6. Consent to participate", "Consent"]) ?? "";
-      const approvalCategory = determineApprovalCategory(row as Record<string, unknown>);
-      const isApproved = approvalCategory === "Approved";
-      const isCanceled = approvalCategory === "Canceled";
-      const isNotApproved = approvalCategory === "Not Approved";
-
-      const consentLower = consentValue.trim().toLowerCase();
-      const isTerminated =
-        consentLower === "no" ||
-        consentLower === "0" ||
-        consentLower === "false" ||
-        consentLower === "n";
-
-      const isUnqualified = pillarPath === "unknown";
-
-      const indicatorCounts = extractQualityIndicatorCounts(row as Record<string, unknown>);
-      const wrongVersionIndicators = indicatorCounts[wrongVersionSlug] ?? 0;
-      const hasWrongVersionCode = extractErrorCodes(row as Record<string, unknown>).some(
-        (code) => normaliseErrorType(code).slug === wrongVersionSlug,
-      );
-
-      const hasWrongVersionFlag = wrongVersionIndicators > 0 || hasWrongVersionCode;
-
-      if (hasWrongVersionFlag) {
-        wrongVersionFlagCount += 1;
-        return;
-      }
-
-      if (isUnqualified || isTerminated) {
-        if (isTerminated) {
-          terminatedInterviews += 1;
-        }
-        unqualifiedRespondents += 1;
-        return;
-      }
-
-      if (pillarPath) {
-        pathTotals[pillarPath] += 1;
-      }
-
-      if (isCanceled) {
-        canceledCount += 1;
-      } else if (isApproved) {
-        approvedCount += 1;
-      } else if (isNotApproved) {
-        notApprovedCount += 1;
-      }
-
-      if (genderValue === "male") maleCount += 1;
-      else if (genderValue === "female") femaleCount += 1;
-    });
-
-    const totalSubmissions = totalRows;
-    const combinedUnqualifiedRespondents = unqualifiedRespondents + terminatedInterviews;
-    const validSubmissions = approvedCount + notApprovedCount + canceledCount;
-    const collectedInterviews = validSubmissions;
-
-    const totalTarget = shouldFilter
-      ? relevantQuotaByLGA.reduce((sum, row) => sum + row.target, 0)
-      : dashboardData.summary?.overallTarget || 0;
-
-    const approvedAgainstTarget = shouldFilter
-      ? relevantQuotaByLGA.reduce((sum, row) => sum + row.achieved, 0)
-      : approvedCount;
-
-    const completionRate =
-      totalTarget > 0 ? Number(((approvedAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
-
-    const submissionsAgainstTarget = collectedInterviews;
-    const submissionProgressPercent =
-      totalTarget > 0 ? Number(((submissionsAgainstTarget / totalTarget) * 100).toFixed(1)) : 0;
-
-    const quotaSummary = {
-      achieved: submissionsAgainstTarget,
-      remaining: Math.max(totalTarget - submissionsAgainstTarget, 0),
-      target: totalTarget,
-      achievedPercent: submissionProgressPercent,
-    };
-
-    const approvalRatePercent =
-      validSubmissions > 0 ? Number(((approvedCount / validSubmissions) * 100).toFixed(1)) : 0;
-
-    const notApprovedRatePercent =
-      validSubmissions > 0 ? Number(((notApprovedCount / validSubmissions) * 100).toFixed(1)) : 0;
-
-    const canceledRatePercent =
-      validSubmissions > 0 ? Number(((canceledCount / validSubmissions) * 100).toFixed(1)) : 0;
-
-    const summary = {
-      overallTarget: totalTarget,
-      totalSubmissions,
-      approvedSubmissions: approvedCount,
-      approvalRate: approvalRatePercent,
-      notApprovedSubmissions: notApprovedCount,
-      notApprovedRate: notApprovedRatePercent,
-      canceledSubmissions: canceledCount,
-      canceledRate: canceledRatePercent,
-      wrongVersionFlagCount,
-      unqualifiedRespondents: combinedUnqualifiedRespondents,
-      validSubmissions,
-      completionRate,
-      treatmentPathCount: pathTotals.treatment,
-      controlPathCount: pathTotals.control,
-      unknownPathCount: pathTotals.unknown,
-      maleCount,
-      femaleCount,
-    };
-    
-    console.log('KPI Summary:', summary);
-
-    return {
-      summary,
-      quotaSummary,
-      statusBreakdown: {
-        approved: approvedCount,
-        notApproved: notApprovedCount,
-        canceled: canceledCount,
-      },
-    };
-  }, [
-    dashboardData.quotaByLGA,
-    dashboardData.summary,
-    filteredAnalysisRowsForKPI,
-    selectedLga,
-  ]);
+  const { summary, quotaSummary, statusBreakdown } = useMemo(
+    () =>
+      computeKpiMetrics(
+        filteredAnalysisRowsForKPI as NormalisedRow[],
+        {
+          quotaByLGA: dashboardData.quotaByLGA,
+          summary: dashboardData.summary,
+        },
+        selectedLga,
+      ),
+    [dashboardData.quotaByLGA, dashboardData.summary, filteredAnalysisRowsForKPI, selectedLga],
+  );
 
   // Compute other metrics from UNFILTERED data
   const {
