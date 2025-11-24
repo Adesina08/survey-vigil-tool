@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import GreatAnalysisTable, { parseAnalysisTable } from "@/components/GreatAnalysisTable";
 import { getAnalysisSchema, type AnalysisSchema } from "@/lib/api.analysis";
 import type { AnalysisResult, DisplayMode } from "@/services/analysis";
 import { generateAnalysis } from "@/services/analysis";
@@ -245,6 +246,15 @@ const Analysis = () => {
   const summaryTitle = primaryMeta ? describeMeta(primaryMeta) : "Analysis summary";
   const notes = analysis?.tables?.flatMap((table) => table.meta.notes ?? []) ?? [];
 
+  const parsedTables = useMemo(
+    () =>
+      analysis?.tables.map((table) => ({
+        meta: table.meta,
+        parsed: parseAnalysisTable(table.html),
+      })) ?? [],
+    [analysis],
+  );
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 lg:p-8">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -388,7 +398,7 @@ const Analysis = () => {
           )}
 
           <div ref={tableContainerRef} className="space-y-6">
-            {analysis.tables.map((table) => (
+            {parsedTables.map((table) => (
               <Card
                 key={`${table.meta.variable}-${table.meta.topbreaks?.join("-") ?? "overall"}`}
                 className="overflow-hidden"
@@ -400,10 +410,7 @@ const Analysis = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div
-                    className="analysis-table-container overflow-x-auto rounded-lg border"
-                    dangerouslySetInnerHTML={{ __html: table.html }}
-                  />
+                  <GreatAnalysisTable table={table.parsed} />
                 </CardContent>
               </Card>
             ))}
