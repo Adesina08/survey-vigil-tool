@@ -893,16 +893,20 @@ export const buildDashboardData = ({
     const isApproved = approvalCategory === "Approved";
     const isNotApproved = approvalCategory === "Not Approved";
     const isCanceled = approvalCategory === "Canceled";
+    const isValidSubmission =
+      row.qualityMetadata?.isValid ?? row["Outcome Status"] === "Valid";
 
     if (isCanceled) {
       canceledCount += 1;
     }
 
     const genderValue = getGender(row);
-    if (genderValue === "male") {
-      maleCount += 1;
-    } else if (genderValue === "female") {
-      femaleCount += 1;
+    if (isValidSubmission) {
+      if (genderValue === "male") {
+        maleCount += 1;
+      } else if (genderValue === "female") {
+        femaleCount += 1;
+      }
     }
 
     const lat = getCoordinate(row, "lat");
@@ -911,11 +915,13 @@ export const buildDashboardData = ({
     const hasValidCoordinates = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
     const hasValidLGA = typeof lga === "string" && lga.length > 0;
 
-    incrementPathCount(pillarTotals, pillarPath);
-    incrementPathCountsMap(pillarByState, state, pillarPath);
-    incrementPathCountsMap(pillarByInterviewer, interviewerId, pillarPath);
-    if (hasValidLGA) {
-      incrementPathCountsMap(pillarByLGA, `${state}|${lga}`, pillarPath);
+    if (isValidSubmission) {
+      incrementPathCount(pillarTotals, pillarPath);
+      incrementPathCountsMap(pillarByState, state, pillarPath);
+      incrementPathCountsMap(pillarByInterviewer, interviewerId, pillarPath);
+      if (hasValidLGA) {
+        incrementPathCountsMap(pillarByLGA, `${state}|${lga}`, pillarPath);
+      }
     }
 
     const submissionTimestamp = parseSubmissionTimestamp(row);
@@ -938,10 +944,14 @@ export const buildDashboardData = ({
     if (hasValidLGA) {
       incrementMap(totalsByLGA, `${state}|${lga}`);
       incrementMap(totalsByLGAAge, `${state}|${lga}|${ageGroup}`);
-      incrementMap(totalsByLGAGender, `${state}|${lga}|${gender}`);
+      if (isValidSubmission) {
+        incrementMap(totalsByLGAGender, `${state}|${lga}|${gender}`);
+      }
     }
     incrementMap(totalsByStateAge, `${state}|${ageGroup}`);
-    incrementMap(totalsByStateGender, `${state}|${gender}`);
+    if (isValidSubmission) {
+      incrementMap(totalsByStateGender, `${state}|${gender}`);
+    }
 
     interviewerNames.set(interviewerId, interviewerName);
     const interviewerError = interviewerErrors.get(interviewerId) ?? {};
