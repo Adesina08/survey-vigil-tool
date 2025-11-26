@@ -57,6 +57,12 @@ interface Submission {
   submissionUuid?: string | null;
   submissionIndex?: string | null;
   minutesDifference?: string | null;
+  johnnieWalkerRedLabel?: string | number | boolean | null;
+  johnnie_walker_red_label?: string | number | boolean | null;
+  johnnieWalker?: string | number | boolean | null;
+  johnnie_walker?: string | number | boolean | null;
+  hennessy?: string | number | boolean | null;
+  jameson?: string | number | boolean | null;
 }
 
 interface InterviewerOption {
@@ -72,7 +78,54 @@ interface InteractiveMapProps {
   metadata?: NormalizedMapMetadata;
 }
 
-type ColorMode = "path" | "approval";
+type ColorMode = "johnnieWalkerRedLabel" | "otherBrandsTracking";
+
+const BRAND_COLORS = {
+  johnnieWalker: "#b91c1c",
+  hennessy: "#f59e0b",
+  jameson: "#15803d",
+  untracked: "#94a3b8",
+} as const;
+
+const isTruthyBrandValue = (value: unknown) => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) && value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized.length === 0) return false;
+    if (["0", "no", "false", "none", "na", "n/a", "null"].includes(normalized)) return false;
+    return true;
+  }
+  return false;
+};
+
+const resolveBrandValue = (submission: Submission, keys: Array<keyof Submission | string>) => {
+  for (const key of keys) {
+    const value = (submission as Record<string, unknown>)[key];
+    if (value !== undefined) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const getBrandFlags = (submission: Submission) => {
+  const johnnieWalkerValue = resolveBrandValue(submission, [
+    "johnnieWalkerRedLabel",
+    "johnnie_walker_red_label",
+    "johnnieWalker",
+    "johnnie_walker",
+  ]);
+  const hennessyValue = resolveBrandValue(submission, ["hennessy"]);
+  const jamesonValue = resolveBrandValue(submission, ["jameson"]);
+
+  return {
+    johnnieWalker: isTruthyBrandValue(johnnieWalkerValue),
+    hennessy: isTruthyBrandValue(hennessyValue),
+    jameson: isTruthyBrandValue(jamesonValue),
+  } as const;
+};
 
 const getPathMetadata = (submission: Submission) => {
   switch (submission.pillarPath) {
@@ -107,8 +160,32 @@ const getApprovalMetadata = (submission: Submission) => {
   } as const;
 };
 
-const getMarkerColor = (submission: Submission, mode: ColorMode) =>
-  mode === "approval" ? getApprovalMetadata(submission).color : getPathMetadata(submission).color;
+const getMarkerColor = (submission: Submission, mode: ColorMode) => {
+  const flags = getBrandFlags(submission);
+
+  if (mode === "johnnieWalkerRedLabel") {
+    return flags.johnnieWalker ? BRAND_COLORS.johnnieWalker : BRAND_COLORS.untracked;
+  }
+
+  if (flags.johnnieWalker) return BRAND_COLORS.johnnieWalker;
+  if (flags.hennessy) return BRAND_COLORS.hennessy;
+  if (flags.jameson) return BRAND_COLORS.jameson;
+
+  return BRAND_COLORS.untracked;
+};
+
+const getLegendItems = (mode: ColorMode) =>
+  mode === "johnnieWalkerRedLabel"
+    ? [
+        { label: "Johnnie Walker Red Label", color: BRAND_COLORS.johnnieWalker },
+        { label: "Not Tracked", color: BRAND_COLORS.untracked },
+      ]
+    : [
+        { label: "Johnnie Walker", color: BRAND_COLORS.johnnieWalker },
+        { label: "Hennessy", color: BRAND_COLORS.hennessy },
+        { label: "Jameson", color: BRAND_COLORS.jameson },
+        { label: "Not Tracked", color: BRAND_COLORS.untracked },
+      ];
 
 const formatColumnLabel = (value: string) =>
   value
@@ -353,7 +430,7 @@ export function InteractiveMap({
   const [selectedErrorType, setSelectedErrorType] = useState("all");
   const [selectedInterviewer, setSelectedInterviewer] = useState("all");
   const [selectedLga, setSelectedLga] = useState("all");
-  const [colorMode, setColorMode] = useState<ColorMode>("path");
+  const [colorMode, setColorMode] = useState<ColorMode>("johnnieWalkerRedLabel");
   const [showLgaLabels, setShowLgaLabels] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
@@ -366,6 +443,7 @@ export function InteractiveMap({
     Feature<Geometry, Record<string, unknown>>[]
   >([]);
   const baseSubmissions = useMemo(() => (Array.isArray(submissions) ? submissions : []), [submissions]);
+  const legendItems = useMemo(() => getLegendItems(colorMode), [colorMode]);
   const interviewerLookup = useMemo(() => {
     const map = new Map<string, InterviewerOption>();
     interviewers.forEach((option) => {
@@ -863,15 +941,7 @@ export function InteractiveMap({
             <div ref={mapContainerRef} className="sticky top-20 z-0 h-full w-full" style={{ zIndex: 0 }} />
           </div>
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            {(colorMode === "path"
-              ? [
-                  { label: "Treatment Pillar", color: "#8b5cf6" },
-                  { label: "Control Pillar", color: "#f97316" },
-                ]
-              : [
-                  { label: "Approved", color: "#16a34a" },
-                  { label: "Not Approved", color: "#dc2626" },
-                ]).map((item) => (
+            {legendItems.map((item) => (
               <div key={item.label} className="flex items-center gap-2">
                 <span
                   className="inline-flex h-3 w-3 rounded-full border border-white shadow"
@@ -893,7 +963,7 @@ export function InteractiveMap({
                 type="single"
                 value={colorMode}
                 onValueChange={(value) => {
-                  if (value === "path" || value === "approval") {
+                  if (value === "johnnieWalkerRedLabel" || value === "otherBrandsTracking") {
                     setColorMode(value);
                   }
                 }}
@@ -901,11 +971,17 @@ export function InteractiveMap({
                 variant="outline"
                 size="sm"
               >
-                <ToggleGroupItem value="approval" className="px-3 py-1 text-xs font-medium uppercase tracking-wide">
-                  Approval
+                <ToggleGroupItem
+                  value="johnnieWalkerRedLabel"
+                  className="px-3 py-1 text-xs font-medium uppercase tracking-wide"
+                >
+                  Johnnie Walker Red Label
                 </ToggleGroupItem>
-                <ToggleGroupItem value="path" className="px-3 py-1 text-xs font-medium uppercase tracking-wide">
-                  Path
+                <ToggleGroupItem
+                  value="otherBrandsTracking"
+                  className="px-3 py-1 text-xs font-medium uppercase tracking-wide"
+                >
+                  Other Brands Tracking
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
