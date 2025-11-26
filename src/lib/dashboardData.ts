@@ -27,7 +27,7 @@ import {
   type NormalizedMapMetadata,
 } from "./mapMetadata";
 
-type PillarPath = "treatment" | "control" | "unknown" | null;
+type PillarPath = "treatment" | "control" | "unknown";
 
 const QC_FLAG_REGEX = /^QC_(FLAG|WARN)_/i;
 const getAgeGroupSortIndex = (ageGroup: string): number => {
@@ -355,12 +355,12 @@ const shouldIgnoreErrorType = (code: string): boolean => {
 
 const determinePillarPath = (pillar?: string | null): PillarPath => {
   if (!pillar) {
-    return null;
+    return "unknown";
   }
 
   const upper = pillar.trim().toUpperCase();
   if (!upper) {
-    return null;
+    return "unknown";
   }
 
   if (upper.includes("TREATMENT")) {
@@ -375,7 +375,7 @@ const determinePillarPath = (pillar?: string | null): PillarPath => {
     return "unknown";
   }
 
-  return null;
+  return "unknown";
 };
 
 const extractPillarDetails = (row: SheetSubmissionRow): { assignment: string | null; path: PillarPath } => {
@@ -439,10 +439,6 @@ const incrementPathCount = (counts: PathCounts, path: PillarPath) => {
 };
 
 const incrementPathCountsMap = (map: Map<string, PathCounts>, key: string, path: PillarPath) => {
-  if (!path) {
-    return;
-  }
-
   const counts = map.get(key) ?? createEmptyPathCounts();
   incrementPathCount(counts, path);
   map.set(key, counts);
