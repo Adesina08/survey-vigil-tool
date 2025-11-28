@@ -179,6 +179,28 @@ const matchesSelectedLga = (value: unknown, selectedLga: string): boolean => {
   return normalisedCandidates.has(target);
 };
 
+const isHeaderLikeRow = (row: NormalisedRow): boolean => {
+  if (!row || typeof row !== "object") {
+    return false;
+  }
+
+  const stringEntries = Object.entries(row).filter(([, value]) => typeof value === "string");
+  if (stringEntries.length === 0) {
+    return false;
+  }
+
+  const matchingEntries = stringEntries.reduce((count, [key, value]) => {
+    const normalisedKey = key.trim().toLowerCase();
+    const normalisedValue = (value as string).trim().toLowerCase();
+    return normalisedKey === normalisedValue ? count + 1 : count;
+  }, 0);
+
+  return matchingEntries >= Math.max(2, Math.ceil(stringEntries.length * 0.6));
+};
+
+const filterOutHeaderRows = (rows: NormalisedRow[]): NormalisedRow[] =>
+  rows.filter((row) => !isHeaderLikeRow(row));
+
 const getPillarPathFromRow = (row: NormalisedRow): PillarPath => {
   const pillar = getPillarFromRow(row);
 
@@ -286,7 +308,8 @@ export const computeKpiMetrics = (
 
   const totalSubmissions = totalRows;
   const combinedUnqualifiedRespondents = unqualifiedRespondents + terminatedInterviews;
-  const validSubmissions = approvedCount + notApprovedCount + canceledCount;
+  const invalidSubmissionsTotal = wrongVersionFlagCount + combinedUnqualifiedRespondents;
+  const validSubmissions = Math.max(totalSubmissions - invalidSubmissionsTotal, 0);
   const collectedInterviews = validSubmissions;
 
   const totalTarget = shouldFilter
@@ -397,6 +420,11 @@ interface QualityControlContentProps {
 export const QualityControlContent = ({ dashboardData, selectedLga }: QualityControlContentProps) => {
   console.log('QualityControlContent render:', { selectedLga, hasData: !!dashboardData.analysisRows });
 
+  const sanitisedAnalysisRows = useMemo(() => {
+    const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
+    return filterOutHeaderRows(rows);
+  }, [dashboardData.analysisRows]);
+
   // Map submissions - ALWAYS unfiltered (not affected by LGA filter)
   const filteredMapSubmissions = useMemo(() => {
     return dashboardData.mapSubmissions || [];
@@ -404,7 +432,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
 
   // Analysis rows for KPI cards - filtered by selectedLga
   const filteredAnalysisRowsForKPI = useMemo(() => {
-    const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
+    const rows = sanitisedAnalysisRows;
     
     // Only filter if we have a valid, non-"all" LGA selected
     const shouldFilter = selectedLga && selectedLga.trim() !== "" && selectedLga.toLowerCase() !== "all";
@@ -430,16 +458,16 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     console.log('Filtering KPI data:', { selectedLga, totalRows: rows.length, filteredRows: filtered.length });
     
     return filtered;
-  }, [dashboardData.analysisRows, selectedLga]);
+  }, [sanitisedAnalysisRows, selectedLga]);
 
   // Analysis rows for other components - ALWAYS unfiltered
   const allAnalysisRows = useMemo(() => {
-    return (dashboardData.analysisRows || []) as NormalisedRow[];
-  }, [dashboardData.analysisRows]);
+    return sanitisedAnalysisRows;
+  }, [sanitisedAnalysisRows]);
 
   const allQualityFlagSlugs = useMemo(() => {
     const slugs = new Set<string>();
-    const rows = (dashboardData.analysisRows || []) as NormalisedRow[];
+    const rows = sanitisedAnalysisRows;
 
     rows.forEach((row) => {
       if (!row || typeof row !== "object") {
@@ -460,7 +488,7 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     });
 
     return Array.from(slugs);
-  }, [dashboardData.analysisRows]);
+  }, [sanitisedAnalysisRows]);
 
   type QuotaAchievementsByPillar = {
     [tab in "treatment" | "control"]?: {
