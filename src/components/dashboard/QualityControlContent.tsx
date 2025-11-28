@@ -245,12 +245,6 @@ export const computeKpiMetrics = (
   const wrongVersionSlug = normaliseErrorType("wrong_version").slug;
 
   rows.forEach((row) => {
-    totalRows += 1;
-
-    const pillarPath = getPillarPathFromRow(row);
-    const genderValue = getGenderFromRow(row);
-    const consentValue =
-      getFirstTextValue(row, ["A6. Consent to participate", "Consent"]) ?? "";
     const approvalCategory = determineApprovalCategory(row as Record<string, unknown>);
     const isApproved = approvalCategory === "Approved";
     const isCanceled = approvalCategory === "Canceled";
@@ -258,7 +252,15 @@ export const computeKpiMetrics = (
 
     if (isCanceled) {
       canceledCount += 1;
+      return;
     }
+
+    totalRows += 1;
+
+    const pillarPath = getPillarPathFromRow(row);
+    const genderValue = getGenderFromRow(row);
+    const consentValue =
+      getFirstTextValue(row, ["A6. Consent to participate", "Consent"]) ?? "";
 
     const consentLower = consentValue.trim().toLowerCase();
     const isTerminated =
@@ -294,12 +296,10 @@ export const computeKpiMetrics = (
       pathTotals[pillarPath] += 1;
     }
 
-    if (!isCanceled) {
-      if (isApproved) {
-        approvedCount += 1;
-      } else if (isNotApproved) {
-        notApprovedCount += 1;
-      }
+    if (isApproved) {
+      approvedCount += 1;
+    } else if (isNotApproved) {
+      notApprovedCount += 1;
     }
 
     if (genderValue === "male") maleCount += 1;
@@ -592,6 +592,16 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
     >();
 
     rows.forEach((row) => {
+      const approvalCategory = determineApprovalCategory(row as Record<string, unknown>);
+      const isApproved = approvalCategory === "Approved";
+      const isCanceled = approvalCategory === "Canceled";
+      const isNotApproved = approvalCategory === "Not Approved";
+
+      if (isCanceled) {
+        canceledCount += 1;
+        return;
+      }
+
       totalSubmissions += 1;
 
       const interviewerId =
@@ -682,20 +692,12 @@ export const QualityControlContent = ({ dashboardData, selectedLga }: QualityCon
 
       const existing = productivityMap.get(key)!;
 
-      const approvalCategory = determineApprovalCategory(row as Record<string, unknown>);
-      const isApproved = approvalCategory === "Approved";
-      const isCanceled = approvalCategory === "Canceled";
-      const isNotApproved = approvalCategory === "Not Approved";
-
       if (isApproved) {
         existing.validSubmissions += 1;
         approvedCount += 1;
       } else if (isNotApproved) {
         existing.invalidSubmissions += 1;
         notApprovedCount += 1;
-      } else if (isCanceled) {
-        existing.invalidSubmissions += 1;
-        canceledCount += 1;
       }
       existing.totalSubmissions += 1;
 
