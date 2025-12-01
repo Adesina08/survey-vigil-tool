@@ -118,7 +118,7 @@ export function DashboardHeader({
                 </svg>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">OGSTEP SURVEY</h1>
+                <h1 className="text-2xl font-bold text-foreground">Sample Realtime Dashboard</h1>
                 <p className="text-sm text-muted-foreground">
                   Real-time quality control dashboard for survey data
                 </p>
