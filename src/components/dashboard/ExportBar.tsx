@@ -49,41 +49,41 @@ export function ExportBar({ rows, errorBreakdown }: ExportBarProps) {
       <div className="mx-auto w-full max-w-7xl">
         <div className="flex flex-wrap justify-center gap-2 text-center">
           <Button
-            onClick={() => handleExport("all")}
+            // onClick={() => handleExport("all")}
             variant="default"
             size="sm"
             className="w-full gap-2 sm:w-auto"
-            disabled={!hasRows}
+            disabled
           >
             <Download className="h-4 w-4" />
             Export All Data
           </Button>
           <Button
-            onClick={() => handleExport("approved")}
+            // onClick={() => handleExport("approved")}
             variant="outline"
             size="sm"
             className="w-full gap-2 border-success text-success hover:bg-success/10 sm:w-auto"
-            disabled={!hasRows}
+            disabled
           >
             <CheckCircle className="h-4 w-4" />
             Export Approved Data
           </Button>
           <Button
-            onClick={() => handleExport("notApproved")}
+            // onClick={() => handleExport("notApproved")}
             variant="outline"
             size="sm"
             className="w-full gap-2 border-destructive text-destructive hover:bg-destructive/10 sm:w-auto"
-            disabled={!hasRows}
+            disabled
           >
             <XCircle className="h-4 w-4" />
             Export Not Approved Data
           </Button>
           <Button
-            onClick={() => handleExport("flags")}
+            // onClick={() => handleExport("flags")}
             variant="outline"
             size="sm"
             className="w-full gap-2 border-warning text-warning hover:bg-warning/10 sm:w-auto"
-            disabled={!hasRows}
+            disabled
           >
             <Flag className="h-4 w-4" />
             Export Error Flags
