@@ -173,16 +173,28 @@ export function DashboardHeader({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuLabel>Export options</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => handleExport("all")} disabled={!hasExportRows}>
+                      <DropdownMenuItem
+                        // onClick={() => handleExport("all")}
+                        disabled
+                      >
                         <Download className="mr-2 h-4 w-4" /> Export All Data
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport("approved")} disabled={!hasExportRows}>
+                      <DropdownMenuItem
+                        // onClick={() => handleExport("approved")}
+                        disabled
+                      >
                         <CheckCircle className="mr-2 h-4 w-4 text-success" /> Export Approved Data
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport("notApproved")} disabled={!hasExportRows}>
+                      <DropdownMenuItem
+                        // onClick={() => handleExport("notApproved")}
+                        disabled
+                      >
                         <XCircle className="mr-2 h-4 w-4 text-destructive" /> Export Not Approved Data
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport("flags")} disabled={!hasExportRows}>
+                      <DropdownMenuItem
+                        // onClick={() => handleExport("flags")}
+                        disabled
+                      >
                         <Flag className="mr-2 h-4 w-4 text-warning" /> Export Error Flags
                       </DropdownMenuItem>
                     </DropdownMenuContent>
